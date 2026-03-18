@@ -759,5 +759,95 @@
       "triage",
       "klinisk_beslutningsstøtte"
     ]
+  },
+  {
+    "id": "gap-004_merged_validation",
+    "title": "xBrain Validation Lab + User Preference Learner",
+    "score": 7.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "validation",
+      "user_research",
+      "personalization",
+      "feedback_loops"
+    ]
+  },
+  {
+    "id": "idea-005_007_014_015_merged",
+    "title": "xBrain Idea Lineage + DNA Extraction + Survivorship Index",
+    "score": 7.8,
+    "verdict": "BUILD",
+    "domains": [
+      "knowledge_capture",
+      "learning_systems",
+      "feedback_loops",
+      "ip_management"
+    ]
+  },
+  {
+    "id": "idea-022_gap-002_gap-003_merged",
+    "title": "xBrain Execution Accelerator (Spec Generator + Pitch Deck + Project Management Export)",
+    "score": 7.7,
+    "verdict": "BUILD",
+    "domains": [
+      "execution",
+      "output_formatting",
+      "integration"
+    ]
+  },
+  {
+    "id": "gap-009_merged_constraints",
+    "title": "xBrain Constraint Conflict Detector + Precedence Resolver",
+    "score": 7.5,
+    "verdict": "BUILD",
+    "domains": [
+      "constraint_analysis",
+      "feasibility",
+      "early_validation"
+    ]
+  },
+  {
+    "id": "idea-006_018_020_merged",
+    "title": "xBrain Domain-Aware Stress Testing (Competitive Landscape + Bias Auditing + Domain Rebalancing)",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "competitive_analysis",
+      "stress_testing",
+      "bias_detection"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "xBrain Team Sync (Async Ideation Workspace)",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "collaboration",
+      "team_workflows",
+      "async_communication"
+    ]
+  },
+  {
+    "id": "idea-012",
+    "title": "xBrain Stakeholder Alignment Mapper",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "stakeholder_analysis",
+      "feasibility",
+      "go_to_market"
+    ]
+  },
+  {
+    "id": "idea-002_003_016_merged",
+    "title": "xBrain Cost Forecaster + Offline Mode + Multi-Model Optimizer",
+    "score": 7.0,
+    "verdict": "BUILD",
+    "domains": [
+      "cost_optimization",
+      "infrastructure",
+      "developer_tools"
+    ]
   }
 ]

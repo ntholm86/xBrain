@@ -133,5 +133,14 @@
     "build_count": 1,
     "tokens_in": 17065,
     "tokens_out": 34425
+  },
+  {
+    "run_id": "run-20260318-181402",
+    "timestamp": "2026-03-18T18:14:02.130384+00:00",
+    "ideas_generated": 30,
+    "candidates": 8,
+    "build_count": 4,
+    "tokens_in": 19979,
+    "tokens_out": 28887
   }
 ]
