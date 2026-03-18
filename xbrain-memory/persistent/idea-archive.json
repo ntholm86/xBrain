@@ -670,5 +670,94 @@
       "teknologi",
       "operationel"
     ]
+  },
+  {
+    "id": "gap-005",
+    "title": "ISO Aorta-Kraft Standardisering-Arbejdsgruppe",
+    "score": 8.3,
+    "verdict": "BUILD",
+    "domains": [
+      "standardisering",
+      "medicinsk_teknik",
+      "interoperabilitet"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Medicin-Respons Imaging Loop (48-Timer Validering)",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "terapeutisk_monitorering",
+      "kardiologi",
+      "farmakodynamik"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Explainable-AI Dashboard med Radiolog-Feedback Loop",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "radiology",
+      "cardiology",
+      "AI_transparency"
+    ]
+  },
+  {
+    "id": "idea-012",
+    "title": "Multimodal Fusion: Echokardiografi + CT + MR 3D-Model",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "radiology",
+      "cardiology",
+      "medical_imaging"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Genetisk-Billedkobling: Mutationer til Kraft-Profiler",
+    "score": 6.9,
+    "verdict": "INCUBATE",
+    "domains": [
+      "genetik",
+      "billeddiagnostik",
+      "kardiovaskularitet"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "Pædiatrisk Aorta-Kraft Normalisering-Atlas",
+    "score": 6.8,
+    "verdict": "INCUBATE",
+    "domains": [
+      "pediatri",
+      "billeddiagnostik",
+      "udviklingsfysiologi"
+    ]
+  },
+  {
+    "id": "gap-009",
+    "title": "Billedarkiv Juridisk-Adgang Framework",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "juridik",
+      "datasikkerhed",
+      "etik",
+      "organisatorisk_tillid"
+    ]
+  },
+  {
+    "id": "gap-006",
+    "title": "Akut-Afdeling Aorta-Kraft Triage-Score",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "akut_medicin",
+      "triage",
+      "klinisk_beslutningsstøtte"
+    ]
   }
 ]
