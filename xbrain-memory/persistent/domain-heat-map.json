@@ -1,12 +1,17 @@
 {
-  "health": 1,
-  "political": 4,
-  "societal": 2,
-  "legal": 4,
-  "technology": 2,
-  "economic": 4,
+  "health": 2,
+  "political": 5,
+  "societal": 3,
+  "legal": 5,
+  "technology": 3,
+  "economic": 5,
   "scientific": 2,
-  "environmental": 3,
+  "environmental": 4,
   "creative": 3,
-  "technological": 3
+  "technological": 3,
+  "transparency": 1,
+  "justice": 1,
+  "privacy": 1,
+  "civic": 1,
+  "media": 1
 }

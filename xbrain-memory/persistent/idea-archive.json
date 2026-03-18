@@ -190,5 +190,101 @@
     "title": "ExpertiseMarkedsplads - Micro-Konsultationer & Licensleasing",
     "score": 6.7,
     "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-007",
+    "title": "Decentraliseret Juridisk Arkiv for Ofre",
+    "score": 7.8,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001",
+    "title": "Pengestrøm-Afsløring: Politisk Korruptionsmapping",
+    "score": 7.5,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-019",
+    "title": "Miljøgæld-Juridisk Forpligtelse-Engine",
+    "score": 7.3,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-008",
+    "title": "Personlig Sundhedsdashboard: Patient-som-Dataanalytiker",
+    "score": 7.3,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-020",
+    "title": "Kemisk-Sikkerhed-Scanner: Husholdning-som-Giftinformationscenter",
+    "score": 7.3,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-004",
+    "title": "Lokalsamfunds-Økonomisk Simulationsmotor",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-012",
+    "title": "Retfærdighedsgab-Kortlægning: Juridisk Ressource-Atlas",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-006",
+    "title": "Narrativ-Mutation-Tracker: Epidemiologi af Misinformation",
+    "score": 6.3,
+    "verdict": "INCUBATE"
+  },
+  {
+    "id": "idea-020-enhanced",
+    "title": "Mobil-baseret jordkvalitets-analyser for småbrugere",
+    "score": 7.7,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-007-merged",
+    "title": "Misinformation-immuniserings-spil",
+    "score": 7.4,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-010",
+    "title": "Farmakologisk-interaktions-simulator for patienter",
+    "score": 7.3,
+    "verdict": "INCUBATE"
+  },
+  {
+    "id": "idea-004-enhanced",
+    "title": "Kontrakt-til-jurisdiktion-risikovurdering",
+    "score": 7.1,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-008-enhanced",
+    "title": "Værdi-neutral personlig CO2-revisor",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001-enhanced",
+    "title": "Lokalpolitiker-stemmehistorik-tracker med værdi-analyse",
+    "score": 6.8,
+    "verdict": "INCUBATE"
+  },
+  {
+    "id": "idea-014",
+    "title": "Transparent data-donation-platform for forskning",
+    "score": 6.6,
+    "verdict": "INCUBATE"
+  },
+  {
+    "id": "idea-019",
+    "title": "Crowdsourced sprogbevarings-arkiv",
+    "score": 6.5,
+    "verdict": "MUTATE"
   }
 ]
