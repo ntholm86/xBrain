@@ -18,6 +18,7 @@ class LLMClient:
         self.max_tokens = max_tokens
         self.total_input_tokens = 0
         self.total_output_tokens = 0
+        self._phase_token_log: list[dict] = []
 
     def generate_json(
         self,
@@ -25,10 +26,13 @@ class LLMClient:
         user_prompt: str,
         *,
         temperature: float = 0.7,
+        model_override: str | None = None,
+        phase: str = "",
     ) -> dict | list:
         """Call the LLM and extract JSON from the response."""
+        use_model = model_override or self.model
         response = self.client.messages.create(
-            model=self.model,
+            model=use_model,
             max_tokens=self.max_tokens,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
@@ -36,6 +40,12 @@ class LLMClient:
         )
         self.total_input_tokens += response.usage.input_tokens
         self.total_output_tokens += response.usage.output_tokens
+        self._phase_token_log.append({
+            "phase": phase or "unknown",
+            "model": use_model,
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+        })
 
         text = response.content[0].text
         truncated = response.stop_reason == "max_tokens"

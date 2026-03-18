@@ -5,7 +5,7 @@ from __future__ import annotations
 from xbrain.models import IdeaCard, IdeateRunResult, StressTestResult
 
 
-def generate_idea_report(result: IdeateRunResult) -> str:
+def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None) -> str:
     """Generate idea-report.md — the flagship human-readable output."""
     lines: list[str] = []
 
@@ -37,6 +37,8 @@ def generate_idea_report(result: IdeateRunResult) -> str:
         f"- **Tokens Used:** {result.total_input_tokens:,} in / "
         f"{result.total_output_tokens:,} out"
     )
+    if cost_info:
+        lines.append(f"- **Actual Cost:** ${cost_info['total_cost_usd']:.4f}")
     lines.append("")
 
     # Sort survivors for comparative summary

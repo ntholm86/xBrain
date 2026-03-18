@@ -2,6 +2,8 @@
 
 Generate, score, stress-test, and refine project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then attacks every idea like a hostile VC — so only the genuinely strong ones survive.
 
+Now with **cost forecasting**, **constraint conflict detection**, **project spec generation**, and **idea lineage tracking**.
+
 ## Setup
 
 1. Install dependencies:
@@ -145,6 +147,125 @@ python -m xbrain ideate --brief "AI-powered restaurant menu optimizer" --ideas 1
 python -m xbrain ideate --ideas 40 --top 15 --constraints "must cost under $100/month to run" "must not require user accounts"
 ```
 
+### `--strategy` — Model routing
+
+Control which model handles which pipeline phase. Saves money by routing cheap phases to Haiku and expensive phases to a stronger model.
+
+```
+# Use one model for everything (default)
+python -m xbrain ideate --strategy single
+
+# Use cheapest model for all phases
+python -m xbrain ideate --strategy cheapest
+
+# Use Haiku for generation, best model for scoring/stress testing
+python -m xbrain ideate --strategy balanced
+
+# Use the best model for everything
+python -m xbrain ideate --strategy best
+```
+
+Configure which models are "cheap" and "best" in `.env`:
+```
+XBRAIN_CHEAP_MODEL=claude-haiku-4-5-20251001
+XBRAIN_BEST_MODEL=claude-sonnet-4-20250514
+```
+
+## Pipeline 2: Specify — Project Spec Generator
+
+After ideation, convert your top BUILD ideas into actionable project specs with user stories, API contracts, task breakdowns, and MVP scope.
+
+```
+python -m xbrain specify --idea ./xbrain-runs/run-XXXXXX/idea-cards.json --select idea-003
+```
+
+This generates:
+- **spec-idea-003.md** — Human-readable project specification
+- **spec-idea-003.json** — Machine-readable spec data
+
+The spec includes:
+- Executive summary
+- User stories with acceptance criteria
+- Architecture & tech stack recommendations
+- API contracts (RESTful endpoints)
+- Data model with relationships
+- 10-15 development tasks ordered by dependency
+- Technical risks and mitigations from the stress test
+- MVP scope (what to build in a 2-week sprint)
+- Kill criteria (when to abort)
+
+### Specify options
+
+```
+# Generate spec in another language
+python -m xbrain specify --idea ./xbrain-runs/run-XXXXXX/idea-cards.json --select idea-003 --lang danish
+```
+
+## Cost Forecasting
+
+Estimate API cost before running — no API calls made.
+
+```
+python -m xbrain estimate --ideas 20 --top 8 --domains health fintech
+```
+
+Output shows per-phase cost breakdown and compares all model routing strategies so you can pick the cheapest option.
+
+### Dry-run with cost
+
+The `--dry-run` flag now includes cost estimation:
+
+```
+python -m xbrain ideate --brief problem.txt --domains health --dry-run
+```
+
+### Actual cost tracking
+
+Every report now includes actual cost after the run completes. The cost is shown in the terminal output and in the report header.
+
+## Constraint Conflict Detection
+
+When you provide 2+ constraints, xBrain automatically checks for logical contradictions before running the pipeline.
+
+```
+python -m xbrain ideate --constraints "must work offline" "must sync in real-time" "no user accounts"
+```
+
+If conflicts are found, you'll see:
+```
+[CONSTCHK ] ⚠ 1 conflict(s) detected:
+[CONSTCHK ]   CONFLICT: must work offline vs must sync in real-time
+[CONSTCHK ]     Why: Offline operation and real-time sync are contradictory
+[CONSTCHK ]     Fix: Consider eventual sync instead of real-time
+[CONSTCHK ] Proceeding anyway — constraints will be applied as-is.
+```
+
+The pipeline continues regardless — it's a warning, not a blocker. But it helps you catch impossible requirements early.
+
+## Idea Lineage
+
+Track idea evolution across runs. xBrain remembers every idea it generates, its score, verdict, and which run produced it.
+
+```
+# Browse all ideas across all runs
+python -m xbrain lineage
+
+# Filter by verdict
+python -m xbrain lineage --verdict BUILD
+
+# Filter by domain
+python -m xbrain lineage --domain health
+
+# Show top 50
+python -m xbrain lineage --top 50
+```
+
+### Idea Genes
+
+High-scoring ideas are automatically decomposed into reusable "idea genes" — problem patterns and solution patterns that get injected into future runs. Over time, xBrain builds an institutional memory of what works.
+
+Genes are stored in `xbrain-memory/persistent/idea-genes.json` and used by the meta-learning phase.
+
 ## Verdicts
 
 Each idea gets a verdict after stress-testing:
@@ -164,6 +285,9 @@ Edit `.env` to change defaults:
 ANTHROPIC_API_KEY=sk-ant-...        # Required
 XBRAIN_MODEL=claude-haiku-4-5-20251001  # Which Claude model to use
 XBRAIN_MAX_TOKENS=16384             # Max output tokens per API call
+XBRAIN_MODEL_STRATEGY=single        # Model routing: single|cheapest|balanced|best
+XBRAIN_CHEAP_MODEL=claude-haiku-4-5-20251001   # Model for cheap phases (balanced strategy)
+XBRAIN_BEST_MODEL=claude-sonnet-4-20250514     # Model for critical phases (balanced strategy)
 ```
 
 ## How It Works
@@ -173,8 +297,13 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
 ### Pipeline Architecture
 
 ```
-IMMERSE → DIVERGE → DEDUP → GAP-FILL → CONVERGE → STRESS TEST → REFINE → META-LEARN
+CONSTRAINT CHECK → IMMERSE → DIVERGE → DEDUP → GAP-FILL → CONVERGE → STRESS TEST → REFINE → META-LEARN
+                                                                                                    ↓
+                                                                                               SPECIFY (Pipeline 2)
 ```
+
+**Phase -0.5 — CONSTRAINT CHECK** (automatic, when 2+ constraints provided)
+Analyzes constraints for logical contradictions. Warns about conflicts and suggests resolutions. Non-blocking — the pipeline continues regardless.
 
 **Phase 0 — IMMERSE** (optional, when `--domains` is provided)
 Deep-dive domain research. For each domain, the AI maps tensions, incentive structures, regulatory landscape, existing players, historical failures, and underserved populations. This builds context that makes later idea generation more grounded.

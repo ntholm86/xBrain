@@ -51,6 +51,14 @@ class MemoryStore:
         """Return distilled score calibration data."""
         return self._read("score-calibration.json", {})
 
+    def get_lineage(self) -> list[dict]:
+        """Return idea lineage graph (parent→child relationships)."""
+        return self._read("idea-lineage.json", [])
+
+    def get_idea_genes(self) -> list[dict]:
+        """Return extracted reusable idea genes."""
+        return self._read("idea-genes.json", [])
+
     # --- Writers ---
 
     def save_run(
@@ -111,6 +119,19 @@ class MemoryStore:
     def save_score_calibration(self, calibration: dict) -> None:
         """Save score calibration data."""
         self._write("score-calibration.json", calibration)
+
+    def save_lineage(self, entries: list[dict]) -> None:
+        """Append lineage entries (idea relationships)."""
+        lineage = self.get_lineage()
+        lineage.extend(entries)
+        self._write("idea-lineage.json", lineage)
+
+    def save_idea_genes(self, genes: list[dict]) -> None:
+        """Save extracted reusable idea genes (problem patterns, solution patterns)."""
+        existing = self.get_idea_genes()
+        existing.extend(genes)
+        # Keep only last 100 genes to prevent unbounded growth
+        self._write("idea-genes.json", existing[-100:])
 
     # --- Helpers ---
 

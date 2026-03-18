@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import traceback
 from pathlib import Path
@@ -69,6 +70,79 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="LANGUAGE",
         help='Output language for the report (e.g. danish, spanish, german). Default: english',
     )
+    ideate.add_argument(
+        "--strategy",
+        choices=["single", "cheapest", "balanced", "best"],
+        help=(
+            "Model routing strategy: "
+            "'single' (default, use one model for everything), "
+            "'cheapest' (Haiku everywhere), "
+            "'balanced' (Haiku for generation, best model for scoring/stress), "
+            "'best' (best model everywhere)"
+        ),
+    )
+
+    # --- specify ---
+    specify = sub.add_parser(
+        "specify",
+        help="Pipeline 2: convert a validated idea into a project spec",
+    )
+    specify.add_argument(
+        "--idea",
+        required=True,
+        metavar="PATH",
+        help="Path to idea-cards.json from a previous run",
+    )
+    specify.add_argument(
+        "--select",
+        required=True,
+        metavar="IDEA_ID",
+        help="ID of the idea to specify (e.g. idea-003)",
+    )
+    specify.add_argument(
+        "--lang",
+        metavar="LANGUAGE",
+        help="Output language for the spec. Default: english",
+    )
+
+    # --- estimate ---
+    estimate = sub.add_parser(
+        "estimate",
+        help="Estimate API cost before running (no API calls made)",
+    )
+    estimate.add_argument("--ideas", type=int, default=20, metavar="N", help="Ideas to generate")
+    estimate.add_argument("--top", type=int, default=8, metavar="N", help="Ideas to score")
+    estimate.add_argument("--domains", nargs="*", metavar="DOMAIN", help="Focus domains")
+    estimate.add_argument("--constraints", nargs="*", metavar="CONSTRAINT", help="Constraints")
+    estimate.add_argument(
+        "--strategy",
+        choices=["single", "cheapest", "balanced", "best"],
+        default="single",
+    )
+
+    # --- lineage ---
+    lineage_p = sub.add_parser(
+        "lineage",
+        help="Browse idea lineage across runs",
+    )
+    lineage_p.add_argument(
+        "--top",
+        type=int,
+        default=20,
+        metavar="N",
+        help="Show top N ideas by score",
+    )
+    lineage_p.add_argument(
+        "--domain",
+        metavar="DOMAIN",
+        help="Filter by domain",
+    )
+    lineage_p.add_argument(
+        "--verdict",
+        choices=["BUILD", "MUTATE", "KILL", "INCUBATE"],
+        help="Filter by verdict",
+    )
+
     return parser
 
 
@@ -100,10 +174,25 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
         cfg.ideas_per_round = args.ideas
     if args.top:
         cfg.converge_top_n = args.top
+    if args.strategy:
+        cfg.model_strategy = args.strategy
 
     if args.dry_run:
+        from xbrain.ideate import IdeatePipeline
+
+        estimate = IdeatePipeline.estimate_cost(
+            model=cfg.model,
+            ideas_per_round=cfg.ideas_per_round,
+            converge_top_n=cfg.converge_top_n,
+            has_domains=bool(domains),
+            has_constraints=bool(constraints),
+            pricing=cfg.MODEL_PRICING,
+            strategy=cfg.model_strategy,
+            cheap_model=cfg.cheap_model,
+        )
         print("[DRY-RUN] Pipeline 1: IDEATE")
         print(f"  Model:       {cfg.model}")
+        print(f"  Strategy:    {cfg.model_strategy}")
         print(f"  Max tokens:  {cfg.max_tokens}")
         print(f"  Domains:     {domains or '(broad scan)'}")
         print(f"  Constraints: {constraints or '(none)'}")
@@ -117,6 +206,11 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
             print(f"  Brief:       (none — open-ended ideation)")
         print(f"  Runs dir:    {cfg.runs_dir}")
         print(f"  Memory dir:  {cfg.memory_dir}")
+        print(f"  Est. cost:   ${estimate['total_est_cost_usd']:.4f}")
+        print()
+        print("  Phase breakdown:")
+        for p in estimate["phases"]:
+            print(f"    {p['phase']:<12s} {p['model']:<35s} ~${p['est_cost_usd']:.4f}")
         print()
         print("No API call will be made. Remove --dry-run to execute.")
         return
@@ -138,6 +232,124 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
     pipeline.run(domains=domains, constraints=constraints, brief_text=brief_text, language=language)
 
 
+def _cmd_specify(args: argparse.Namespace) -> None:
+    cfg = Config()
+
+    if not cfg.api_key:
+        print("ERROR: ANTHROPIC_API_KEY not set.", file=sys.stderr)
+        sys.exit(1)
+
+    idea_path = Path(args.idea)
+    if not idea_path.exists():
+        print(f"ERROR: File not found: {args.idea}", file=sys.stderr)
+        sys.exit(1)
+
+    # Auto-discover stress test report in same directory
+    stress_path = idea_path.parent / "stress-test-report.json"
+
+    from xbrain.specify import SpecifyPipeline
+
+    pipeline = SpecifyPipeline(config=cfg)
+    pipeline.run(
+        idea_cards_path=idea_path,
+        idea_id=args.select,
+        stress_report_path=stress_path if stress_path.exists() else None,
+        language=args.lang,
+    )
+
+
+def _cmd_estimate(args: argparse.Namespace) -> None:
+    cfg = Config()
+    cfg.model_strategy = args.strategy
+
+    from xbrain.ideate import IdeatePipeline
+
+    estimate = IdeatePipeline.estimate_cost(
+        model=cfg.model,
+        ideas_per_round=args.ideas,
+        converge_top_n=args.top,
+        has_domains=bool(args.domains),
+        has_constraints=bool(args.constraints),
+        pricing=cfg.MODEL_PRICING,
+        strategy=args.strategy,
+        cheap_model=cfg.cheap_model,
+    )
+
+    print("xBrain Cost Estimate")
+    print("=" * 50)
+    print(f"  Model:       {cfg.model}")
+    print(f"  Strategy:    {args.strategy}")
+    print(f"  Ideas:       {args.ideas}")
+    print(f"  Top N:       {args.top}")
+    print()
+    print("  Phase breakdown:")
+    for p in estimate["phases"]:
+        print(f"    {p['phase']:<12s} {p['model']:<35s} ~${p['est_cost_usd']:.6f}")
+    print()
+    print(f"  TOTAL ESTIMATED COST: ${estimate['total_est_cost_usd']:.4f}")
+    print()
+    # Compare strategies
+    print("  Compare strategies:")
+    for strat in ["cheapest", "balanced", "best"]:
+        est = IdeatePipeline.estimate_cost(
+            model=cfg.model,
+            ideas_per_round=args.ideas,
+            converge_top_n=args.top,
+            has_domains=bool(args.domains),
+            has_constraints=bool(args.constraints),
+            pricing=cfg.MODEL_PRICING,
+            strategy=strat,
+            cheap_model=cfg.cheap_model,
+        )
+        print(f"    {strat:<12s} ${est['total_est_cost_usd']:.4f}")
+
+
+def _cmd_lineage(args: argparse.Namespace) -> None:
+    cfg = Config()
+
+    from xbrain.memory import MemoryStore
+
+    memory = MemoryStore(cfg.memory_dir / "persistent")
+    lineage = memory.get_lineage()
+
+    if not lineage:
+        print("No idea lineage yet. Run 'python -m xbrain ideate' first.")
+        return
+
+    # Apply filters
+    if args.domain:
+        lineage = [e for e in lineage if args.domain.lower() in
+                   [d.lower() for d in e.get("domain_tags", [])]]
+    if args.verdict:
+        lineage = [e for e in lineage if e.get("verdict") == args.verdict]
+
+    # Sort by score descending
+    lineage.sort(key=lambda e: e.get("score", 0), reverse=True)
+    lineage = lineage[:args.top]
+
+    if not lineage:
+        print("No ideas match the filter criteria.")
+        return
+
+    # Print table
+    print(f"{'ID':<25s} {'Score':>5s}  {'Verdict':<8s} {'Run':<22s} {'Title'}")
+    print("-" * 100)
+    for entry in lineage:
+        idea_id = entry.get("idea_id", "?")[:24]
+        score = entry.get("score", 0)
+        verdict = entry.get("verdict", "?")
+        run_id = entry.get("run_id", "?")[:21]
+        title = entry.get("title", "?")[:50]
+        print(f"{idea_id:<25s} {score:5.1f}  {verdict:<8s} {run_id:<22s} {title}")
+
+    # Stats
+    print()
+    total = len(memory.get_lineage())
+    builds = sum(1 for e in memory.get_lineage() if e.get("verdict") == "BUILD")
+    genes = len(memory.get_idea_genes())
+    print(f"Total ideas tracked: {total} | BUILD: {builds} | Idea genes: {genes}")
+
+
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
@@ -149,6 +361,12 @@ def main() -> None:
     try:
         if args.command == "ideate":
             _cmd_ideate(args)
+        elif args.command == "specify":
+            _cmd_specify(args)
+        elif args.command == "estimate":
+            _cmd_estimate(args)
+        elif args.command == "lineage":
+            _cmd_lineage(args)
     except KeyboardInterrupt:
         print("\nAborted.", file=sys.stderr)
         sys.exit(130)

@@ -38,3 +38,44 @@ class Config:
         "cost": -0.10,
         "ethical_risk": -0.10,
     }
+
+    # Model routing strategy: "cheapest" | "balanced" | "best"
+    model_strategy: str = os.getenv("XBRAIN_MODEL_STRATEGY", "single")
+
+    # Per-1M-token pricing (input, output) — update as Anthropic changes prices
+    MODEL_PRICING: dict[str, tuple[float, float]] = {
+        "claude-haiku-4-5-20251001":   (1.00,  5.00),
+        "claude-sonnet-4-20250514":    (3.00, 15.00),
+        "claude-sonnet-4-5-20250929":  (3.00, 15.00),
+        "claude-opus-4-20250514":      (15.00, 75.00),
+        "claude-opus-4-1-20250805":    (15.00, 75.00),
+        "claude-opus-4-5-20251101":    (15.00, 75.00),
+        "claude-opus-4-6":             (15.00, 75.00),
+    }
+
+    # Phase → model routing for "cheapest" and "balanced" strategies
+    # Maps phase name to model tier: "cheap" or "best"
+    PHASE_ROUTING: dict[str, dict[str, str]] = {
+        "cheapest": {
+            "immerse": "cheap", "diverge": "cheap", "dedup": "cheap",
+            "gapfill": "cheap", "converge": "cheap", "stress": "cheap",
+            "refine": "cheap", "meta": "cheap", "constraints": "cheap",
+            "specify": "cheap",
+        },
+        "balanced": {
+            "immerse": "cheap", "diverge": "cheap", "dedup": "cheap",
+            "gapfill": "cheap", "converge": "best", "stress": "best",
+            "refine": "best", "meta": "cheap", "constraints": "cheap",
+            "specify": "best",
+        },
+        "best": {
+            "immerse": "best", "diverge": "best", "dedup": "best",
+            "gapfill": "best", "converge": "best", "stress": "best",
+            "refine": "best", "meta": "best", "constraints": "best",
+            "specify": "best",
+        },
+    }
+
+    # Cheap model (used for routing)
+    cheap_model: str = os.getenv("XBRAIN_CHEAP_MODEL", "claude-haiku-4-5-20251001")
+    best_model: str = os.getenv("XBRAIN_BEST_MODEL", "")

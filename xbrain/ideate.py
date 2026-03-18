@@ -23,6 +23,8 @@ from xbrain.models import (
 )
 from xbrain.output import generate_idea_report
 from xbrain.prompts import (
+    CONSTRAINT_CHECK_SYSTEM,
+    CONSTRAINT_CHECK_USER,
     CONVERGE_SYSTEM,
     CONVERGE_USER,
     DEDUP_SYSTEM,
@@ -100,6 +102,21 @@ class IdeatePipeline:
             _log("IDEATE", f"Constraints: {', '.join(constraints)}")
         if language:
             _log("IDEATE", f"Language: {language}")
+        if self.cfg.model_strategy != "single":
+            _log("IDEATE", f"Model strategy: {self.cfg.model_strategy}")
+
+        # Cost estimate
+        estimate = self.estimate_cost(
+            model=self.cfg.model,
+            ideas_per_round=self.cfg.ideas_per_round,
+            converge_top_n=self.cfg.converge_top_n,
+            has_domains=bool(domains),
+            has_constraints=bool(constraints),
+            pricing=self.cfg.MODEL_PRICING,
+            strategy=self.cfg.model_strategy,
+            cheap_model=self.cfg.cheap_model,
+        )
+        _log("IDEATE", f"Estimated cost: ${estimate['total_est_cost_usd']:.4f}")
 
         result = IdeateRunResult(
             run_id=run_id,
@@ -109,6 +126,10 @@ class IdeatePipeline:
 
         # Phase -1 — Meta-Learn (distill playbook if enough runs accumulated)
         self._maybe_distill_playbook()
+
+        # Phase -0.5 — Constraint Conflict Check
+        if constraints and len(constraints) >= 2:
+            self._phase_check_constraints(constraints)
 
         # Phase 0 — Immerse (optional)
         domain_briefs: list[DomainBrief] = []
@@ -233,6 +254,8 @@ class IdeatePipeline:
             f"  python -m xbrain specify --idea {run_dir}/idea-cards.json --select <idea-id>",
         )
         _log("IDEATE", f"Tokens used: {result.total_input_tokens:,} in / {result.total_output_tokens:,} out")
+        cost_info = self.actual_cost()
+        _log("IDEATE", f"Actual cost: ${cost_info['total_cost_usd']:.4f}")
 
         return run_dir
 
@@ -276,7 +299,10 @@ class IdeatePipeline:
             domain_heat=json.dumps(domain_heat),
         )
 
-        data = self.llm.generate_json(META_LEARN_SYSTEM, prompt, temperature=0.3)
+        data = self.llm.generate_json(
+            META_LEARN_SYSTEM, prompt, temperature=0.3,
+            model_override=self._model_for_phase("meta"), phase="meta",
+        )
 
         playbook = data.get("playbook", "")
         calibration = data.get("score_calibration", {})
@@ -295,11 +321,46 @@ class IdeatePipeline:
         if anti_patterns:
             _log("META", f"  Anti-patterns: {'; '.join(anti_patterns[:3])}")
 
+    def _phase_check_constraints(self, constraints: list[str]) -> None:
+        """Detect contradictions in user-specified constraints before running the pipeline."""
+        _log("CONSTCHK", f"Checking {len(constraints)} constraints for conflicts...")
+
+        prompt = CONSTRAINT_CHECK_USER.format(
+            constraint_count=len(constraints),
+            constraints_list="\n".join(f"- {c}" for c in constraints),
+        )
+
+        try:
+            data = self.llm.generate_json(
+                CONSTRAINT_CHECK_SYSTEM, prompt, temperature=0.2,
+                model_override=self._model_for_phase("constraints"), phase="constraints",
+            )
+
+            conflicts = data.get("conflicts", [])
+            if conflicts:
+                _log("CONSTCHK", f"  ⚠ {len(conflicts)} conflict(s) detected:")
+                for conflict in conflicts:
+                    pair = conflict.get("constraints", [])
+                    reason = conflict.get("reason", "")
+                    suggestion = conflict.get("suggestion", "")
+                    _log("CONSTCHK", f"    CONFLICT: {' vs '.join(pair)}")
+                    _log("CONSTCHK", f"      Why: {reason}")
+                    if suggestion:
+                        _log("CONSTCHK", f"      Fix: {suggestion}")
+                _log("CONSTCHK", "  Proceeding anyway — constraints will be applied as-is.")
+            else:
+                _log("CONSTCHK", "  ✓ No conflicts detected.")
+        except Exception as e:
+            _log("CONSTCHK", f"  Skipped (error: {e})")
+
     def _phase_immerse(self, domains: list[str]) -> list[DomainBrief]:
         _log("IMMERSE", f"Deep-diving into: {', '.join(domains)}")
 
         prompt = IMMERSE_USER.format(domains=", ".join(domains))
-        data = self.llm.generate_json(self._sys(IMMERSE_SYSTEM), prompt, temperature=0.6)
+        data = self.llm.generate_json(
+            self._sys(IMMERSE_SYSTEM), prompt, temperature=0.6,
+            model_override=self._model_for_phase("immerse"), phase="immerse",
+        )
         briefs_raw = data.get("domain_briefs", [])
 
         briefs = []
@@ -341,7 +402,10 @@ class IdeatePipeline:
             playbook_context=build_playbook_context(self.memory.get_playbook()),
         )
 
-        data = self.llm.generate_json(self._sys(DIVERGE_SYSTEM), prompt, temperature=0.9)
+        data = self.llm.generate_json(
+            self._sys(DIVERGE_SYSTEM), prompt, temperature=0.9,
+            model_override=self._model_for_phase("diverge"), phase="diverge",
+        )
         ideas_raw = data.get("ideas", [])
 
         ideas = []
@@ -380,6 +444,7 @@ class IdeatePipeline:
 
         data = self.llm.generate_json(
             self._sys(DEDUP_SYSTEM), prompt, temperature=0.2,
+            model_override=self._model_for_phase("dedup"), phase="dedup",
         )
 
         keep_ids = set(data.get("keep", [i.id for i in raw_ideas]))
@@ -428,6 +493,7 @@ class IdeatePipeline:
 
         data = self.llm.generate_json(
             self._sys(DIVERGE_GAPFILL_SYSTEM), prompt, temperature=0.95,
+            model_override=self._model_for_phase("gapfill"), phase="gapfill",
         )
 
         ideas_raw = data.get("ideas", [])
@@ -462,7 +528,8 @@ class IdeatePipeline:
             calibration_context=calibration_ctx,
         )
 
-        data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5)
+        data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5,
+                                       model_override=self._model_for_phase("converge"), phase="converge")
 
         clustering = data.get("clustering_summary", "")
         if clustering:
@@ -508,7 +575,8 @@ class IdeatePipeline:
             candidates_json=candidates_json,
         )
 
-        data = self.llm.generate_json(self._sys(STRESS_TEST_SYSTEM), prompt, temperature=0.4)
+        data = self.llm.generate_json(self._sys(STRESS_TEST_SYSTEM), prompt, temperature=0.4,
+                                       model_override=self._model_for_phase("stress"), phase="stress")
 
         results_raw = data.get("results", [])
         results = []
@@ -623,7 +691,8 @@ class IdeatePipeline:
         temperature = max(0.5, 0.9 - (iteration * 0.15))
         _log("REFINE", f"  DIVERGE: Generating {diverge_ideas_count} focused ideas (temperature={temperature:.2f})...")
         
-        data = self.llm.generate_json(self._sys(DIVERGE_SYSTEM), refined_prompt, temperature=temperature)
+        data = self.llm.generate_json(self._sys(DIVERGE_SYSTEM), refined_prompt, temperature=temperature,
+                                       model_override=self._model_for_phase("refine"), phase="refine-diverge")
         ideas_raw = data.get("ideas", [])
 
         refined_raw_ideas = []
@@ -650,7 +719,8 @@ class IdeatePipeline:
         )
 
         _log("REFINE", f"  CONVERGE: Scoring {len(refined_raw_ideas)} ideas, selecting top {converge_top_n}...")
-        data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5)
+        data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5,
+                                       model_override=self._model_for_phase("refine"), phase="refine-converge")
 
         clustering = data.get("clustering_summary", "")
         if clustering:
@@ -746,7 +816,8 @@ class IdeatePipeline:
     def _write_outputs(self, run_dir: Path, result: IdeateRunResult) -> None:
         """Write all pipeline outputs to disk."""
         # idea-report.md
-        report = generate_idea_report(result)
+        cost_info = self.actual_cost()
+        report = generate_idea_report(result, cost_info=cost_info)
         (run_dir / "idea-report.md").write_text(report, encoding="utf-8")
 
         # idea-cards.json — only survivors with BUILD or INCUBATE
@@ -829,6 +900,41 @@ class IdeatePipeline:
         if attack_patterns:
             self.memory.save_attack_patterns(attack_patterns)
 
+        # Save lineage: track which ideas came from which run + source technique
+        lineage_entries = []
+        for c in result.survivors:
+            entry = {
+                "idea_id": c.id,
+                "title": c.title,
+                "run_id": result.run_id,
+                "timestamp": result.timestamp,
+                "source_technique": c.source_technique,
+                "parent_ideas": c.parent_ideas,
+                "domain_tags": c.domain_tags,
+                "score": c.composite_score,
+                "verdict": c.stress_test_verdict,
+            }
+            lineage_entries.append(entry)
+        if lineage_entries:
+            self.memory.save_lineage(lineage_entries)
+
+        # Extract idea genes from high-scoring ideas
+        genes = []
+        for c in result.survivors:
+            if c.composite_score >= 6.5:
+                genes.append({
+                    "gene_type": "solution_pattern",
+                    "source_idea": c.id,
+                    "source_run": result.run_id,
+                    "title": c.title,
+                    "domains": c.domain_tags,
+                    "pattern": c.rationale[:200] if c.rationale else "",
+                    "score": c.composite_score,
+                    "verdict": c.stress_test_verdict,
+                })
+        if genes:
+            self.memory.save_idea_genes(genes)
+
     def _sys(self, base_prompt: str) -> str:
         """Inject language instruction into a system prompt if set."""
         if self._language:
@@ -842,3 +948,84 @@ class IdeatePipeline:
     @staticmethod
     def _make_run_id() -> str:
         return "run-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+
+    # ------------------------------------------------------------------
+    # Model routing
+    # ------------------------------------------------------------------
+
+    def _model_for_phase(self, phase: str) -> str | None:
+        """Return model override for a phase, or None to use default."""
+        strategy = self.cfg.model_strategy
+        if strategy == "single":
+            return None  # use self.llm.model everywhere
+        routing = self.cfg.PHASE_ROUTING.get(strategy, {})
+        tier = routing.get(phase, "best")
+        if tier == "cheap":
+            return self.cfg.cheap_model or None
+        return (self.cfg.best_model or self.cfg.model) or None
+
+    # ------------------------------------------------------------------
+    # Cost estimation
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def estimate_cost(
+        model: str,
+        ideas_per_round: int,
+        converge_top_n: int,
+        has_domains: bool,
+        has_constraints: bool,
+        pricing: dict[str, tuple[float, float]],
+        strategy: str = "single",
+        cheap_model: str = "",
+    ) -> dict:
+        """Estimate API cost before running. Returns phase breakdown and total."""
+        # Rough token estimates per phase (based on observed runs)
+        phases = []
+        def _add(name: str, inp: int, out: int):
+            m = model
+            if strategy != "single" and cheap_model:
+                from xbrain.config import Config
+                routing = Config.PHASE_ROUTING.get(strategy, {})
+                tier = routing.get(name, "best")
+                if tier == "cheap":
+                    m = cheap_model
+            phases.append({"phase": name, "model": m,
+                           "est_input_tokens": inp, "est_output_tokens": out})
+
+        if has_constraints:
+            _add("constraints", 800, 600)
+        if has_domains:
+            _add("immerse", 600, 3000)
+        _add("diverge", 2000, 4000 + ideas_per_round * 120)
+        _add("dedup", 1500 + ideas_per_round * 80, 1500)
+        _add("gapfill", 1500, 2000)
+        _add("converge", 2000 + ideas_per_round * 80, 5000 + converge_top_n * 500)
+        _add("stress", 2000 + converge_top_n * 300, 5000 + converge_top_n * 800)
+
+        total_cost = 0.0
+        for p in phases:
+            rate = pricing.get(p["model"], (3.0, 15.0))  # default to sonnet pricing
+            cost = (p["est_input_tokens"] / 1_000_000 * rate[0] +
+                    p["est_output_tokens"] / 1_000_000 * rate[1])
+            p["est_cost_usd"] = round(cost, 6)
+            total_cost += cost
+
+        return {
+            "phases": phases,
+            "total_est_cost_usd": round(total_cost, 4),
+            "model": model,
+            "strategy": strategy,
+        }
+
+    def actual_cost(self) -> dict:
+        """Return actual cost breakdown after a run."""
+        total = 0.0
+        phases = []
+        for entry in self.llm._phase_token_log:
+            rate = self.cfg.MODEL_PRICING.get(entry["model"], (3.0, 15.0))
+            cost = (entry["input_tokens"] / 1_000_000 * rate[0] +
+                    entry["output_tokens"] / 1_000_000 * rate[1])
+            phases.append({**entry, "cost_usd": round(cost, 6)})
+            total += cost
+        return {"phases": phases, "total_cost_usd": round(total, 4)}

@@ -1,6 +1,47 @@
 """Prompt templates for xBrain Pipeline 1: IDEATE phases."""
 
 # ---------------------------------------------------------------------------
+# Constraint Conflict Detection
+# ---------------------------------------------------------------------------
+
+CONSTRAINT_CHECK_SYSTEM = (
+    "You are a constraint analysis engine. Detect logical contradictions, "
+    "tensions, and impossible combinations in user-specified constraints. "
+    "Be precise. Only flag REAL conflicts, not minor tensions. "
+    "You MUST respond with valid JSON only — no markdown, no commentary."
+)
+
+CONSTRAINT_CHECK_USER = """\
+Analyze these {constraint_count} constraints for logical conflicts:
+
+{constraints_list}
+
+For each pair of constraints that CONFLICT (are logically impossible or \
+very difficult to satisfy simultaneously), report:
+- Which two constraints conflict
+- Why they conflict
+- A suggested resolution (relax one, prioritize, or reframe)
+
+Only report REAL conflicts — not minor tensions. If constraints are merely \
+challenging but not contradictory, do NOT flag them.
+
+Respond with ONLY valid JSON:
+{{
+  "conflicts": [
+    {{
+      "constraints": ["constraint A text", "constraint B text"],
+      "reason": "Why these conflict",
+      "severity": "hard|soft",
+      "suggestion": "How to resolve"
+    }}
+  ],
+  "notes": "Any general observations about the constraint set"
+}}
+
+If there are NO conflicts, respond with: {{"conflicts": [], "notes": "No conflicts detected."}}
+"""
+
+# ---------------------------------------------------------------------------
 # Phase 0: IMMERSE
 # ---------------------------------------------------------------------------
 
@@ -577,4 +618,102 @@ def build_calibration_context(calibration: dict) -> str:
     if weak:
         lines.append(f"- Score these dimensions MORE HARSHLY: {', '.join(weak)}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Pipeline 2: SPECIFY — Execution Accelerator
+# ---------------------------------------------------------------------------
+
+SPECIFY_SYSTEM = (
+    "You are a senior software architect and product manager. Your job is to "
+    "convert validated idea cards into actionable project specifications that "
+    "a developer can start coding immediately. Be specific, concrete, and "
+    "opinionated about technology choices. No hand-waving. "
+    "You MUST respond with valid JSON only — no markdown, no commentary."
+)
+
+SPECIFY_USER = """\
+Generate a complete project specification for this validated idea:
+
+IDEA:
+{idea_json}
+
+STRESS TEST RESULTS:
+{stress_json}
+
+Create a specification with:
+
+1. OVERVIEW: One-paragraph executive summary
+2. USER STORIES: 5-8 user stories in "As a [persona], I want [action] so that [benefit]" format. \
+Include acceptance criteria for each.
+3. ARCHITECTURE: Recommended tech stack, system components, data flow. \
+Be opinionated — pick specific technologies.
+4. API CONTRACTS: Define 3-5 core API endpoints (method, path, request/response shapes). \
+Use RESTful conventions.
+5. DATA MODEL: Core entities and their relationships.
+6. TASK BREAKDOWN: Break into 10-15 development tasks, ordered by dependency. \
+Each task should be completable in 1-3 days. Include acceptance criteria.
+7. RISKS & MITIGATIONS: Top 3 technical risks from the stress test and how to handle them.
+8. MVP SCOPE: What to build first (2-week sprint). What to defer.
+9. KILL CRITERIA: Conditions that should abort the project (from stress test).
+
+Respond with ONLY valid JSON:
+{{
+  "title": "Project title",
+  "overview": "Executive summary paragraph",
+  "user_stories": [
+    {{
+      "id": "US-001",
+      "story": "As a [persona], I want [action] so that [benefit]",
+      "acceptance_criteria": ["criterion 1", "criterion 2"],
+      "priority": "must-have|should-have|nice-to-have"
+    }}
+  ],
+  "architecture": {{
+    "tech_stack": {{"frontend": "...", "backend": "...", "database": "...", "hosting": "...", "other": ["..."]}},
+    "components": ["component 1 description", "component 2 description"],
+    "data_flow": "Description of how data flows through the system"
+  }},
+  "api_contracts": [
+    {{
+      "method": "POST",
+      "path": "/api/v1/resource",
+      "description": "What this endpoint does",
+      "request_body": {{"field": "type and description"}},
+      "response_body": {{"field": "type and description"}},
+      "auth": "required|optional|none"
+    }}
+  ],
+  "data_model": [
+    {{
+      "entity": "EntityName",
+      "fields": {{"field_name": "type — description"}},
+      "relationships": ["relates to EntityB via foreign key"]
+    }}
+  ],
+  "tasks": [
+    {{
+      "id": "T-001",
+      "title": "Task title",
+      "description": "What to do",
+      "depends_on": [],
+      "effort_days": 2,
+      "acceptance_criteria": ["criterion 1"]
+    }}
+  ],
+  "risks": [
+    {{
+      "risk": "What could go wrong",
+      "likelihood": "high|medium|low",
+      "mitigation": "How to handle it"
+    }}
+  ],
+  "mvp_scope": {{
+    "include": ["feature 1", "feature 2"],
+    "defer": ["feature 3", "feature 4"],
+    "sprint_goal": "What the 2-week MVP should demonstrate"
+  }},
+  "kill_criteria": ["condition 1", "condition 2"]
+}}
+"""
 
