@@ -1,0 +1,194 @@
+[
+  {
+    "id": "idea-005",
+    "title": "Algorithmic Audit Engine",
+    "score": 7.9,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-012",
+    "title": "Privacy-Preserving Synthetic Patient Data Engine",
+    "score": 7.9,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-010",
+    "title": "Cryptographic Abuse Pattern Detector",
+    "score": 7.6,
+    "verdict": "KILL"
+  },
+  {
+    "id": "idea-001",
+    "title": "Legislative Impact Simulator",
+    "score": 7.3,
+    "verdict": "KILL"
+  },
+  {
+    "id": "idea-002",
+    "title": "Replication Marketplace for Failed Studies",
+    "score": 7.3,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-011",
+    "title": "Transparent Carbon Ledger for Supply Chains",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-009",
+    "title": "Hyperlocal Job Displacement Forecaster",
+    "score": 6.9,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-003",
+    "title": "Hyperlocal Misinformation Early Warning System",
+    "score": 6.8,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001-merged",
+    "title": "Real-Time Emissions Verification Network",
+    "score": 7.9,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-004-merged",
+    "title": "Supply Chain Carbon Decoder & Green Swap Engine",
+    "score": 7.7,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-016",
+    "title": "Climate Impact Reverse-Auction Marketplace",
+    "score": 7.3,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-003-merged",
+    "title": "Community Renewable Energy Design & Deployment Platform",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-005",
+    "title": "Climate Research Monetization & Startup Acceleration",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-015",
+    "title": "Climate Tech Regulatory Compliance Automation",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-018-merged",
+    "title": "Real-Time Consumer Climate Cost Transparency",
+    "score": 6.9,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-002-merged",
+    "title": "Policy Impact Simulation Game Suite",
+    "score": 6.7,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-002",
+    "title": "Real-Time Tax Optimization Engine for Developer Income",
+    "score": 7.6,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-008",
+    "title": "Reputation-Backed Developer Lending",
+    "score": 7.4,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-021",
+    "title": "Freelance Rate Benchmarking & Wage Transparency Tool",
+    "score": 7.3,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-011",
+    "title": "European Tax Residency Arbitrage Scanner",
+    "score": 7.1,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-017",
+    "title": "Causal Skill-to-Wealth Roadmap Generator",
+    "score": 6.9,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-004",
+    "title": "Developer Equity Crowdfunding Platform",
+    "score": 6.8,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001",
+    "title": "Peer-Verified Micro-Credential Marketplace",
+    "score": 6.6,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-019",
+    "title": "Content-to-Revenue Automation Engine",
+    "score": 6.6,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001",
+    "title": "PræcisionsLandbrugsFond - Jordkemi møder Crowdfunding",
+    "score": 7.6,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-005",
+    "title": "SolFællesskab - Kollektiv solcelleejerskab",
+    "score": 7.6,
+    "verdict": "BUILD"
+  },
+  {
+    "id": "idea-002-013-merged",
+    "title": "TaxAI - Proaktiv Skatteoptimering for Selvstændige",
+    "score": 7.6,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-020",
+    "title": "RevenueShare API - Revenue-deling uden juridisk ekspertise",
+    "score": 7.4,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-012",
+    "title": "PeerLån - Peer-baseret Kreditvurdering for SMV'er",
+    "score": 7.4,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-011",
+    "title": "StatensMarkedsplads - Små Virksomheder møder Offentlige Kontrakter",
+    "score": 7.4,
+    "verdict": "BUILD"
+  },
+  {
+    "id": "idea-018",
+    "title": "MindMatch Ventures - Værdier før Pitch",
+    "score": 6.7,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-003-014-017-merged",
+    "title": "ExpertiseMarkedsplads - Micro-Konsultationer & Licensleasing",
+    "score": 6.7,
+    "verdict": "MUTATE"
+  }
+]

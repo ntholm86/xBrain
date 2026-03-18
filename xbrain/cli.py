@@ -37,8 +37,8 @@ def _build_parser() -> argparse.ArgumentParser:
         nargs="*",
         metavar="DOMAIN",
         help=(
-            "Focus on specific domains (e.g. health technology legal). "
-            "Omit to scan all nine default domains."
+            "Focus on specific domains — any topic works "
+            '(e.g. health fintech "urban planning" gaming agriculture).'
         ),
     )
     ideate.add_argument(
@@ -64,6 +64,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print the planned run without calling the LLM (useful for testing)",
     )
+    ideate.add_argument(
+        "--lang",
+        metavar="LANGUAGE",
+        help='Output language for the report (e.g. danish, spanish, german). Default: english',
+    )
     return parser
 
 
@@ -88,6 +93,7 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
     domains = args.domains if args.domains else None
     constraints = args.constraints if args.constraints else None
     brief_text = _resolve_brief(args.brief)
+    language = args.lang or None
 
     # Override pipeline defaults from CLI
     if args.ideas:
@@ -99,10 +105,11 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
         print("[DRY-RUN] Pipeline 1: IDEATE")
         print(f"  Model:       {cfg.model}")
         print(f"  Max tokens:  {cfg.max_tokens}")
-        print(f"  Domains:     {domains or cfg.ALL_DOMAINS}")
+        print(f"  Domains:     {domains or '(broad scan)'}")
         print(f"  Constraints: {constraints or '(none)'}")
         print(f"  Ideas:       {cfg.ideas_per_round}")
         print(f"  Top N:       {cfg.converge_top_n}")
+        print(f"  Language:    {language or 'english'}")
         if brief_text:
             preview = brief_text[:200] + ("..." if len(brief_text) > 200 else "")
             print(f"  Brief:       {preview}")
@@ -128,7 +135,7 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
     from xbrain.ideate import IdeatePipeline  # noqa: E402
 
     pipeline = IdeatePipeline(config=cfg)
-    pipeline.run(domains=domains, constraints=constraints, brief_text=brief_text)
+    pipeline.run(domains=domains, constraints=constraints, brief_text=brief_text, language=language)
 
 
 def main() -> None:

@@ -56,38 +56,30 @@ Without `--brief`, the engine generates ideas on its own across all domains.
 
 ### `--domains` — Focus areas
 
-Narrow ideation to specific domains. Available domains:
-
-| Domain | What it covers |
-|--------|---------------|
-| `political` | Governance, policy, civic tech, elections |
-| `scientific` | Research tools, lab tech, data analysis |
-| `societal` | Education, community, social impact |
-| `economic` | Finance, markets, business tools |
-| `environmental` | Climate, sustainability, energy |
-| `technological` | Dev tools, infrastructure, AI/ML |
-| `creative` | Art, music, content, design |
-| `health` | Medical, wellness, biotech |
-| `legal` | Compliance, contracts, justice |
+Narrow ideation to specific topics. Write anything — the AI interprets it.
 
 ```
-# Single domain
 python -m xbrain ideate --domains health
 
-# Multiple domains
-python -m xbrain ideate --domains health technology legal
+python -m xbrain ideate --domains fintech "urban planning" agriculture
+
+python -m xbrain ideate --domains "developer tools" gaming education
+
+python -m xbrain ideate --domains "B2B SaaS" "climate tech" logistics
 ```
 
-Without `--domains`, all nine domains are scanned.
+Without `--domains`, the engine scans broadly across many fields.
 
 ### `--constraints` — Add requirements
 
-Force ideas to meet specific conditions.
+Force ideas to meet specific conditions. Write anything.
 
 ```
 python -m xbrain ideate --constraints "must work offline"
 
 python -m xbrain ideate --constraints "must be free" "must work on mobile" "no login required"
+
+python -m xbrain ideate --constraints "solo developer" "launch in 2 weeks" "zero marketing budget"
 ```
 
 ### `--ideas` — How many raw ideas to generate
@@ -113,6 +105,18 @@ See what would happen without spending any credits.
 ```
 python -m xbrain ideate --brief problem.txt --domains health --dry-run
 ```
+
+### `--lang` — Output language
+
+Get the report in any language.
+
+```
+python -m xbrain ideate --lang danish
+
+python -m xbrain ideate --brief "problem.txt" --lang spanish
+```
+
+Default: english.
 
 ## Examples
 

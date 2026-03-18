@@ -1,0 +1,1535 @@
+# xBrain: Self-Thinking AI Idea Engine & Autonomous Builder
+
+## Philosophy
+This is not a monolithic autonomous system. This is a **developer toolkit** of independent AI pipelines, each invoked manually, each producing reviewable documents, and each completely decoupled from the next. The developer runs a pipeline, reads the output, makes decisions, and then — when ready — feeds those decisions into the next pipeline.
+
+The idea engine thinks in ways humans wouldn't — cross-pollinating domains, questioning assumptions, exploring the uncomfortable and unconventional. But the human is always in the loop between every major step. The AI thinks; the human decides; the AI builds; the human reviews.
+
+## Safety Mandate
+Human oversight is non-negotiable. The system thinks freely but acts under governance. Any change affecting backend public APIs, infra, DB migrations, auth/authz, or exceeding the LOC threshold (default 50) requires human approval before merge. No autonomous release without staged rollout and monitoring. The idea generation itself is unconstrained — only execution is gated.
+
+---
+
+# PIPELINE ARCHITECTURE
+
+## Overview
+xBrain is composed of **4 independent pipelines**. Each pipeline is a standalone skill/command that can be invoked independently. Pipelines communicate through **defined output documents** — not through shared state or direct coupling.
+
+```
+┌─────────────┐     idea-report/      ┌─────────────┐     project-spec/     ┌─────────────┐     build-report/     ┌─────────────┐
+│  PIPELINE 1  │ ──────────────────▶  │  PIPELINE 2  │ ──────────────────▶  │  PIPELINE 3  │ ──────────────────▶  │  PIPELINE 4  │
+│   IDEATE     │    human reviews     │   SPECIFY    │    human reviews     │    BUILD     │    human reviews     │   EVALUATE   │
+│              │    & selects idea    │              │    & approves spec   │             │    & tests project   │              │
+└─────────────┘                       └─────────────┘                       └─────────────┘                       └─────────────┘
+     ▲  can run N times                                                                                                │
+     │  before proceeding                                                                                               │
+     └───────────────────────────────── learning feeds back ◀───────────────────────────────────────────────────────────┘
+```
+
+**Key principles:**
+- Each pipeline is **self-contained** — it reads input documents and produces output documents
+- The human **always reviews** output documents before invoking the next pipeline
+- Pipelines can be run **multiple times** — run IDEATE 5 times, compare the reports, then pick your favorite idea
+- Documents are **human-readable** (Markdown) with **machine-readable** companions (JSON) so the next pipeline can consume them
+- Any pipeline can be **skipped** — if you already have a project spec, jump straight to BUILD
+- Each pipeline has a **defined trigger** (command/skill invocation) and produces output in a **defined location**
+
+## Developer Workflow (Practical Usage)
+
+Here's how a developer actually uses xBrain day-to-day:
+
+### Step 1: Generate Ideas (run as many times as you want)
+```bash
+# Run the ideation pipeline
+xbrain ideate
+xbrain ideate --domains "health,economic"       # focus on specific domains
+xbrain ideate --constraints "must work offline"  # add constraints
+
+# Each run produces a report in ./xbrain-runs/{run-id}/
+# Browse and compare reports from different runs
+ls ./xbrain-runs/
+```
+
+**You get:** `idea-report.md` — a ranked list of 5-8 ideas with scores, personas, stress test results, and verdicts. Read it like a magazine. Star your favorites.
+
+### Step 2: Pick an Idea and Produce a Spec
+```bash
+# Select an idea from a previous run and generate a full project spec
+xbrain specify --idea ./xbrain-runs/run-003/idea-cards.json --select idea-007
+```
+
+**You get:** `project-spec/` — a complete project specification with architecture, user stories, API contracts, deployment slices, distribution plan, and success criteria. Read it, edit it, argue with it.
+
+### Step 3: Build the Project
+```bash
+# Feed the approved spec into the build pipeline
+xbrain build --spec ./xbrain-runs/run-003/project-spec/
+```
+
+**You get:** A working codebase + `build-report/` with audit results, test coverage, and iteration history.
+
+### Step 4: Evaluate What You Built
+```bash
+# Evaluate the built project against the original idea and spec
+xbrain evaluate --project ./my-project/ --spec ./xbrain-runs/run-003/project-spec/
+```
+
+**You get:** `evaluation-report/` — hypothesis results, idea-quality vs. build-quality breakdown, and a verdict: SHIP / ITERATE / PIVOT / KILL.
+
+### Between Every Step
+The developer:
+- Reads the output documents
+- Makes manual edits if desired (the spec is just Markdown + JSON — you own it)
+- Decides whether to proceed, re-run the current pipeline with different parameters, or stop
+- No pipeline auto-triggers the next one. Ever.
+
+## Pipeline Contract Reference
+
+| Pipeline | Trigger | Input | Output Directory | Key Output Files |
+|---|---|---|---|---|
+| **IDEATE** | `xbrain ideate` | Optional: domain focus, constraints, memory | `./xbrain-runs/{run-id}/` | `idea-report.md`, `idea-cards.json`, `idea-log.json`, `stress-test-report.json` |
+| **SPECIFY** | `xbrain specify` | Selected Idea Card from Pipeline 1 | `./xbrain-runs/{run-id}/project-spec/` | `project-spec.md`, `project-spec.json`, `tech-blueprint.md`, `distribution-plan.md` |
+| **BUILD** | `xbrain build` | `project-spec/` directory from Pipeline 2 | Built project dir + `./xbrain-runs/{run-id}/build-report/` | `build-report.md`, `audit-report.json`, built source code |
+| **EVALUATE** | `xbrain evaluate` | Built project + idea card + project spec | `./xbrain-runs/{run-id}/evaluation-report/` | `evaluation-report.md`, `hypothesis-results.json`, `memory-updates.json` |
+
+---
+
+# PIPELINE 1: IDEATE — The Idea Engine
+
+**Input:** Optional domain focus, optional constraints, cross-session memory
+**Output:** `./xbrain-runs/{run-id}/idea-report.md`, `idea-cards.json`, `idea-log.json`, `stress-test-report.json`
+**Trigger:** `xbrain ideate`
+
+This pipeline generates, filters, and stress-tests project ideas. It can be run as many times as you want. Each run produces a self-contained report. You read the reports, compare across runs, and pick the idea you want to develop further.
+
+---
+
+## Ideation Philosophy
+The current approach ("ask for 5 ideas") is shallow autocomplete, not ideation. Real ideation requires structured phases with distinct cognitive modes, adversarial pressure, and real-world grounding. The idea engine must:
+- Think **divergently** before thinking convergently (explore before filtering)
+- Collide **cross-domain concepts** (what happens when biology meets urban planning? when game theory meets education?)
+- Apply **adversarial stress-testing** (a Devil's Advocate agent actively tries to kill every idea)
+- Validate against **real-world feasibility** (can this hold water? does anyone need this? does it already exist?)
+- **Remember** across sessions (what was tried, what failed, what patterns emerge)
+- Produce ideas spanning **any domain**: political tools, scientific simulations, societal infrastructure, economic models, creative platforms, environmental systems — anything programmable
+
+## Ideation Pipeline (Multi-Phase Iterative)
+
+### Phase 0: IMMERSE — Domain Deepening (Optional, 1 iteration)
+Before generating ideas, the system may optionally deep-dive into one or more target domains. Shallow scanning produces shallow ideas. Immersion produces insight.
+
+**0a. Domain Selection**
+The human can specify 1-3 focus domains, or the system can auto-select based on:
+- Underexplored domains (from the Domain Heat Map in cross-session memory)
+- Domains with recent high-signal activity (trending problems, regulatory changes, tech breakthroughs)
+- Domains the system has historically produced weak ideas in (from scoring calibration data)
+
+**0b. Deep Domain Study**
+For each selected domain, study:
+- **Incentive structures**: Who are the players? What motivates them? Where are misaligned incentives?
+- **Regulatory landscape**: What's legal, what's changing, what's ambiguous?
+- **Existing players**: Who's already here? What's their business model? Where are their blind spots?
+- **Historical failures**: What's been tried and failed? Why did it fail? What's changed since?
+- **Adjacent domains**: What technologies or approaches from neighboring fields could be imported?
+- **User archetypes**: Who suffers most in this domain? What does their day look like?
+
+**0c. Immersion Output**
+Produce a Domain Brief per domain: key tensions, underserved populations, regulatory windows, technology gaps, and 3-5 "pressure points" where intervention could have outsized impact. These briefs feed directly into Phase 1.
+
+### Phase 1: DIVERGE — Wide-Open Exploration (3-5 iterations)
+The goal is volume and variety. No filtering, no judgment. Generate raw material from multiple angles.
+
+**1a. Domain Scan**
+The system surveys multiple domains for unsolved problems, emerging trends, and friction points:
+- **Political**: governance transparency, voter tools, policy simulation, misinformation detection
+- **Scientific**: data visualization, research replication tools, simulation engines, citizen science platforms
+- **Societal**: accessibility tools, community coordination, mental health tech, education innovation
+- **Economic**: market analysis, financial literacy, small business automation, inequality measurement
+- **Environmental**: carbon tracking, resource optimization, climate modeling, biodiversity monitoring
+- **Technological**: developer tooling, AI safety infrastructure, privacy tools, decentralization
+- **Creative**: generative art, music composition, narrative engines, collaborative creation
+- **Health**: diagnostic aids, health data sovereignty, telemedicine tools, epidemic modeling
+- **Legal/Ethical**: contract analysis, bias detection, rights monitoring, regulatory compliance
+
+**1a-ii. User-Pain Mining**
+Supplements the domain scan by searching for real complaints and unmet needs:
+- Forum/community scraping: Reddit threads, StackOverflow questions, HackerNews "Ask HN" posts
+- Support ticket pattern analysis: what are people repeatedly struggling with?
+- Analogy transfer: find solutions that work in domain A and ask "why doesn't domain B have this?"
+- Patent/academic gap analysis: ideas that were researched but never productized
+
+**1b. Cross-Domain Collision**
+Systematically combine concepts from different domains to produce novel intersections:
+- Example: Game Theory + Education = competitive learning platforms with mechanism design
+- Example: Epidemiology + Misinformation = information contagion modeling and intervention tools
+- Example: Supply Chain + Environmental = end-to-end carbon footprint tracking with verified data
+- Generate a collision matrix: pick 2-3 domains, force combinations, evaluate novelty
+
+**1c. Contrarian Inversion**
+For each conventional approach, ask: "What if the opposite is true?"
+- If everyone builds centralized platforms, what if the solution is radically local?
+- If everyone focuses on data collection, what if the answer is data destruction?
+- If everyone builds for scale, what if the value is in the niche?
+- Generate 3-5 contrarian hypotheses per round
+
+**1d. Contextual Constraint Injection**
+Force creativity by applying constraints matched to the idea's domain and target context — not randomly selected. Constraints should stress-test the idea's real-world viability, not just force arbitrary creativity.
+
+**Constraint Selection Logic:**
+- **Infrastructure constraints** (for ideas targeting developing regions): "Must work offline", "Must work on 2G networks", "Must run on low-end hardware"
+- **Accessibility constraints** (for consumer-facing ideas): "Must be usable by a 10-year-old", "Must work without reading", "Must support screen readers"
+- **Economic constraints** (for ideas targeting underserved markets): "Must cost $0 to run", "Must generate value before requiring payment", "Must work without a credit card"
+- **Time constraints** (for productivity/utility ideas): "Must produce value in under 60 seconds", "Must require zero onboarding"
+- **Trust constraints** (for ideas handling sensitive data): "Must work without collecting PII", "Must be auditable by the user"
+- **Scale constraints** (for ideas with network effects): "Must be useful with 1 user", "Must not degrade at 1M users"
+
+The system selects 1-2 constraints per idea based on domain tags and target persona (see Phase 2). If no persona exists yet, select constraints from the most relevant category based on domain. The goal is to surface real adoption barriers, not generate random novelty.
+
+**1e. Raw Idea Output**
+Each divergence round produces 15-30 raw idea seeds, each as a one-sentence concept with:
+- Source technique (domain scan / collision / contrarian / constraint)
+- Domain tags
+- Novelty signal (why this hasn't been done)
+
+### Phase 2: CONVERGE — Filtering & Clustering (2-3 iterations)
+Reduce the raw idea pool to 5-8 strong candidates through structured evaluation.
+
+**2a. Deduplication & Clustering**
+- Group similar ideas into clusters
+- Merge overlapping concepts into stronger hybrid ideas
+- Identify the core insight behind each cluster
+
+**2a-ii. User Persona Definition**
+Every idea that survives clustering must answer: **"Who specifically is this for?"**
+An idea without a persona is an idea without a user. For each candidate:
+- Define the **primary persona**: who is the single most important user? (e.g., "City council member in a mid-size US city", "First-generation college student applying to financial aid", "Independent journalist in a country with press restrictions")
+- Define their **context**: what's their day like? what tools do they currently use? what's their technical literacy?
+- Define their **pain**: what specific problem does this solve for them? how do they currently cope?
+- Define their **motivation**: why would they switch to this? what's the activation energy required?
+- Optionally define a **secondary persona**: who else benefits? (e.g., the journalist's editor, the student's counselor)
+
+The persona shapes everything downstream: MVP scope, UI decisions, distribution strategy, constraint selection, and success metrics. Ideas that can't identify a specific persona are too abstract to build.
+
+**2b. Novelty Verification**
+For each candidate, actively check:
+- Does this already exist? (search GitHub, Product Hunt, academic papers, patent databases)
+- If similar things exist, what's the specific gap or angle that makes this different?
+- Score: truly novel / novel angle on existing concept / already saturated
+
+**2c. Multi-Vector Scoring**
+Rate each candidate on a weighted composite score that combines qualitative and quantitative factors:
+- **Impact** (0-10) — Size of affected population, pain severity, urgency, and leverage
+- **Confidence** (0-10) — How certain are we this will work? Evidence strength
+- **Effort** (0-10) — Implementation complexity, time to MVP, technical risk
+- **Cost** (0-10) — Estimated infra cost, data acquisition cost, maintenance burden
+- **Ethical Risk** (0-10) — Potential for misuse, harm, legal liability
+- **Sustainability** (0-10) — Can this project survive after launch? Revenue potential, community sustainability, or self-funding viability. A project that costs $45/month to run but generates $0/month indefinitely scores low. Consider: subscription potential, open-source sustainability models, grant eligibility, ad-free revenue paths, or natural viral loops that reduce acquisition cost to zero
+- **Defensibility** (0-10) — How hard is it to clone? Score based on: network effects (do more users make it better?), data moats (does usage generate proprietary data?), switching costs (how painful is it to leave?), technical complexity (is the implementation non-trivial to replicate?), ecosystem lock-in (does it integrate deeply with existing workflows?). A project that can be cloned in a weekend by a competent developer scores 0-2. A project with compounding data advantages scores 8-10
+- **Market Timing** (0-10) — Is this the right moment? Score based on: technology readiness (are the required APIs/infra mature?), regulatory window (is new regulation creating demand or about to kill it?), cultural readiness (does the public care about this problem now?), competitive window (is the market empty, emerging, or saturated?), trigger events (has something recently happened that makes this suddenly relevant?). Ideas that are 3 years too early or 2 years too late score low
+
+**Composite scoring formula:**
+`score = (0.25 × impact) + (0.20 × confidence) + (0.10 × sustainability) + (0.10 × defensibility) + (0.05 × market_timing) - (0.10 × effort) - (0.10 × cost) - (0.10 × ethical_risk)`
+
+Normalize to 0-10 scale. Configurable weights allow tuning for different priorities.
+
+**Cold-Start Acknowledgment:** The initial weights above are educated guesses, not calibrated values. For the first 20 ideation runs, the system should:
+- Report **raw dimension scores alongside the composite** so humans can apply their own judgment
+- Flag the composite score as "uncalibrated" in all outputs
+- Track actual outcomes vs. predicted scores to build a calibration dataset
+- After 20+ runs with outcome data, re-derive weights via regression analysis
+- Publish calibration confidence: "scoring model accuracy: N/A (insufficient data)" → "scoring model accuracy: 72% (based on 25 outcomes)"
+
+**2d. Stopping Rules**
+The convergence phase has intelligent stopping conditions beyond a fixed round count:
+- **Quality threshold**: Stop early if the top candidate scores > 8.0
+- **Plateau detection**: Stop if the top score hasn't improved by > 0.3 in the last round
+- **Maximum rounds**: Hard cap at configured max (default 3)
+- **Minimum viable pool**: Don't stop until at least 3 candidates score > 5.0
+
+**2e. Human Signal Validation (Recommended)**
+Before ideas advance to stress testing, gather real-world signal from actual humans. This is the cheapest and most valuable test — and most ideation systems skip it entirely.
+
+**Methods (pick 1-2 per round, cheapest first):**
+- **5-Person Pitch Test**: Describe the idea in one sentence to 5 people in the target persona. Record: gut reaction (excited / confused / indifferent), first question asked, willingness to try it. Cost: 30 minutes
+- **Forum Probe**: Post a non-promotional question in a relevant community (Reddit, Discord, Slack, HN): "How do you currently handle [problem]?" or "Would you use a tool that [value prop]?" Gauge response volume and sentiment. Cost: 1 hour + wait time
+- **Search Demand Signal**: Check Google Trends, keyword search volume, and related queries for the problem space. High search volume + low quality results = opportunity. Zero search volume = the audience doesn't know they have this problem (or doesn't have it). Cost: 15 minutes
+- **Competitor Review Mining**: Read 1- and 2-star reviews of existing solutions in the space. What do people hate? What's missing? Does this idea address those gaps? Cost: 30 minutes
+- **Expert Pulse**: If possible, send a 2-sentence description to one domain expert and ask for a candid reaction. Cost: 5 minutes + relationship
+
+**Signal Output:**
+For each idea, record: method used, sample size, positive/negative/neutral ratio, verbatim quotes (if any), and a demand_signal score (0-10). Ideas with demand_signal < 3 should be flagged for extra scrutiny in Phase 3.
+
+This step is marked "recommended" not "required" because some ideas are too early-stage for users to evaluate. But skipping it should be a conscious choice with documented reasoning, not a default.
+
+**2f. Convergence Output**
+Produce a ranked shortlist of 5-8 ideas with: title, one-paragraph description, composite score breakdown, novelty score, domain tags, source technique, estimated cost range, primary persona, demand signal (if gathered).
+
+### Phase 3: STRESS TEST — Adversarial Validation (2-4 iterations)
+Each surviving idea gets attacked from multiple angles. Ideas that survive are worth building.
+
+**3a. Devil's Advocate Agent (Freeform + Structured)**
+A dedicated adversarial agent tries to kill each idea. The agent operates in two modes:
+
+**Mode 1: Freeform Attack (Primary)**
+The Devil's Advocate reasons freely without a prescribed template. It studies the idea, identifies the weakest assumptions, and constructs the most devastating argument it can. It should find attacks the idea's creators didn't anticipate — not just check boxes on a list. The agent should think like: a competitor who wants to build something better, a journalist writing a takedown piece, a VC who's seen this pitch 50 times, or a user who tried something similar and got burned.
+
+**Mode 2: Structured Checklist (Minimum Coverage)**
+After freeform attacks, ensure these angles were covered (if the freeform missed any):
+- Prior art: "This already exists as [X] and they failed/succeeded because..."
+- Adoption failure: "Nobody will use this because..."
+- Technical blockers: "This is impossible/impractical because..."
+- Problem reframing: "The real problem isn't what you think it is..."
+- Negative externalities: "This will cause harm because..."
+- Obsolescence: "In 2 years this will be irrelevant because..."
+- Market timing: "This is too early/too late because..."
+- Defensibility: "A well-funded competitor could clone this in [X] days because..."
+
+**Defense Protocol:**
+The idea's defenders must produce counterarguments for each attack. The Devil's Advocate then gets one rebuttal round. If the defense can't survive the rebuttal, the idea dies or mutates. Track: attacks_made, attacks_survived, attacks_fatal, strongest_surviving_argument.
+
+**3b. Real-World Feasibility Check**
+- **Technical**: Can Claude Code actually build this? What's the tech stack? Are there hard dependencies on external APIs, data sources, or hardware the system can't access?
+- **Scope**: Can a working prototype be built in a single session? What's the MVP vs. the full vision?
+- **Data**: Does this need data that's hard to obtain, legally restricted, or ethically problematic?
+- **Maintenance**: Will this break in 6 months if nobody maintains it?
+- **Legal/Ethical**: Does this create liability? Could it be misused? Does it require licensing?
+- **Cost estimate**: What's the realistic infrastructure cost? (compute, storage, APIs, domains) — express in USD/month
+- **Resource modeling**: Engineering effort in person-hours for MVP and for full vision
+- **LLM Capability Fit**: Explicitly assess what the AI builder (Claude Code) is good and bad at relative to this idea. Score each dimension:
+  - **Strong fit**: text processing, code generation, API integration, data transformation, CLI tools, web apps with standard frameworks, documentation generation
+  - **Moderate fit**: data visualization (needs libraries), database design, authentication flows, real-time features (websockets)
+  - **Weak fit**: precise numerical computation, real-time data feeds, custom visual design, hardware interaction, native mobile apps, high-performance computing, audio/video processing
+  - If the idea's core value depends on a "weak fit" capability, flag it as a structural risk. The idea might still be viable but the MVP scope must route around the weakness
+
+Output a **feasibility matrix** per idea:
+| Dimension | Score (1-5) | Notes |
+|---|---|---|
+| Technical risk | | |
+| Data availability | | |
+| Regulatory risk | | |
+| Cost (infra/month) | | |
+| Time to prototype | | |
+| Maintenance burden | | |
+| LLM capability fit | | |
+| Defensibility | | |
+| Market timing | | |
+
+**3c. Perspective Rotation**
+Evaluate the idea from different stakeholder viewpoints:
+- "What would a skeptical end-user think?"
+- "What would a domain expert in [relevant field] criticize?"
+- "What would a regulator flag?"
+- "What would a 16-year-old think is obvious about this?"
+- "What would someone in a developing country need changed?"
+
+**3d. Stress Test Output**
+Each idea gets a survival report:
+- Kill arguments and counterarguments (freeform + structured)
+- Feasibility verdict: buildable / needs scoping / not feasible
+- Risk inventory: technical risks, adoption risks, ethical risks, timing risks, defensibility risks
+- LLM capability fit assessment and scope adjustments needed
+- Mutation suggestions: how the idea should change based on stress testing
+- Final decision: **BUILD** / **MUTATE & RETEST** / **KILL** / **INCUBATE** (promising but not ready — shelve for future re-evaluation)
+
+**3e. Build-Phase Kill Criteria**
+Define conditions that should abort the build even after the idea passes stress testing. These criteria are checked continuously during Pipeline 3 (BUILD):
+- **Fatal technical discovery**: A core dependency is unavailable, deprecated, or license-incompatible
+- **Competitor preemption**: A well-funded competitor launches an equivalent product during build
+- **Legal blocker**: Legal review reveals regulatory prohibition or unacceptable liability
+- **Scope explosion**: MVP scope has grown beyond 3x the original estimate without a corresponding increase in validated demand
+- **Hypothesis invalidation**: New evidence emerges (during build) that directly falsifies the core hypothesis
+- **Cost overrun**: Estimated infrastructure cost exceeds 5x the original estimate
+
+When a kill criterion triggers, the build pauses and presents options to the human:
+1. **KILL** — Stop the build, archive the idea with lessons learned
+2. **MUTATE** — Return to Pipeline 2 with the new information, re-scope the idea
+3. **OVERRIDE** — Human acknowledges the risk and continues (must document reasoning)
+
+Kill criteria prevent sunk-cost-driven building. It's better to kill a build at 60% than to ship something the stress test would have caught if it had this information.
+
+---
+
+## Idea Memory & Learning System
+
+### Cross-Session Memory
+The idea engine must persist knowledge across runs:
+- **Idea Archive**: Every idea ever generated, with its scores, stress test results, and final decision (build/mutate/kill)
+- **Pattern Registry**: Recurring themes, successful idea structures, common failure modes
+- **Domain Heat Map**: Which domains have been explored, which are underexplored
+- **Kill Log**: Ideas that were killed and why — prevents reinventing rejected concepts
+- **Build Log**: Ideas that were built, their outcomes, and lessons learned
+
+Storage: `./xbrain-memory/{session-id}/` for session data, `./xbrain-memory/persistent/` for cross-session knowledge
+
+### Idea Backlog & Incubation System
+Not every idea should be built or killed immediately. Some ideas are promising but need more evidence, better timing, or a missing technology to mature. The incubation system provides a structured "shelf" for these ideas.
+
+**Backlog States:**
+- **ACTIVE** — Currently in the ideation pipeline (Phases 1-4)
+- **INCUBATING** — Promising but not ready. Shelved with a re-evaluation trigger
+- **READY** — Previously incubated, now meets conditions for re-entry into the pipeline
+- **ARCHIVED** — Killed or built; retained for learning only
+
+**Incubation Triggers (conditions that move an idea from ACTIVE to INCUBATING):**
+- Stress test verdict is "promising but blocked by [specific dependency]"
+- Market timing score < 4 but impact score > 7 (right idea, wrong time)
+- Core hypothesis can't be tested yet (required data source doesn't exist, API not available)
+- Human decision between Pipeline 1 and Pipeline 2: "Not now, but revisit later"
+
+**Re-evaluation Triggers (conditions that move an idea from INCUBATING to READY):**
+- A blocking dependency becomes available (new API, new dataset, regulatory change)
+- A related idea is built and the incubated idea could compose with it
+- The Domain Heat Map shows the incubated idea's domain is now trending
+- Periodic re-scoring (every 5 runs) detects the idea's composite score has improved due to changed context
+- The human manually flags the idea for re-entry
+
+**Storage:** `./xbrain-memory/persistent/backlog.json` — array of Idea Cards with backlog state and trigger conditions
+
+**Composition Detection:**
+When reviewing the backlog, the system should check: can any incubated idea be **composed** with a recently built project? If Run 1 built a "carbon tracker" and the backlog contains "policy impact simulator," the system should surface the composition opportunity: "carbon-aware policy simulator" as a new READY idea.
+
+### Learning Feedback Loop
+After a project is built and evaluated:
+- Was the idea actually novel in practice?
+- Did the stress test predictions hold up?
+- What did we miss?
+- Feed these lessons back into the idea engine's pattern registry
+- Calibrate scoring weights: if high-scored ideas consistently underperform, adjust formula weights
+- Track false positive rate: ideas that scored well but failed in practice
+
+---
+
+## Idea Card Schema (Pipeline 1 Output Format)
+Every idea is stored as a structured Idea Card. This is the primary machine-readable output of Pipeline 1.
+
+**Note:** The `hypotheses` field is populated by Pipeline 2 (SPECIFY), not Pipeline 1. Pipeline 1 outputs Idea Cards with `hypotheses: []`.
+```json
+{
+  "id": "idea-001",
+  "title": "Civic Policy Simulator",
+  "rationale": "One paragraph explaining why this matters...",
+  "hypotheses": [
+    {
+      "id": "h1",
+      "statement": "If citizens can simulate policy changes on real municipal data, civic engagement in local elections will increase.",
+      "metric": "simulations_run_per_week",
+      "baseline": 0,
+      "target": 500,
+      "experiment": "smoke_test",
+      "falsification": "<50 simulations in first month despite 1000 page views",
+      "stop_rule": "Abandon if <100 simulations after 2 weeks of availability"
+    }
+  ],
+  "success_metrics": ["simulations_per_week", "return_user_rate", "data_accuracy_score"],
+  "composite_score": 8.4,
+  "score_breakdown": {"impact": 9.2, "confidence": 7.5, "effort": 6.0, "cost": 3.0, "ethical_risk": 2.0, "sustainability": 6.5, "defensibility": 7.0, "market_timing": 8.0},
+  "scoring_calibration_status": "uncalibrated",
+  "estimated_effort": "medium",
+  "estimated_cost_usd_month": 45,
+  "ethical_risk": "low",
+  "novelty_score": 0.78,
+  "domain_tags": ["political", "game_theory"],
+  "source_technique": "cross_domain_collision",
+  "parent_ideas": ["idea-003", "idea-017"],
+  "primary_persona": {"who": "City council member in a mid-size US city", "pain": "No way to preview policy impact before voting", "context": "Non-technical, uses Excel and email"},
+  "distribution_channel": "Direct outreach to 3 city councils + post on r/localgov",
+  "demand_signal": {"method": "forum_probe", "score": 7.2, "sample_size": 12, "key_quote": "I wish I could model this before the vote"},
+  "sustainability_model": "SaaS for municipalities at $99/month per city",
+  "defensibility_notes": "Data moat: each city's historical policy data + outcomes creates proprietary dataset",
+  "market_timing_notes": "Post-pandemic civic engagement at all-time high; open data mandates expanding",
+  "llm_capability_fit": "strong",
+  "backlog_state": "active",
+  "stress_test_verdict": "BUILD",
+  "kill_arguments_survived": 4,
+  "phase": "refine",
+  "timestamp": "2026-03-18T14:30:00Z"
+}
+```
+
+---
+
+## Real-Time Output (Pipeline 1)
+
+### Terminal Output (Live)
+The human must be able to watch the system think in real time:
+```
+[IMMERSE  Phase 0] Domain deepening: political, environmental (auto-selected: underexplored)
+[IMMERSE  0b] Political: 5 pressure points identified, 3 regulatory windows open
+[IMMERSE  0b] Environmental: 4 pressure points, 2 emerging tech enablers
+
+[DIVERGE  Round 1/3] Scanning 9 domains for unsolved problems...
+[DIVERGE  1a] Domain: Political — 4 raw ideas generated
+[DIVERGE  1a] Domain: Scientific — 3 raw ideas generated
+[DIVERGE  1a-ii] User-pain mining: 5 Reddit threads, 3 HN posts analyzed
+[DIVERGE  1b] Cross-domain collisions: 6 novel intersections found
+[DIVERGE  1c] Contrarian inversions: 4 hypotheses generated
+[DIVERGE  1d] Contextual constraints: "must work on 2G" applied to 3 developing-world ideas
+[DIVERGE  1d] Contextual constraints: "must cost $0" applied to 2 underserved-market ideas
+[DIVERGE  Round 1/3] Total raw ideas: 22
+
+[CONVERGE Round 1/2] Clustering 22 raw ideas...
+[CONVERGE 2a] 7 clusters identified, 4 merges performed → 12 candidates
+[CONVERGE 2a-ii] Persona defined for 12 candidates
+[CONVERGE 2b] Novelty check: 3 saturated (removed), 9 remain
+[CONVERGE 2c] Multi-vector scoring (8 dimensions, UNCALIBRATED). Top 6 candidates:
+  #1 [8.7] "Civic Policy Simulator" — political+game_theory — persona: city council member
+  #2 [8.3] "Research Replication Tracker" — scientific+transparency — persona: grad student
+  #3 [7.9] "Carbon Footprint Provenance Chain" — environmental+supply_chain — persona: CPO
+  ...
+[CONVERGE 2e] Human signal validation: 5-person pitch test for top 3 ideas
+[CONVERGE 2e] Demand signal: #1=7.2, #2=6.5, #3=4.1 (flagged for extra scrutiny)
+
+[STRESS   Round 1/3] Devil's Advocate attacking "Civic Policy Simulator"...
+[STRESS   3a] FREEFORM: "The real problem is trust, not simulation — citizens don't believe
+              models created by the same government they distrust"
+[STRESS   3a] Defense: "Third-party hosted, open-source model, auditable by anyone"
+[STRESS   3a] STRUCTURED: Prior art check — SimCity is entertainment, not governance
+[STRESS   3a] Attacks: 8 made, 6 survived, 2 fatal (mutated away)
+[STRESS   3b] Feasibility: BUILDABLE — LLM capability fit: STRONG
+[STRESS   3b] Defensibility: 7/10 (data moat from municipal integrations)
+[STRESS   3b] Market timing: 8/10 (open data mandates expanding)
+[STRESS   3c] Perspective: Regulator flags data accuracy liability
+[STRESS   3d] Verdict: BUILD (with scope reduction: start with one city)
+[STRESS   3e] Kill criteria defined: abort if municipal data API access denied
+
+[IDEATE   COMPLETE] Pipeline 1 finished. 2 ideas survived stress testing.
+[IDEATE   OUTPUT] Reports written to ./xbrain-runs/run-007/
+[IDEATE   OUTPUT]   idea-report.md — human-readable ranked report
+[IDEATE   OUTPUT]   idea-cards.json — 2 surviving Idea Cards
+[IDEATE   OUTPUT]   idea-log.json — full trace (22 raw → 9 filtered → 2 survivors)
+[IDEATE   OUTPUT]   stress-test-report.json — adversarial analysis
+[IDEATE   NEXT] Review the report. When ready, run:
+[IDEATE   NEXT]   xbrain specify --idea ./xbrain-runs/run-007/idea-cards.json --select idea-007
+```
+
+### Structured Log Output
+Every run produces a complete log at `./xbrain-runs/{run-id}/`:
+- `idea-log.json` — Full trace: every idea generated, scored, killed, or promoted, with reasoning
+- `stress-test-report.json` — All adversarial arguments, counterarguments, and verdicts
+- `feasibility-report.json` — Technical feasibility assessments
+- `decision-log.json` — Human decisions and system recommendations
+- `session-summary.md` — Human-readable narrative of what happened and why
+- `memory-updates.json` — What was learned and persisted to cross-session memory
+
+---
+
+# PIPELINE 2: SPECIFY — Project Specification
+
+**Input:** Selected Idea Card from Pipeline 1 (`idea-cards.json`)
+**Output:** `./xbrain-runs/{run-id}/project-spec/` containing `project-spec.md`, `project-spec.json`, `tech-blueprint.md`, `distribution-plan.md`
+**Trigger:** `xbrain specify --idea ./xbrain-runs/{run-id}/idea-cards.json --select {idea-id}`
+
+This pipeline takes a single idea selected by the human from a Pipeline 1 run and converts it into a complete, buildable project specification. The human reviews and edits the spec before proceeding to build. The spec is just Markdown + JSON — you own it, you can modify it.
+
+---
+
+## Hypothesis Framework
+Every idea entering Pipeline 2 must be converted into one or more **testable hypotheses**. This prevents aimless building and gives clear go/no-go signals.
+
+### Hypothesis Template
+- **Statement**: "If we build [X], then [Y] will change by [Z] within [T] days."
+- **Primary metric**: name + baseline + target
+- **Experiment**: cheapest test to validate (from the experimentation ladder)
+- **Falsification**: what result would *disprove* this hypothesis?
+- **Stop rule**: when to abandon this line of investigation
+
+## Idea Evolution
+- Incorporate mutation suggestions from stress testing (from Pipeline 1's stress-test-report)
+- Sharpen the value proposition into one sentence
+- Define scope: what's IN the MVP and what's explicitly OUT
+- Convert each idea into testable hypotheses using the framework above
+
+## Experimentation Ladder
+Before committing to a full build, identify the cheapest experiment that validates the core hypothesis:
+1. **Paper test** — Can you explain the idea to 3 people and get genuine interest? (cost: 0)
+2. **Mockup** — Generate a clickable prototype or screenshot walkthrough (cost: minutes)
+3. **Smoke test** — Build a landing page or form to gauge real demand (cost: hours)
+4. **Spike** — Build the single riskiest technical component to prove feasibility (cost: hours-days)
+5. **MVP** — Build the minimum viable product (cost: days)
+The system picks the lowest rung that answers the biggest open question and proposes it before full build.
+
+## Technical Blueprint
+- Architecture: data model, components, APIs, UI
+- Tech stack selection via **decision matrix**: weigh latency, concurrency, ecosystem maturity, cost, and maintainability
+- Dependency inventory and risk assessment
+- Estimated complexity: small (< 500 LOC) / medium (500-2000 LOC) / large (> 2000 LOC)
+- Estimated cost: USD/month for infrastructure
+- **Spec artifacts**: user stories, acceptance criteria, API contract (OpenAPI if applicable), data model (ERD), test plan
+
+## Distribution Blueprint
+A product nobody finds is a product nobody uses. Before committing to build, define how the target persona will discover and adopt this project.
+
+**Distribution Strategy (select applicable channels):**
+- **Organic search**: What would the target persona Google? Does this idea answer a query people are already searching for? Define target keywords
+- **Community seeding**: Which specific communities (subreddits, Discord servers, Slack groups, forums, Twitter/X circles) contain the target persona? What's the natural way to introduce this without being spammy?
+- **Content leverage**: Can the project produce shareable artifacts? (e.g., a climate tool that generates embeddable visualizations, a research tool that produces citable reports)
+- **Integration hooks**: Can this plug into tools the persona already uses? (VS Code extensions, browser extensions, Slack bots, API integrations, GitHub Actions)
+- **Viral mechanics**: Does the product get better or more visible when shared? (e.g., collaborative tools, comparison tools, tools that produce public outputs)
+- **Network effects**: Does usage by one person make it more valuable for others?
+- **Developer distribution**: If targeting developers — npm/pip/crate package, GitHub template, CLI tool, or framework plugin?
+
+**GTM Minimum:**
+Every project must have at least ONE concrete distribution channel identified with a specific first action. Example: "Post to r/datascience with a demo notebook showing [specific use case] within 48 hours of launch."
+
+If no credible distribution path exists, the idea should be reconsidered — the world's best tool that nobody can find is indistinguishable from no tool.
+
+## Success Criteria
+- Define 3-5 measurable success metrics for the project
+- Define what "done" looks like for the MVP
+- Define what failure looks like (so we can detect it)
+- Tie each metric back to a testable hypothesis
+
+## Deployment Slices
+Decompose the MVP into the smallest units of functionality that are independently deployable and provide user value. Each slice should validate at least one hypothesis or reduce one risk.
+
+**Example for "Civic Policy Simulator":**
+- Slice 1: Static data viewer — display one city's policy data (validates: do users engage with the data?)
+- Slice 2: Basic simulation — change one policy parameter, see projected impact (validates: do users run simulations?)
+- Slice 3: Comparison mode — compare before/after or city-vs-city (validates: do users share results?)
+- Slice 4: Historical validation — test predictions against historical outcomes (validates: do users trust the model?)
+
+## Pipeline 2 Output Documents
+
+### `project-spec.md` (Human-Readable)
+The complete project specification in a format the developer reads, edits, and approves:
+- One-sentence value proposition
+- Target persona recap
+- Hypotheses with success/failure criteria
+- Architecture overview
+- User stories with acceptance criteria
+- API contracts
+- Data model
+- Deployment slices (ordered)
+- Distribution plan
+- Cost estimate
+- Build-phase kill criteria (carried forward from Pipeline 1 stress test)
+
+### `project-spec.json` (Machine-Readable)
+Same content in structured JSON for Pipeline 3 (BUILD) to consume programmatically.
+
+### `tech-blueprint.md`
+Detailed technical architecture: component diagram, data flow, tech stack decision matrix, dependency inventory, complexity estimate.
+
+### `distribution-plan.md`
+Full distribution strategy with specific channels, first actions, timeline, and success metrics for distribution itself.
+
+## Real-Time Output (Pipeline 2)
+```
+[SPECIFY  START] Specifying project from idea-007: "Civic Policy Simulator"
+[SPECIFY  ] Reading idea card and stress test results from ./xbrain-runs/run-007/
+[SPECIFY  ] Value proposition: "Let city council members simulate policy changes on real municipal data before voting"
+[SPECIFY  ] Scope: IN — single city data viewer + basic simulation. OUT — multi-city, real-time feeds
+[SPECIFY  ] Hypotheses: 2 defined, tied to 3 success metrics
+[SPECIFY  ] Experimentation ladder: recommend SPIKE (build data ingestion to prove API access)
+[SPECIFY  ] Technical blueprint: Next.js + Python API + PostgreSQL
+[SPECIFY  ] Distribution: direct outreach to 3 city councils + r/localgov post
+[SPECIFY  ] Sustainability: SaaS for municipalities at $99/month
+[SPECIFY  ] Deployment slices: 4 (data viewer → simulation → comparison → validation)
+[SPECIFY  ] Kill criteria: abort if municipal data API access denied, scope > 3x, cost > 5x
+[SPECIFY  COMPLETE] Specification written to ./xbrain-runs/run-007/project-spec/
+[SPECIFY  OUTPUT]   project-spec.md — human-readable full spec
+[SPECIFY  OUTPUT]   project-spec.json — machine-readable for build pipeline
+[SPECIFY  OUTPUT]   tech-blueprint.md — technical architecture
+[SPECIFY  OUTPUT]   distribution-plan.md — GTM strategy
+[SPECIFY  NEXT] Review the spec. Edit it if needed. When ready, run:
+[SPECIFY  NEXT]   xbrain build --spec ./xbrain-runs/run-007/project-spec/
+```
+
+---
+
+# PIPELINE 3: BUILD — Execution Engine
+
+**Input:** `project-spec/` directory from Pipeline 2
+**Output:** Built project codebase + `./xbrain-runs/{run-id}/build-report/` containing `build-report.md`, `audit-report.json`
+**Trigger:** `xbrain build --spec ./xbrain-runs/{run-id}/project-spec/`
+
+This pipeline takes the approved project specification and builds it. The developer reviews the built code, runs it, and tests it before proceeding to evaluation.
+
+---
+
+## System Overview
+The execution engine reads the project spec from Pipeline 2 and executes it. It plans, scaffolds, builds, audits, and iterates on the codebase — applying low-risk changes automatically and creating PRs for medium/high-risk changes. The execution loop runs up to `max_iterations` (default 5) until audits produce only "skip" actions.
+
+The execution engine supports two modes:
+- **Greenfield mode**: Build a new project from scratch (default)
+- **Enhancement mode**: Improve an existing open-source project or extend an existing codebase. In this mode, the Planner first performs a codebase analysis (architecture, conventions, test patterns, dependency graph) before generating the task graph. The Builder follows existing conventions rather than imposing new ones. This mode is activated when the idea spec references an existing repository or the human specifies a target codebase.
+
+## Execution Architecture
+
+### Component Roles
+| Component | Role | Input | Output |
+|---|---|---|---|
+| **Planner** | Creates blueprint and task graph | Refined idea spec | Tasks, dependencies, estimates |
+| **Scaffolder** | Generates initial project structure | Blueprint | Boilerplate, config, directory structure |
+| **Builder** | Implements features per task graph | Task + context | Code, tests |
+| **Auditor** | Code quality checks (SOLID/DRY/YAGNI, style consolidation) | Repo snapshot | Actions: `{id,file,range,severity,effort,patch,rationale,confidence}` |
+| **Triage** | Risk/impact/effort scoring | Actions | Decisions: autoapply / PR / skip |
+| **Refactorer** | Applies patches or creates PRs | Patch + branch policy | Branch, diff, test results |
+| **CI Runner** | Lint, test, visual diff | Branch | CI report |
+| **Loop Controller** | Decides continue or stop | Audit results | Continue/stop + logs |
+| **Kill Monitor** | Checks build-phase kill criteria continuously | Build state + external signals | Continue / pause-for-human |
+
+### Multi-Agent Parallel Execution
+For medium and large projects, the execution engine can parallelize work across independent task branches:
+- **Frontend Agent**: UI components, styling, client-side logic
+- **Backend Agent**: APIs, data models, business logic, database
+- **Test Agent**: Test generation, integration tests, E2E tests, test data fixtures
+- **Infra Agent**: CI/CD config, deployment scripts, monitoring setup
+
+The Planner identifies independent task branches in the task graph and assigns them to parallel agents. A **Merge Coordinator** handles integration points between agents, resolves conflicts, and ensures interface contracts (API schemas, shared types) are honored across agents. Parallel execution is optional — small projects run single-agent by default.
+
+### Incremental Value Delivery
+Instead of building the entire MVP and then evaluating, the execution engine delivers value in increments:
+1. **Planner** decomposes the MVP into **deployment slices** — the smallest unit of functionality that is independently deployable and provides user value
+2. Each slice is built, tested, and deployed before the next slice begins
+3. After each slice deployment, run the relevant subset of success metrics from the Idea Card
+4. If a metric fails early, the system can pivot the remaining slices without having wasted effort on unvalidated features
+5. Each slice includes its own feature flag, so it can be enabled/disabled independently
+
+**Example decomposition for "Civic Policy Simulator":**
+- Slice 1: Static data viewer — display one city's policy data (validates: do users engage with the data?)
+- Slice 2: Basic simulation — change one policy parameter, see projected impact (validates: do users run simulations?)
+- Slice 3: Comparison mode — compare before/after or city-vs-city (validates: do users share results?)
+- Slice 4: Historical validation — test predictions against historical outcomes (validates: do users trust the model?)
+
+The human can stop after any slice if the metrics don't support continuing.
+
+### Execution Loop
+1. **Plan**: Generate task graph from the refined idea blueprint
+2. **Scaffold**: Create project structure, dependencies, config files, and **instrumentation** (metrics, logging, tracing, error budgets defined before any feature code)
+3. **Build**: Implement features according to task graph, writing tests alongside code. Wrap every new behavior in a **feature flag** for safe rollout
+4. **Audit**: Run multi-level code quality checks:
+   - **Static analysis**: lint, typecheck, SOLID/DRY/YAGNI pattern detection
+   - **AST pattern checks**: duplication, unused exports, complexity hotspots
+   - **Style consolidation**: duplicate/near-duplicate rules, unused selectors
+   - **Security scan**: dependency vulnerabilities, injection patterns, auth gaps
+5. **Triage**: Score each finding with concrete thresholds:
+   - **Autoapply**: `risk == low AND confidence >= 0.85 AND tests_cover_change == true`
+   - **PR** (1 reviewer required): `risk == medium AND confidence >= 0.6`
+   - **Human required**: `risk == high OR touches_backend_api OR loc_changed > LOC_APPROVAL_THRESHOLD`
+   - **Skip**: `impact < 0.3 OR effort > impact`
+   - **Iteration stop**: no actions with `decision != skip` OR reached `max_iterations`
+6. **Apply**: Refactorer applies auto patches, runs CI. For PRs, create annotated PR with tests and visual diffs
+7. **Re-audit**: If non-skipped actions remain, repeat up to `max_iterations` (default 5)
+8. **Finish**: Produce final report with action history, diffs, CI results, release recommendations
+
+### Audit Action Schema (JSON)
+```json
+{
+  "id": "act-123",
+  "file": "src/services/userService.ts",
+  "range": {"start": 120, "end": 240},
+  "severity": "medium",
+  "effort": "small",
+  "patch": "--- a/... +++ b/...",
+  "rationale": "violates single responsibility; extract auth logic",
+  "confidence": 0.87,
+  "rollback_cost": "low",
+  "evidence": ["AST-similarity:0.92", "unused-exports:0"]
+}
+```
+
+## Real-Time Output (Pipeline 3)
+```
+[BUILD    START] Building from spec: ./xbrain-runs/run-007/project-spec/
+[BUILD    ] Reading project-spec.json...
+[BUILD    ] Project: "Civic Policy Simulator" — 4 deployment slices planned
+[BUILD    PLAN] Task graph: 12 tasks, 4 independent branches (parallel execution enabled)
+[BUILD    SCAFFOLD] Project structure created: Next.js + Python API + PostgreSQL
+[BUILD    SCAFFOLD] Instrumentation: metrics, logging, tracing, error budgets configured
+[BUILD    SLICE 1/4] Building: Static data viewer
+[BUILD    ] Frontend agent: 3 components, Backend agent: 2 API endpoints
+[BUILD    AUDIT] 6 findings: 4 autoapplied (low risk), 1 PR (medium), 1 skipped
+[BUILD    CI] Lint ✓ Typecheck ✓ Tests 12/12 ✓ Security ✓
+[BUILD    SLICE 1/4] Complete. Feature-flagged and deployable.
+[BUILD    KILL-CHECK] Kill criteria: all clear
+[BUILD    SLICE 2/4] Building: Basic simulation...
+...
+[BUILD    COMPLETE] All 4 slices built. 3 iterations total.
+[BUILD    OUTPUT] Build report written to ./xbrain-runs/run-007/build-report/
+[BUILD    OUTPUT]   build-report.md — iteration history, decisions, CI results
+[BUILD    OUTPUT]   audit-report.json — all findings and resolutions
+[BUILD    OUTPUT]   Built project in ./civic-policy-simulator/
+[BUILD    NEXT] Review and test the project. When ready, run:
+[BUILD    NEXT]   xbrain evaluate --project ./civic-policy-simulator/ --spec ./xbrain-runs/run-007/project-spec/
+```
+
+---
+
+# PIPELINE 4: EVALUATE — Feedback & Learning
+
+**Input:** Built project directory + Idea Card (`idea-cards.json`) + project spec (`project-spec/`)
+**Output:** `./xbrain-runs/{run-id}/evaluation-report/` containing `evaluation-report.md`, `hypothesis-results.json`, `memory-updates.json`
+**Trigger:** `xbrain evaluate --project ./my-project/ --spec ./xbrain-runs/{run-id}/project-spec/`
+
+This pipeline evaluates the built project against the original idea and spec. It separates idea-quality from build-quality, tests hypotheses, and produces a verdict. The developer uses this to decide: ship, iterate, pivot, or kill.
+
+---
+
+## Separate Idea Quality from Build Quality
+When a project underperforms, the cause matters. The evaluation must distinguish between:
+- **Idea-quality signals**: demand, engagement, retention, willingness to pay, user sentiment, competitive differentiation. These answer: "Was this the right thing to build?"
+- **Build-quality signals**: bug count, performance, test coverage, uptime, code quality scores, security audit results. These answer: "Was this built well?"
+
+Cross-reference: if build quality is high but idea quality is low, the idea was wrong — return to Pipeline 2 for re-specification or Pipeline 1 for new ideation. If idea quality signals are positive but build quality is poor, fix the build — don't blame the idea.
+
+## Evaluation Checklist
+- Does the prototype actually deliver on the value proposition?
+- Run the success metrics — do they pass? Attribute each to idea-quality or build-quality
+- Test each hypothesis from the Idea Card — confirmed, partially confirmed, or falsified?
+- If hypotheses fail, determine root cause (idea flaw vs. build flaw) before deciding next action
+- If idea-quality fails, the idea needs mutation (back to Pipeline 1 or 2), not just code fixes
+- If build-quality fails, re-run Pipeline 3 with fixes, not a new idea
+- Update the scoring model calibration: was the composite score predictive of actual outcomes?
+
+## External Validation (Recommended)
+Self-evaluation has blind spots. Before declaring an idea validated or falsified:
+- Get **3-5 real users** in the target persona to try the product and provide feedback (even informal)
+- Compare the built product against **1-2 existing alternatives** (if any) on concrete dimensions
+- If possible, run a **blind comparison**: show users the product and a competitor without labels, record preference
+- Document external feedback alongside internal metrics in the evaluation report
+
+The system should never declare an idea "validated" based solely on self-defined metrics measured by the same system that built it.
+
+## Verdict
+Based on the evaluation, the pipeline produces one of four verdicts:
+- **SHIP** — Idea-quality and build-quality both pass. Deploy to production
+- **ITERATE-BUILD** — Idea-quality is positive but build-quality needs work. Re-run Pipeline 3
+- **PIVOT-IDEA** — Build-quality is fine but idea-quality fails. Return to Pipeline 1 or 2 with lessons
+- **KILL** — Both quality dimensions fail or the idea is fundamentally flawed. Archive with lessons learned
+
+## Memory & Learning Updates
+After evaluation, persist knowledge for future Pipeline 1 runs:
+- Was the idea actually novel in practice?
+- Did the stress test predictions hold up?
+- What did we miss?
+- Feed these lessons back into cross-session memory (pattern registry, domain heat map, kill log)
+- Calibrate scoring weights: if high-scored ideas consistently underperform, adjust formula weights
+- Track false positive rate: ideas that scored well but failed in practice
+- Update the Idea Backlog: trigger re-evaluation of incubated ideas if relevant
+
+## Pipeline 4 Output Documents
+
+### `evaluation-report.md` (Human-Readable)
+- Idea-quality assessment with evidence
+- Build-quality assessment with metrics
+- Hypothesis test results
+- External validation summary (if gathered)
+- Verdict with reasoning
+- Recommended next action
+
+### `hypothesis-results.json` (Machine-Readable)
+Each hypothesis from the Idea Card with: status (confirmed/partially-confirmed/falsified), evidence, root cause analysis (idea-flaw vs build-flaw).
+
+### `memory-updates.json`
+What was learned and should be persisted to cross-session memory. Consumed by the memory system for future Pipeline 1 runs.
+
+## Real-Time Output (Pipeline 4)
+```
+[EVALUATE START] Evaluating ./civic-policy-simulator/ against spec
+[EVALUATE ] Reading idea card, project spec, and build report
+[EVALUATE ] Testing hypothesis h1: "civic engagement increases with policy simulation"
+[EVALUATE ] Build-quality:
+[EVALUATE ]   Test coverage: 87% ✓  Bugs: 0 critical, 2 minor  Performance: p95 < 200ms ✓
+[EVALUATE ]   Code quality: SOLID score 8.2/10  Security: no findings
+[EVALUATE ] Idea-quality:
+[EVALUATE ]   User engagement: 23 simulations in first week (target: 50) — BELOW TARGET
+[EVALUATE ]   Return rate: 45% (target: 30%) — ABOVE TARGET
+[EVALUATE ]   External validation: 3/5 test users found it "useful" or "very useful"
+[EVALUATE ] Hypothesis h1: PARTIALLY CONFIRMED — engagement below target but retention strong
+[EVALUATE ] Scoring calibration: composite predicted 8.4, actual outcome ~7.1 (delta tracked)
+[EVALUATE VERDICT] ITERATE-BUILD — idea has signal but needs better onboarding (build fix)
+[EVALUATE ] Memory updates: 4 lessons persisted to cross-session memory
+[EVALUATE COMPLETE] Report written to ./xbrain-runs/run-007/evaluation-report/
+[EVALUATE OUTPUT]   evaluation-report.md — full evaluation with verdict
+[EVALUATE OUTPUT]   hypothesis-results.json — hypothesis test results
+[EVALUATE OUTPUT]   memory-updates.json — lessons for future runs
+```
+
+---
+
+# CROSS-PIPELINE: SAFETY, GOVERNANCE & OBSERVABILITY
+
+## Human Approval Requirements
+**Mandatory human approval** for:
+- Modifications to backend public APIs or infra
+- Database migrations
+- Authentication/authorization code changes
+- Changes exceeding LOC_APPROVAL_THRESHOLD (default 50)
+- Idea selection (between Pipeline 1 and Pipeline 2 — the human always picks the idea to specify)
+
+## CI & Quality Gates
+- Lint, typecheck, unit tests, integration tests, security scan, license scan, PII scan, visual regression for frontend
+- PRs must pass all gates before merge
+- Visual diff required for frontend merges
+- **Threat modeling**: automated threat model generation for new features touching auth, data, or external APIs
+
+## Reversibility & Auditability
+- Every autoapply creates a branch and tag of the previous stable commit; merges are reversible
+- Each action includes rationale, confidence, and evidence (code snippets, AST diff)
+- Structured logs and artifacts stored in `./audit-artifacts/{run-id}/` in **immutable storage**
+- Rate limits on autoapplies per run (configurable; default max 10/day); human review required if too many changes proposed
+- Do not publish code violating licenses or containing PII without explicit human consent
+- Full **provenance chain** for every action: idea origin → evidence → code diff → tests → CI result → reviewer decision → timestamp
+
+## Canary Deployment & Auto-Rollback
+- Every deployment goes through canary first: deploy to canary environment, monitor error rate and key metrics for configurable window (default 15 minutes)
+- **Auto-rollback triggers**: error rate > baseline + 2%, key metric drops > 10%, any P0 alert fires
+- Health checks run continuously during canary window
+- Only after canary passes does staged rollout begin (5% → 25% → 100%)
+
+## Sandboxing & Test Data
+- All experiments and autoapplies run first in an **isolated sandbox** environment with synthetic/scrubbed data
+- Maintain realistic but PII-free test datasets and fixtures for consistent evaluation
+- Sandbox must replicate production topology (DB, cache, queue) at minimum scale
+
+## Idea Engine Safety
+- The idea engine (Pipeline 1) is free to think about anything — no domain restrictions
+- But ideas involving surveillance, weapons, manipulation, or illegal activity are flagged for explicit human review before proceeding
+- All generated ideas and reasoning are logged and auditable
+- The system never acts on an idea without human approval between pipelines
+
+## Agent Versioning & Drift Detection
+- Each agent/skill is independently versioned (e.g., IdeaGenerator v1.2, Auditor v2.0, DevilsAdvocate v1.1)
+- Changelogs maintained per agent; allow rollback to previous agent versions
+- **Drift detection**: periodically audit the idea engine's own outputs for systematic bias:
+  - Domain distribution: is it always generating tech ideas and ignoring political/health?
+  - Kill rate patterns: is the Devil's Advocate killing good ideas or letting weak ones through?
+  - Scoring calibration: are high-scored ideas actually succeeding when built?
+  - Schedule heuristic updates when drift exceeds threshold
+
+## Human Approval UX
+- Build a compact **review interface** for human decision points that shows:
+  - Idea card with scores, hypotheses, and stress test results
+  - Code diffs with syntax highlighting
+  - Test results and visual diffs side-by-side
+  - Rationale and evidence for each proposed action
+  - One-click approve / reject / request-changes / rollback
+- Terminal fallback: for CLI-only workflows, present the same information as formatted terminal output with numbered choices
+
+## Meta-Metrics — Measuring the Engine Itself
+xBrain must measure its own effectiveness. Without meta-metrics, there's no way to know if the engine is improving, stagnating, or degrading over time.
+
+### Engine Performance Metrics
+| Metric | Description | Target | Frequency |
+|---|---|---|---|
+| **Idea-to-BUILD rate** | % of generated ideas that reach BUILD verdict | Track trend (no fixed target initially) | Per run |
+| **BUILD-to-success rate** | % of built projects that meet their own success criteria | > 50% after calibration | Per build |
+| **Cost per quality idea** | Total tokens/compute cost ÷ number of ideas scoring > 7.0 | Decreasing trend | Per run |
+| **Scoring accuracy** | Correlation between composite score and post-build evaluation score | > 0.7 after 20 runs | Monthly |
+| **False positive rate** | % of high-scored ideas (> 8.0) that fail in practice | < 30% | Quarterly |
+| **False negative rate** | % of killed ideas that were later proven viable (when similar ideas succeed elsewhere) | Track only — hard to measure | Quarterly |
+| **Domain coverage** | % of configured domains that received at least one idea in last 10 runs | > 70% | Every 10 runs |
+| **Kill rate balance** | Devil's Advocate kill rate (should be 40-60%, not 10% or 90%) | 40-60% | Per run |
+| **Time per phase** | How long each phase takes (diverge, converge, stress test, refine) | Track variance | Per run |
+| **Human override rate** | % of system recommendations the human overrides | Track trend (high rate = miscalibration) | Monthly |
+| **Backlog conversion rate** | % of INCUBATING ideas that eventually reach BUILD | Track trend | Quarterly |
+
+### Reporting
+- After each run, append to `./xbrain-memory/persistent/meta-metrics.json`
+- Every 10 runs, generate a meta-metrics dashboard in `./xbrain-runs/meta-report.md`
+- The dashboard should flag: scoring drift, domain bias, kill rate anomalies, and calibration status
+- If BUILD-to-success rate drops below 30% for 5 consecutive builds, flag for human review of the entire pipeline
+
+## Traceability (Not Reproducibility)
+True reproducibility is impossible in a system that depends on LLM outputs, web searches, cross-session memory, and external signals — all of which are non-deterministic. Pretending otherwise is misleading.
+
+Instead, design for **traceability**: given any output (idea, score, decision, code change), you can trace back to the exact inputs, reasoning, and context that produced it.
+
+**Traceability Requirements:**
+- Every idea records: which phase produced it, which technique, which domain brief (if any), which constraints were applied
+- Every score records: raw dimension scores, the formula version and weights used, any human overrides
+- Every decision records: the options considered, the evidence for/against, the reasoning, the human input (if any)
+- Every code change records: which idea, which task in the task graph, which audit finding triggered it, the diff, the test results
+- Store LLM model version, prompt templates used, and any configuration that could affect outputs
+- Store timestamps for all operations to enable temporal debugging ("what changed between run 5 and run 6?")
+
+**What this enables:**
+- "Why did the system score this idea at 8.4?" → traceable to raw scores + formula + evidence
+- "Why was this idea killed?" → traceable to Devil's Advocate arguments + defense failure + human confirmation
+- "Why was this code change auto-applied?" → traceable to audit finding + triage score + test results
+- Debugging systematic failures across runs
+
+---
+
+# SKILL DEFINITIONS & IMPLEMENTATION
+
+xBrain is implemented as **4 independent skills**, one per pipeline. Each skill can be invoked independently.
+
+## SKILL.md — Pipeline 1: IDEATE
+
+```yaml
+name: xbrain-ideate
+description: |
+  AI idea engine that generates, filters, and stress-tests project ideas.
+  Produces a ranked report of 5-8 ideas with personas, scores, and adversarial analysis.
+  Can be run multiple times — each run produces an independent report.
+triggers:
+  - "xbrain ideate"
+  - "generate ideas"
+  - "idea engine"
+
+pipeline: 1-ideate
+input:
+  required: []
+  optional: [domain_focus, constraints, memory_path]
+output:
+  directory: ./xbrain-runs/{run_id}/
+  files:
+    - idea-report.md        # human-readable ranked report
+    - idea-cards.json        # machine-readable Idea Cards
+    - idea-log.json          # full trace of all ideas generated/scored/killed
+    - stress-test-report.json  # adversarial analysis details
+
+phases:
+  immerse:
+    rounds: 1
+    optional: true
+    steps: [domain_selection, deep_domain_study, domain_brief]
+  diverge:
+    rounds: 3
+    techniques: [domain_scan, user_pain_mining, cross_domain_collision, contrarian_inversion, contextual_constraint_injection]
+    domains: [political, scientific, societal, economic, environmental, technological, creative, health, legal]
+    raw_ideas_per_round: 15-30
+  converge:
+    rounds: 2
+    steps: [deduplication, persona_definition, novelty_verification, multi_vector_scoring, human_signal_validation]
+    scoring_dimensions: [impact, confidence, effort, cost, ethical_risk, sustainability, defensibility, market_timing]
+    output_candidates: 5-8
+  stress_test:
+    rounds: 3
+    agents: [devil_advocate_freeform, devil_advocate_structured, feasibility_checker, perspective_rotator]
+    decisions: [build, mutate_retest, kill, incubate]
+    build_phase_kill_criteria: true
+
+scoring:
+  weights: {impact: 0.25, confidence: 0.20, sustainability: 0.10, defensibility: 0.10, market_timing: 0.05, effort: -0.10, cost: -0.10, ethical_risk: -0.10}
+  calibration_status: uncalibrated
+  convergence_score_threshold: 8.0
+  convergence_plateau_delta: 0.3
+
+memory:
+  session_path: ./xbrain-memory/{session_id}/
+  persistent_path: ./xbrain-memory/persistent/
+  stores: [idea_archive, pattern_registry, domain_heat_map, kill_log, build_log, scoring_calibration, backlog, meta_metrics, domain_briefs]
+```
+
+## SKILL.md — Pipeline 2: SPECIFY
+
+```yaml
+name: xbrain-specify
+description: |
+  Takes a selected idea from Pipeline 1 and produces a complete, buildable project
+  specification including hypotheses, technical blueprint, distribution plan,
+  deployment slices, and success criteria.
+triggers:
+  - "xbrain specify"
+  - "specify project"
+  - "create spec"
+
+pipeline: 2-specify
+input:
+  required:
+    - idea_cards_path    # path to idea-cards.json from Pipeline 1
+    - selected_idea_id   # which idea to specify
+  optional: [stress_test_report_path]
+output:
+  directory: ./xbrain-runs/{run_id}/project-spec/
+  files:
+    - project-spec.md      # human-readable full specification
+    - project-spec.json    # machine-readable for Pipeline 3
+    - tech-blueprint.md    # detailed technical architecture
+    - distribution-plan.md # GTM strategy with specific actions
+
+steps:
+  - hypothesis_framing     # convert idea into testable hypotheses
+  - idea_evolution         # sharpen value prop, define MVP scope
+  - experimentation_ladder # identify cheapest validation experiment
+  - technical_blueprint    # architecture, tech stack, dependencies, cost
+  - distribution_blueprint # how target persona discovers the product
+  - success_criteria       # measurable metrics tied to hypotheses
+  - deployment_slices      # smallest independently deployable value units
+```
+
+## SKILL.md — Pipeline 3: BUILD
+
+```yaml
+name: xbrain-build
+description: |
+  Reads a project specification from Pipeline 2 and builds it. Plans, scaffolds,
+  implements, audits, and iterates. Produces working code with tests, instrumentation,
+  and feature flags.
+triggers:
+  - "xbrain build"
+  - "build project"
+
+pipeline: 3-build
+input:
+  required:
+    - spec_path    # path to project-spec/ directory from Pipeline 2
+  optional: [existing_codebase_path]
+output:
+  project_directory: ./{project_name}/
+  report_directory: ./xbrain-runs/{run_id}/build-report/
+  files:
+    - build-report.md     # iteration history, decisions, CI results
+    - audit-report.json   # all findings and resolutions
+
+execution:
+  modes: [greenfield, enhancement]
+  parallel_agents: [frontend, backend, test, infra]
+  incremental_delivery: true
+  deployment_slices: true
+  max_iterations: 5
+  interfaces:
+    - Planner.run(project_spec) -> {blueprint, task_graph, deployment_slices}
+    - Scaffolder.run(blueprint) -> {project_structure}
+    - Builder.run(task, context) -> {code, tests}
+    - Auditor.run(path, scope) -> {actions}
+    - Triage.run(actions) -> {decisions}
+    - Refactorer.run(patch, branch_policy) -> {branch, commit, tests_run, ci_status}
+    - KillMonitor.run(build_state, kill_criteria) -> {continue | pause_for_human}
+    - MergeCoordinator.run(agent_outputs) -> {integrated_codebase}
+    - LoopController.run(max_iterations) -> {final_report}
+
+config:
+  loc_approval_threshold: 50
+  autoapply_risk_threshold: low
+  autoapply_confidence_minimum: 0.85
+  pr_confidence_minimum: 0.6
+  max_autoapplies_per_day: 10
+  human_approval_required_for: [backend_api, db_migration, infra]
+  feature_flags_required: true
+  kill_monitor_enabled: true
+  parallel_execution: auto
+```
+
+## SKILL.md — Pipeline 4: EVALUATE
+
+```yaml
+name: xbrain-evaluate
+description: |
+  Evaluates a built project against the original idea and specification.
+  Separates idea-quality from build-quality. Tests hypotheses. Produces a
+  verdict (SHIP/ITERATE-BUILD/PIVOT-IDEA/KILL) and updates cross-session memory.
+triggers:
+  - "xbrain evaluate"
+  - "evaluate project"
+
+pipeline: 4-evaluate
+input:
+  required:
+    - project_path   # path to built project directory
+    - spec_path      # path to project-spec/ from Pipeline 2
+  optional: [idea_cards_path, build_report_path]
+output:
+  directory: ./xbrain-runs/{run_id}/evaluation-report/
+  files:
+    - evaluation-report.md    # human-readable evaluation with verdict
+    - hypothesis-results.json # hypothesis test results
+    - memory-updates.json     # lessons for future Pipeline 1 runs
+
+evaluation:
+  idea_quality_signals: [demand, engagement, retention, willingness_to_pay, user_sentiment, competitive_differentiation]
+  build_quality_signals: [bug_count, performance, test_coverage, uptime, code_quality, security_audit]
+  verdicts: [ship, iterate_build, pivot_idea, kill]
+  external_validation_recommended: true
+  scoring_calibration: true
+```
+
+## Cross-Pipeline Configuration
+
+```yaml
+# Shared across all pipelines
+safety:
+  require_human_approval: true
+  rollback_enabled: true
+  visual_diff_required_for_frontend_merges: true
+  flag_sensitive_ideas: true
+  idea_freedom: unconstrained
+  execution_freedom: gated
+  sandbox_required: true
+  canary_deployment: true
+  auto_rollback: true
+  feature_flags: true
+  pii_scan: true
+  license_scan: true
+  threat_modeling: true
+  drift_detection_interval: weekly
+  provenance_tracking: true
+  immutable_audit_storage: true
+  traceability: true
+  build_phase_kill_monitor: true
+  scoring_cold_start_warning: true
+  external_validation_recommended: true
+
+agent_versions:
+  idea_generator: v1.0
+  domain_immersion: v1.0
+  devil_advocate: v1.0
+  feasibility_assessor: v1.0
+  human_signal_validator: v1.0
+  auditor: v1.0
+  triage: v1.0
+  refactorer: v1.0
+  kill_monitor: v1.0
+  merge_coordinator: v1.0
+  loop_controller: v1.0
+  drift_detector: v1.0
+  meta_metrics_reporter: v1.0
+  evaluator: v1.0
+
+observability:
+  terminal_output: true
+  logs_path: ./xbrain-runs/{run_id}/
+  audit_artifacts_path: ./audit-artifacts/{run_id}/
+  meta_metrics_path: ./xbrain-memory/persistent/meta-metrics.json
+  meta_report_frequency: every_10_runs
+```
+
+---
+
+## Bootstrap Prompts (One Per Pipeline)
+
+### Pipeline 1: IDEATE — Bootstrap Prompt
+
+```
+You are xBrain IDEATE, an AI idea generation engine.
+
+YOUR MISSION: Generate genuinely novel, useful project ideas through structured
+multi-phase ideation. You produce a report — not a product. The human decides what
+happens next.
+
+INPUTS: Optional domain focus, optional constraints, cross-session memory (if available).
+OUTPUTS: Write all outputs to ./xbrain-runs/{run_id}/
+  - idea-report.md (human-readable ranked report)
+  - idea-cards.json (machine-readable Idea Cards)
+  - idea-log.json (full trace)
+  - stress-test-report.json (adversarial analysis)
+
+PHASE 0 — IMMERSE (optional):
+If domains specified or Domain Heat Map shows underexplored areas, deep-dive first.
+Study: incentive structures, regulatory landscape, existing players' blind spots,
+historical failures, adjacent technologies, and user archetypes.
+Produce a Domain Brief per domain: key tensions, pressure points, regulatory windows.
+
+PHASE 1 — DIVERGE (think widely, no judgment):
+Scan domains: political, scientific, societal, economic, environmental, technological,
+creative, health, legal. Generate 2-4 raw seeds per domain.
+Cross-domain collisions: force novel intersections between domain pairs.
+Contrarian inversion: flip 3 conventional assumptions.
+Contextual constraints: apply domain-appropriate constraints (infrastructure for
+developing-world ideas, accessibility for consumer, economic for underserved markets).
+Target: 15-30 raw ideas per round, 3 rounds.
+
+PHASE 2 — CONVERGE (filter, persona, rank):
+Cluster and merge similar ideas. Define a primary user persona for EVERY survivor.
+Verify novelty (search prior art). Score using 8-dimension weighted formula:
+  score = (0.25×impact) + (0.20×confidence) + (0.10×sustainability) + (0.10×defensibility)
+         + (0.05×market_timing) - (0.10×effort) - (0.10×cost) - (0.10×ethical_risk)
+Flag as UNCALIBRATED for first 20 runs. Report raw scores alongside composite.
+Stop early if top > 8.0 or no improvement > 0.3 in last round.
+RECOMMENDED: Gather human signal (5-person pitch, forum probe, search demand).
+Output top 5-8 candidates with full breakdowns.
+
+PHASE 3 — STRESS TEST (try to kill each idea):
+Devil's Advocate in FREEFORM mode (find devastating attacks) then STRUCTURED mode
+(ensure coverage: prior art, adoption failure, technical blockers, problem reframing,
+negative externalities, obsolescence, market timing, defensibility).
+Check LLM CAPABILITY FIT. Rotate perspectives: skeptical user, domain expert,
+regulator, teenager, developing-country user.
+Define BUILD-PHASE KILL CRITERIA for survivors.
+Output verdicts: BUILD / MUTATE / KILL / INCUBATE.
+
+PIPELINE ENDS HERE. Do NOT proceed to specification or building.
+Write the report and tell the human: "Review the report. When ready, run:
+  xbrain specify --idea ./xbrain-runs/{run_id}/idea-cards.json --select {idea-id}"
+```
+
+### Pipeline 2: SPECIFY — Bootstrap Prompt
+
+```
+You are xBrain SPECIFY, a project specification engine.
+
+YOUR MISSION: Take a selected idea from an IDEATE run and produce a complete,
+buildable project specification.
+
+INPUTS:
+  - idea-cards.json (from Pipeline 1, with selected idea ID)
+  - stress-test-report.json (from Pipeline 1, optional)
+OUTPUTS: Write all outputs to ./xbrain-runs/{run_id}/project-spec/
+  - project-spec.md (human-readable full specification)
+  - project-spec.json (machine-readable for build pipeline)
+  - tech-blueprint.md (detailed technical architecture)
+  - distribution-plan.md (GTM strategy)
+
+STEPS:
+1. Read the selected idea card and its stress test results.
+2. HYPOTHESIS FRAMING: Convert the idea into 1-3 testable hypotheses:
+   "If we build [X], then [Y] will change by [Z] within [T] days."
+   Each hypothesis needs: metric, baseline, target, falsification criteria, stop rule.
+3. IDEA EVOLUTION: Sharpen value proposition to one sentence. Define MVP scope
+   (what's IN and what's explicitly OUT). Incorporate stress test mutations.
+4. EXPERIMENTATION LADDER: Identify cheapest experiment that validates core hypothesis:
+   paper test → mockup → smoke test → spike → MVP.
+5. TECHNICAL BLUEPRINT: Architecture, tech stack (via decision matrix), dependencies,
+   complexity estimate, cost estimate, spec artifacts (user stories, acceptance criteria,
+   API contract, data model, test plan).
+6. DISTRIBUTION BLUEPRINT: How will the target persona discover this? Define at least
+   ONE concrete distribution channel with a specific first action. If no credible
+   distribution path exists, flag the idea for reconsideration.
+7. SUCCESS CRITERIA: 3-5 measurable metrics tied to hypotheses.
+8. DEPLOYMENT SLICES: Decompose MVP into smallest independently deployable value units.
+   Each slice validates at least one hypothesis or reduces one risk.
+
+PIPELINE ENDS HERE. Do NOT proceed to building.
+Write the spec and tell the human: "Review the spec. Edit if needed. When ready, run:
+  xbrain build --spec ./xbrain-runs/{run_id}/project-spec/"
+```
+
+### Pipeline 3: BUILD — Bootstrap Prompt
+
+```
+You are xBrain BUILD, an autonomous code generation engine.
+
+YOUR MISSION: Read a project specification and build it. Produce working, tested,
+audited code.
+
+INPUTS:
+  - project-spec/ directory (from Pipeline 2) containing project-spec.json,
+    tech-blueprint.md, distribution-plan.md
+OUTPUTS:
+  - Built project in ./{project_name}/
+  - Build report in ./xbrain-runs/{run_id}/build-report/
+    - build-report.md (iteration history, CI results)
+    - audit-report.json (findings and resolutions)
+
+EXECUTION:
+1. PLAN: Read project-spec.json. Generate task graph. Decompose into deployment slices.
+2. SCAFFOLD: Create project structure with instrumentation (metrics, logging, tracing,
+   error budgets) BEFORE feature code.
+3. BUILD: For medium/large projects, parallelize across independent branches (frontend,
+   backend, test, infra agents). Implement features with tests. Feature-flag everything.
+4. AUDIT: Static analysis, AST checks, style consolidation, security scan.
+   Autoapply only when: risk == low AND confidence >= 0.85 AND tests pass.
+   Create PRs for medium/high risk with evidence and rationale.
+5. DEPLOY SLICES: Build and deploy each slice independently. After each slice, run
+   relevant success metrics. If a metric fails early, pivot remaining slices.
+6. KILL MONITOR: Check build-phase kill criteria continuously. If triggered, PAUSE
+   and present options: KILL / MUTATE / OVERRIDE.
+7. LOOP: Repeat audit-fix up to max_iterations (default 5) until clean.
+
+PIPELINE ENDS HERE. Do NOT evaluate the project.
+Write the build report and tell the human: "Review and test the project. When ready, run:
+  xbrain evaluate --project ./{project_name}/ --spec ./xbrain-runs/{run_id}/project-spec/"
+```
+
+### Pipeline 4: EVALUATE — Bootstrap Prompt
+
+```
+You are xBrain EVALUATE, a project evaluation engine.
+
+YOUR MISSION: Evaluate a built project against its original idea and specification.
+Separate idea-quality from build-quality. Test hypotheses. Produce a verdict.
+
+INPUTS:
+  - Built project directory
+  - project-spec/ from Pipeline 2
+  - idea-cards.json from Pipeline 1 (optional, for scoring calibration)
+  - build-report/ from Pipeline 3 (optional)
+OUTPUTS: Write to ./xbrain-runs/{run_id}/evaluation-report/
+  - evaluation-report.md (human-readable evaluation with verdict)
+  - hypothesis-results.json (test results per hypothesis)
+  - memory-updates.json (lessons for future Pipeline 1 runs)
+
+EVALUATION:
+1. IDEA-QUALITY: Assess demand, engagement, retention, willingness to pay, user
+   sentiment, competitive differentiation. "Was this the right thing to build?"
+2. BUILD-QUALITY: Assess bugs, performance, test coverage, uptime, code quality,
+   security. "Was this built well?"
+3. CROSS-REFERENCE: High build-quality + low idea-quality = wrong idea (return to
+   Pipeline 1/2). Positive idea-quality + poor build-quality = fix the build (Pipeline 3).
+4. HYPOTHESIS TESTING: For each hypothesis, determine: confirmed / partially confirmed /
+   falsified. Identify root cause (idea flaw vs build flaw).
+5. EXTERNAL VALIDATION: RECOMMEND getting 3-5 real users to try the product.
+   Never declare "validated" based solely on self-defined metrics.
+6. VERDICT: SHIP / ITERATE-BUILD / PIVOT-IDEA / KILL
+7. MEMORY: Update cross-session memory with lessons. Calibrate scoring weights.
+   Check backlog for ideas whose re-evaluation triggers are now met.
+```
+
+---
+
+## Example Subagent Prompts
+
+### Divergent Idea Generator
+```
+You are a divergent thinking engine. Your job is to generate RAW, UNFILTERED idea seeds.
+Do NOT self-censor. Do NOT evaluate feasibility yet. Prioritize novelty and surprise.
+
+Scan these domains: political, scientific, societal, economic, environmental, technological,
+creative, health, legal.
+For each domain, identify 2-4 unsolved problems or emerging opportunities.
+Then perform 5 cross-domain collisions (pick 2 domains, force a novel intersection).
+Then generate 3 contrarian inversions (take a conventional assumption, flip it).
+
+For each idea seed, output:
+{id, concept (one sentence), source_technique, domain_tags, novelty_signal}
+
+Generate at least 20 idea seeds. Be bold. Think weird. Go wide.
+```
+
+### Devil's Advocate
+```
+You are a ruthless Devil's Advocate. Your job is to DESTROY weak ideas.
+
+For the following idea: [IDEA]
+Target persona: [PERSONA]
+
+MODE 1 — FREEFORM ATTACK:
+Study the idea deeply. Identify its weakest assumptions. Construct the most devastating
+argument you can — something the creators didn't anticipate. Think like:
+- A competitor who wants to build something better
+- A journalist writing a takedown piece
+- A VC who's seen this pitch 50 times
+- A user who tried something similar and got burned
+Do NOT follow a checklist. Find the real vulnerability.
+
+MODE 2 — STRUCTURED COVERAGE (ensure these angles were covered):
+1. "This already exists as [X]" — find prior art
+2. "Nobody will use this because..." — argue adoption failure
+3. "This is technically impossible/impractical because..." — find hard blockers
+4. "The real problem is actually..." — reframe the problem
+5. "This will cause harm because..." — identify negative externalities
+6. "In 2 years this will be irrelevant because..." — argue obsolescence
+7. "The timing is wrong because..." — too early or too late
+8. "A competitor could clone this in [X] days because..." — no defensibility
+
+For each attack (freeform + structured), be specific and evidence-based.
+After attacking, provide:
+- attacks_made (count)
+- attacks_survived (count, after defense)
+- kill_confidence (0-1)
+- strongest_argument
+- strongest_surviving_defense
+- suggested_mutation (how the idea could change to survive)
+- verdict: KILL / BUILD / MUTATE / INCUBATE
+```
+
+### Feasibility Assessor
+```
+You are a technical feasibility assessor. Evaluate whether Claude Code can build this idea.
+
+For the idea: [IDEA]
+Target persona: [PERSONA]
+
+Assess:
+1. Tech stack needed — what languages, frameworks, services?
+2. External dependencies — APIs, data sources, hardware? Are they accessible?
+3. Data requirements — what data is needed? Is it available, legal, ethical?
+4. Scope estimate — MVP in LOC: small (<500), medium (500-2000), large (>2000)
+5. Hard blockers — anything that makes this literally impossible to build?
+6. Maintenance burden — will this break in 6 months with no maintenance?
+7. Legal/ethical — any licensing, liability, or misuse concerns?
+8. LLM Capability Fit — for each core feature, rate Claude Code's ability:
+   - STRONG: text processing, code gen, API integration, data transforms, CLI tools, standard web apps
+   - MODERATE: data visualization, DB design, auth flows, real-time features
+   - WEAK: precise numerics, real-time data feeds, custom visual design, hardware, native mobile, HPC, audio/video
+   If the core value depends on a WEAK capability, flag it — the MVP must route around it.
+9. Defensibility — how hard is this to clone? Network effects? Data moats? Switching costs?
+10. Market timing — is the required infrastructure ready? Is demand present NOW?
+
+Produce feasibility matrix:
+| Dimension | Score (1-5) | Notes |
+|---|---|---|
+| Technical risk | | |
+| Data availability | | |
+| Regulatory risk | | |
+| Cost (infra/month) | | |
+| Time to prototype | | |
+| Maintenance burden | | |
+| LLM capability fit | | |
+| Defensibility | | |
+| Market timing | | |
+
+Verdict: BUILDABLE / NEEDS_SCOPING / NOT_FEASIBLE
+If NEEDS_SCOPING, specify what must be cut and propose deployment slices (smallest
+independently deployable units of value, ordered by risk reduction).
+```
+
+### Backend Auditor
+```
+Analyze path ./backend for SOLID/DRY/YAGNI violations. Output JSON actions:
+[{id, file, range, severity, effort, patch, rationale, confidence, evidence_snippet}]
+Use AST analysis for duplication and unused exports detection.
+```
+
+### Style Consolidator
+```
+Analyze ./client/styles for duplicate or near-duplicate style rules. Suggest
+variables/mixins and produce patches to consolidate. Identify selectors unused in DOM.
+```
+
+---
+
+# DEPLOYMENT & RELEASE (Applies to Pipeline 3 outputs)
+
+## Safe Rollout Strategy
+- **Start in a sandbox**: Run against a test repo with verbose logging and dry-run mode, using scrubbed test data
+- **Gradual trust**: Autoapply trivial fixes first, expand scope as confidence grows
+- **Feature flags**: Every new behavior ships behind a flag; enable progressively
+- **Canary deployment**: Deploy to canary, monitor error rate + key metrics for 15 min, auto-rollback on threshold breach
+- **Monitoring**: Runtime monitoring with automated rollback triggers (error rate > baseline + 2%, key metric drops > 10%, P0 alert)
+
+## Release Restrictions
+- No auto-merge of medium/high risk changes without human reviewers and staged rollout
+- Staged deployment: canary → 5% → 25% → 100%
+- Emergency rollback procedures documented and tested
+- Manual sign-off required; post-deployment monitoring for at least 24 hours
+- Full provenance chain stored in immutable audit storage
+
+## Quick Wins (Implement First)
+1. **Pipeline 1 standalone**: Implement `xbrain ideate` as the first working pipeline — diverge + converge + stress test. Produces idea-report.md and idea-cards.json. No build capability yet. This is your Stage 0 MVP.
+2. **Define output schemas**: Create JSON schemas for idea-cards.json, project-spec.json, hypothesis-results.json. These are the contracts between pipelines.
+3. **Pipeline 2 standalone**: Implement `xbrain specify` — reads an idea card, produces project-spec/. Test by manually writing an idea card and running specify.
+4. **Terminal output format**: Implement the real-time terminal output format (the [IDEATE], [SPECIFY], [BUILD], [EVALUATE] prefix format) so every pipeline has consistent, readable progress output.
+5. **Idea Backlog with JSON storage**: Implement basic incubation/re-evaluation triggers in ./xbrain-memory/persistent/backlog.json.
+6. **Dry-run auditor**: Create the Audit Action JSON schema and a dry-run auditor that only reports (no edits) — prep for Pipeline 3.
+7. **Cross-session memory structure**: Set up ./xbrain-memory/ directory structure with persistent stores (idea archive, pattern registry, domain heat map).
+8. **Meta-metrics tracking**: Per-run append to meta-metrics.json. Start collecting data from Pipeline 1 runs immediately.
+9. **Pipeline 3 integration**: Wire up `xbrain build` to read from project-spec/ and produce build-report/.
+10. **End-to-end dry run**: Run all 4 pipelines in sequence on a single idea to validate the document contracts work.
+
+---
+
+# WHAT'S STILL MISSING (Critical Self-Assessment)
+
+These are gaps to address in future iterations. Items previously listed here that have been integrated into the main spec are marked as [ADDRESSED].
+
+1. **External Signal Ingestion**: The system still generates ideas from internal knowledge only. A truly powerful version would ingest real-time signals — news feeds, trending GitHub repos, academic preprint abstracts, Reddit /r/changemyview debates, StackOverflow pain points — and use them as idea fuel. This requires web access or a curated signal pipeline.
+
+2. **Multi-Agent Debate Protocol**: The Devil's Advocate is now freeform + structured (see Phase 3 Stress Test), but the full model is a structured debate between 3+ agents with different priors (optimist, pessimist, pragmatist, ethicist) using formal argumentation. Ideas that survive multi-party debate are far stronger than ideas that survive a single critic.
+
+3. **Human-in-the-Loop Mid-Ideation**: [PARTIALLY ADDRESSED] Human signal validation is now in Phase 2e of Pipeline 1. The pipeline architecture itself ensures human review between every pipeline. Consider adding optional human checkpoints within Pipeline 1 at Phase 0 (domain selection) and Phase 3 (stress test review) for more interactive workflows.
+
+4. **Quantitative Novelty Scoring**: "Is this novel?" is currently vibes-based. A real system could: embed the idea as a vector, compare against a database of existing projects (GitHub, Product Hunt, arXiv), and compute a semantic distance score. Low distance = already exists.
+
+5. **Idea Genealogy**: [PARTIALLY ADDRESSED] `parent_ideas` field exists in the Idea Card schema, and composition detection is in the backlog system. Full genealogy visualization (idea family tree) is future work.
+
+6. **Time-Bounded Ideation**: The system should have a configurable time budget. "Spend 10 minutes on divergence, 5 on convergence, 10 on stress testing." Without time pressure, ideation sprawls. With it, the system is forced to prioritize.
+
+7. **Execution Feedback → Idea Improvement**: [ADDRESSED] Pipeline 4 (EVALUATE) separates idea-quality from build-quality signals and feeds back to the appropriate pipeline. Scoring calibration tracks composite score vs actual outcomes.
+
+8. **Portfolio Thinking**: [PARTIALLY ADDRESSED] The Idea Backlog & Incubation System supports multiple ideas at different stages. Full portfolio management (actively running 3-5 ideas in parallel across different pipeline stages) is future work.
+
+9. **Composability**: [ADDRESSED] Composition detection is built into the backlog system (see Idea Memory & Learning System).
+
+10. **Adversarial Red Teaming of the Engine Itself**: [ADDRESSED] Meta-metrics and drift detection (see Safety, Governance & Observability) cover domain distribution, kill rate patterns, scoring calibration, and systematic bias detection.
+
+11. **Reproducibility**: [ADDRESSED] Replaced with Traceability (see Safety, Governance & Observability). True reproducibility is impossible in non-deterministic systems; traceability provides equivalent debugging and auditing value.
+
+12. **Cost-Aware Ideation Budget**: [PARTIALLY ADDRESSED] Cost per quality idea is tracked in meta-metrics. Full token/compute budget enforcement per pipeline is future work.
+
+13. **Observability as a First-Class Citizen in Built Projects**: [ADDRESSED] Scaffolder creates instrumentation (metrics, logging, tracing, error budgets) before feature code (see Pipeline 3 Execution Loop).
+
+14. **Multi-Modal Ideation**: Currently limited to text. Future versions could incorporate visual inputs (screenshots of competitor UIs, diagrams, whiteboard photos) and produce visual outputs (architecture diagrams, UI mockups) as part of the ideation process.

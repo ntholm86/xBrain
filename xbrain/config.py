@@ -22,7 +22,7 @@ class Config:
     score_threshold: float = 8.0
     plateau_delta: float = 0.3
 
-    ALL_DOMAINS: list[str] = [
+    DEFAULT_DOMAINS: list[str] = [
         "political", "scientific", "societal", "economic",
         "environmental", "technological", "creative", "health", "legal",
     ]

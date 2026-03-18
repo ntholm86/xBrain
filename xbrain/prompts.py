@@ -313,10 +313,10 @@ def build_brief_context(brief_text: str | None) -> str:
     )
 
 
-def build_domain_context(domains: list[str] | None, all_domains: list[str]) -> str:
+def build_domain_context(domains: list[str] | None, default_domains: list[str]) -> str:
     if domains:
         return f"FOCUS DOMAINS: {', '.join(domains)}"
-    return f"SCAN ALL DOMAINS: {', '.join(all_domains)}"
+    return f"SCAN BROADLY — suggested starting domains include: {', '.join(default_domains)} (but explore beyond these if relevant)"
 
 
 def build_constraint_context(constraints: list[str] | None) -> str:

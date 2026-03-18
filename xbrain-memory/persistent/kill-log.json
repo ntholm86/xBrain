@@ -1,0 +1,12 @@
+[
+  {
+    "id": "idea-010",
+    "title": "Cryptographic Abuse Pattern Detector",
+    "reason": "You don't have access to the data you need. Harassment complaints are siloed in HR systems and confidential settlements. Even if you did have access, differential privacy would anonymize the abusers, making your tool useless for enforcement. You're trying to solve a data access problem with cryptography."
+  },
+  {
+    "id": "idea-001",
+    "title": "Legislative Impact Simulator",
+    "reason": "Legislators don't make decisions based on data. They make decisions based on ideology, constituent pressure, and lobbyist money. You're selling a tool to a market that doesn't want it. Even if they wanted it, the problem is unsolvable—legislative impact is fundamentally unpredictable. Any model you build will be wrong, and legislators will ignore it."
+  }
+]

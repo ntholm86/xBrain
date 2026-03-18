@@ -73,8 +73,10 @@ class IdeatePipeline:
         domains: list[str] | None = None,
         constraints: list[str] | None = None,
         brief_text: str | None = None,
+        language: str | None = None,
     ) -> Path:
         """Execute the full ideation pipeline and return the run directory."""
+        self._language = language
         run_id = self._make_run_id()
         run_dir = self.cfg.runs_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -87,6 +89,8 @@ class IdeatePipeline:
             _log("IDEATE", f"Focus domains: {', '.join(domains)}")
         if constraints:
             _log("IDEATE", f"Constraints: {', '.join(constraints)}")
+        if language:
+            _log("IDEATE", f"Language: {language}")
 
         result = IdeateRunResult(
             run_id=run_id,
@@ -152,7 +156,7 @@ class IdeatePipeline:
         _log("IMMERSE", f"Deep-diving into: {', '.join(domains)}")
 
         prompt = IMMERSE_USER.format(domains=", ".join(domains))
-        data = self.llm.generate_json(IMMERSE_SYSTEM, prompt, temperature=0.6)
+        data = self.llm.generate_json(self._sys(IMMERSE_SYSTEM), prompt, temperature=0.6)
         briefs_raw = data.get("domain_briefs", [])
 
         briefs = []
@@ -172,7 +176,7 @@ class IdeatePipeline:
     ) -> list[RawIdea]:
         _log("DIVERGE", f"Round 1/{self.cfg.diverge_rounds} — generating raw idea seeds...")
 
-        domain_ctx = build_domain_context(domains, self.cfg.ALL_DOMAINS)
+        domain_ctx = build_domain_context(domains, self.cfg.DEFAULT_DOMAINS)
         constraint_ctx = build_constraint_context(constraints)
         memory_ctx = build_memory_context(
             self.memory.past_idea_count(),
@@ -193,7 +197,7 @@ class IdeatePipeline:
             brief_context=brief_ctx,
         )
 
-        data = self.llm.generate_json(DIVERGE_SYSTEM, prompt, temperature=0.9)
+        data = self.llm.generate_json(self._sys(DIVERGE_SYSTEM), prompt, temperature=0.9)
         ideas_raw = data.get("ideas", [])
 
         ideas = []
@@ -223,7 +227,7 @@ class IdeatePipeline:
             ideas_json=ideas_json,
         )
 
-        data = self.llm.generate_json(CONVERGE_SYSTEM, prompt, temperature=0.5)
+        data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5)
 
         clustering = data.get("clustering_summary", "")
         if clustering:
@@ -269,7 +273,7 @@ class IdeatePipeline:
             candidates_json=candidates_json,
         )
 
-        data = self.llm.generate_json(STRESS_TEST_SYSTEM, prompt, temperature=0.4)
+        data = self.llm.generate_json(self._sys(STRESS_TEST_SYSTEM), prompt, temperature=0.4)
 
         results_raw = data.get("results", [])
         results = []
@@ -409,6 +413,16 @@ class IdeatePipeline:
         }
 
         self.memory.save_run(ideas_for_archive, list(domains_used), killed, metrics)
+
+    def _sys(self, base_prompt: str) -> str:
+        """Inject language instruction into a system prompt if set."""
+        if self._language:
+            return (
+                base_prompt + f" All human-readable text in your JSON response "
+                f"(titles, rationales, descriptions, attacks, defenses, personas, etc.) "
+                f"MUST be written in {self._language}. Keep JSON keys in English."
+            )
+        return base_prompt
 
     @staticmethod
     def _make_run_id() -> str:

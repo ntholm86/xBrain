@@ -7,5 +7,32 @@
     "build_count": 0,
     "tokens_in": 7606,
     "tokens_out": 17957
+  },
+  {
+    "run_id": "run-20260318-135645",
+    "timestamp": "2026-03-18T13:56:45.932396+00:00",
+    "ideas_generated": 20,
+    "candidates": 8,
+    "build_count": 0,
+    "tokens_in": 8178,
+    "tokens_out": 21997
+  },
+  {
+    "run_id": "run-20260318-142120",
+    "timestamp": "2026-03-18T14:21:20.729263+00:00",
+    "ideas_generated": 22,
+    "candidates": 8,
+    "build_count": 0,
+    "tokens_in": 8095,
+    "tokens_out": 21885
+  },
+  {
+    "run_id": "run-20260318-143002",
+    "timestamp": "2026-03-18T14:30:02.451147+00:00",
+    "ideas_generated": 20,
+    "candidates": 8,
+    "build_count": 2,
+    "tokens_in": 8664,
+    "tokens_out": 19069
   }
 ]
