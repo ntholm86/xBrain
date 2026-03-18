@@ -286,5 +286,389 @@
     "title": "Crowdsourced sprogbevarings-arkiv",
     "score": 6.5,
     "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-005-016-003-hybrid",
+    "title": "Patient Data Sovereignty Platform",
+    "score": 7.9,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-002-008-hybrid",
+    "title": "Transparent Medicine Pricing & Subscription Model",
+    "score": 7.8,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001-017-hybrid",
+    "title": "Physician Burnout Early Warning & Workflow Optimization",
+    "score": 7.1,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-012-015-hybrid",
+    "title": "Algorithmic Bias Detection & Public Accountability Scorecard",
+    "score": 7.1,
+    "verdict": "BUILD"
+  },
+  {
+    "id": "idea-018-hybrid",
+    "title": "Decentralized Clinical Trial Matching Engine",
+    "score": 7.1,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-020-hybrid",
+    "title": "Regulatory Compliance Translation for Developers",
+    "score": 7.0,
+    "verdict": "BUILD"
+  },
+  {
+    "id": "idea-019-hybrid",
+    "title": "Tech Worker Data Cooperative & Collective Bargaining Platform",
+    "score": 6.7,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-013-hybrid",
+    "title": "Crowdfunded Cybersecurity Threat Intelligence Marketplace",
+    "score": 6.6,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-003",
+    "title": "AI Skatteoptimerings-Coach for Danske Borgere",
+    "score": 7.3,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-010",
+    "title": "Politisk Økonomisk Kalkulator",
+    "score": 7.1,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-021",
+    "title": "AI Hus-Investeringsoptimizer med ROI-Beregning",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-007",
+    "title": "Pensionister som Startup-Mentorer og Micro-Investorer",
+    "score": 6.9,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001",
+    "title": "Omvendt Crowdfunding: Investorer Finder Mennesker",
+    "score": 6.8,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-004",
+    "title": "Dansk Håndværk og Ekspertise som Globalt Kursus-Marked",
+    "score": 6.6,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-014",
+    "title": "Omvendt Freelancer-Auktion: Firmaer Søger Løsninger",
+    "score": 6.4,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-012",
+    "title": "Peer-to-Peer Lån Gennem Lokale Sociale Netværk",
+    "score": 5.6,
+    "verdict": "KILL"
+  },
+  {
+    "id": "idea-013-merged",
+    "title": "Politisk Påvirkelse-Genealogi-Tracker",
+    "score": 7.9,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-006-merged",
+    "title": "Epidemiologisk Misinformation-Simulator",
+    "score": 7.8,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-009-merged",
+    "title": "Offline Diagnostisk AI for Ressourcebegrænsede Områder",
+    "score": 7.6,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-020-merged",
+    "title": "Hyper-lokal Forurenings-Crowdsource-Detektor",
+    "score": 7.5,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-015-merged",
+    "title": "Teknisk Gæld-Detektor for Open-Source",
+    "score": 7.3,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-005-merged",
+    "title": "Federated Learning for Kulturinstitutioner",
+    "score": 7.0,
+    "verdict": "INCUBATE"
+  },
+  {
+    "id": "idea-004-merged",
+    "title": "Decentraliseret Gig-Arbejder-Netværk",
+    "score": 7.0,
+    "verdict": "INCUBATE"
+  },
+  {
+    "id": "idea-002-merged",
+    "title": "Værdi-Driven Klimaprojektions-Platform",
+    "score": 6.4,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001-002-hybrid",
+    "title": "Bayesian Experiment Collective — Decentraliseret A/B-test platform med delt statistisk kraft",
+    "score": 7.5,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001-003-hybrid",
+    "title": "Federet Test-Indsigt Netværk med Differential Privacy",
+    "score": 7.5,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001-003-hybrid",
+    "title": "Federet Test-Indsigt Netværk med Differential Privacy",
+    "score": 7.5,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-002",
+    "title": "Test-Fraude-Detektor: Real-Time Compliance Engine",
+    "score": 7.2,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-002",
+    "title": "Test-Fraude-Detektor: Real-Time Compliance Engine",
+    "score": 7.2,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-005",
+    "title": "Test-Design-Oracle: AI-Drevet Hypotese-Assistent",
+    "score": 6.4,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-005",
+    "title": "Test-Design-Oracle: AI-Drevet Hypotese-Assistent",
+    "score": 6.4,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-080-082-hybrid",
+    "title": "Intent Drift Engine: Real-time Compliance & Hypothesis Refinement Platform",
+    "score": 7.7,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001-002-004-merged",
+    "title": "Refinement Auditor: Cross-Domain Iteration Optimizer",
+    "score": 7.5,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-002",
+    "title": "Refinement Debt Visualizer: Technical Iteration Cost Analyzer",
+    "score": 7.5,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-001-002-004-merged",
+    "title": "Refinement Auditor: Cross-Domain Iteration Optimizer",
+    "score": 7.5,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-002",
+    "title": "Refinement Debt Visualizer: Technical Iteration Cost Analyzer",
+    "score": 7.5,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-083-081-hybrid",
+    "title": "Refinement Integrity Auditor (Cross-Domain)",
+    "score": 7.4,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-083-081-hybrid",
+    "title": "Refinement Integrity Auditor (Cross-Domain)",
+    "score": 7.4,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-081-refined",
+    "title": "Refinement Friction Cartographer: Causal Bottleneck Analyzer",
+    "score": 7.1,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-081-refined",
+    "title": "Refinement Friction Cartographer: Causal Bottleneck Analyzer",
+    "score": 7.1,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-080-084-hybrid",
+    "title": "Refinement Velocity Intervention Engine",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-080-084-hybrid",
+    "title": "Refinement Velocity Intervention Engine",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-080-083-hybrid",
+    "title": "Refinement Decision Engine: Predict Saturation & Simulate Rollback",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-080-083-hybrid",
+    "title": "Refinement Decision Engine: Predict Saturation & Simulate Rollback",
+    "score": 7.0,
+    "verdict": "MUTATE"
+  },
+  {
+    "id": "idea-002",
+    "title": "Regnskabsrevisor-simulator for små virksomheder",
+    "score": 7.3,
+    "verdict": "BUILD",
+    "domains": [
+      "regnskab",
+      "compliance",
+      "skat"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "AI-drevet byggesagsanalysator for små byggefirmaer",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "byggeri",
+      "jura",
+      "compliance"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Arbejdsrets-compliance-checker for danske virksomheder",
+    "score": 6.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "arbejdsret",
+      "compliance",
+      "HR"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Demand Signal Injection: Market Reality Grounding",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "machine_learning"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Idea Deduplication Engine: Semantic Clustering Pre-Filter",
+    "score": 6.9,
+    "verdict": "BUILD",
+    "domains": [
+      "software_quality",
+      "machine_learning"
+    ]
+  },
+  {
+    "id": "idea-008",
+    "title": "Cross-Domain Incentive Mapper: Stakeholder Alignment Detector",
+    "score": 6.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "machine_learning"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Intra-Phase Iterative Refinement: Multi-Turn Divergence Loops",
+    "score": 6.4,
+    "verdict": "BUILD",
+    "domains": [
+      "software_quality",
+      "machine_learning"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Inverse Scoring Calibration: Flipping the Frame to Break Bias",
+    "score": 6.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "machine_learning",
+      "software_quality"
+    ]
+  },
+  {
+    "id": "hybrid-jur-001",
+    "title": "Juridisk Risiko-Radar for SMV'er",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "jura",
+      "HR",
+      "teknologi",
+      "SMV"
+    ]
+  },
+  {
+    "id": "hybrid-econ-001",
+    "title": "Økonomisk Transparens-Motor: Fra Revisor-Tekst til Handlinger",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "regnskab",
+      "økonomi",
+      "teknologi",
+      "SMV"
+    ]
+  },
+  {
+    "id": "hybrid-compliance-001",
+    "title": "Compliance-Radar: Proaktiv Arbejdsmiljø & GDPR-Scanning",
+    "score": 6.5,
+    "verdict": "BUILD",
+    "domains": [
+      "compliance",
+      "arbejdsmiljø",
+      "GDPR",
+      "teknologi",
+      "operationel"
+    ]
   }
 ]

@@ -59,6 +59,7 @@ buildable software project.
 {constraint_context}
 {memory_context}
 {immersion_context}
+{playbook_context}
 
 Apply these techniques:
 
@@ -79,6 +80,13 @@ constraint that stress-tests real-world viability:
    - For underserved-market ideas: "must cost $0 to run"
    - For sensitive-data ideas: "must work without collecting PII"
 
+5. AI-AUGMENTABLE IDEAS: Actively generate ideas that would normally \
+require deep domain expertise BUT where AI can bridge the expertise gap. \
+Think: domains where a non-expert builder + AI tools (LLMs, code gen, \
+data analysis, document parsing) can deliver expert-level value. Don't \
+filter out ideas just because the builder lacks domain credentials — \
+if AI can substitute for that expertise, the idea is valid and valuable.
+
 Respond with ONLY valid JSON:
 {{
   "ideas": [
@@ -93,6 +101,85 @@ Respond with ONLY valid JSON:
 }}
 
 Generate at least {idea_count} idea seeds. Be bold. Go wide.
+"""
+
+# ---------------------------------------------------------------------------
+# Phase 1b: DEDUP — Semantic deduplication pre-filter
+# ---------------------------------------------------------------------------
+
+DEDUP_SYSTEM = (
+    "You are a deduplication engine. Your job is to identify semantically "
+    "identical or near-identical ideas — same core concept expressed in "
+    "different words. Be aggressive about collapsing true duplicates but "
+    "preserve genuinely distinct variations. "
+    "You MUST respond with valid JSON only — no markdown, no commentary."
+)
+
+DEDUP_USER = """\
+Analyze these {idea_count} raw idea seeds and identify duplicates or \
+near-duplicates (same core concept, different wording).
+
+IDEAS:
+{ideas_json}
+
+For each cluster of duplicates, keep the BEST version (most specific, \
+most novel framing) and mark the rest for removal.
+
+Also report what themes are OVER-REPRESENTED (too many similar ideas) \
+and what areas have GAPS (no ideas generated despite being relevant).
+
+Respond with ONLY valid JSON:
+{{
+  "keep": ["idea-001", "idea-003", "idea-005"],
+  "remove": [
+    {{"id": "idea-002", "duplicate_of": "idea-001", "reason": "Same concept as idea-001 but less specific"}}
+  ],
+  "overrepresented_themes": ["theme 1", "theme 2"],
+  "gap_areas": ["area with no ideas that should have been explored", "another gap"]
+}}
+"""
+
+# ---------------------------------------------------------------------------
+# Phase 1c: DIVERGE GAP-FILL — Fill gaps identified by dedup
+# ---------------------------------------------------------------------------
+
+DIVERGE_GAPFILL_SYSTEM = (
+    "You are a divergent thinking engine specializing in gap-filling. "
+    "You have seen the ideas from a previous round and know which themes "
+    "are over-represented and which areas are unexplored. Your job is to "
+    "generate ideas ONLY in the gap areas — do NOT repeat themes that "
+    "already have enough ideas. Be maximally creative and diverse. "
+    "You MUST respond with valid JSON only — no markdown, no commentary."
+)
+
+DIVERGE_GAPFILL_USER = """\
+Generate {idea_count} NEW idea seeds that fill the gaps from a previous \
+ideation round.
+
+{brief_context}
+{domain_context}
+{playbook_context}
+
+PREVIOUS ROUND ANALYSIS:
+- Over-represented themes (DO NOT generate more of these): {overrepresented}
+- Gap areas (FOCUS here): {gaps}
+- Previous ideas (DO NOT duplicate): {previous_titles}
+
+Generate ideas that are MAXIMALLY DIFFERENT from the previous round. \
+Explore the gap areas aggressively. Use contrarian thinking.
+
+Respond with ONLY valid JSON:
+{{
+  "ideas": [
+    {{
+      "id": "gap-001",
+      "concept": "One sentence description",
+      "source_technique": "gap_fill",
+      "domain_tags": ["domain1", "domain2"],
+      "novelty_signal": "Why this fills a gap"
+    }}
+  ]
+}}
 """
 
 # ---------------------------------------------------------------------------
@@ -112,6 +199,8 @@ Take these {idea_count} raw idea seeds and converge them into the top \
 
 RAW IDEAS:
 {ideas_json}
+
+{calibration_context}
 
 STEPS:
 1. CLUSTER: Group similar ideas. Merge overlapping concepts into stronger \
@@ -139,6 +228,22 @@ Score novelty 0.0 to 1.0.
 
    NOTE: effort, cost, ethical_risk are NEGATIVE factors — high = bad.
    Be honest and critical, not generous.
+
+5. INVERSE SCORING: For EACH candidate, ALSO answer this question:
+   "What would need to be TRUE for this idea to be TERRIBLE?"
+   List 2-3 conditions. Then score an inverse_confidence (0-10) where:
+   - 10 = the 'terrible' conditions are extremely likely (idea is fragile)
+   - 0 = the 'terrible' conditions are nearly impossible (idea is robust)
+   Use this to adjust your scores: if inverse_confidence > 6, reduce \
+   your positive dimension scores by 0.5-1.5 points. This breaks the \
+   tendency to score everything 7-8.
+
+   IMPORTANT ON EFFORT: When scoring effort, consider whether AI tools \
+(LLMs, code generation, document parsing, data analysis) can dramatically \
+reduce the expertise barrier. An idea that requires deep domain knowledge \
+should NOT be penalized on effort if that knowledge gap is bridgeable \
+via AI. Score effort based on what a competent developer WITH AI tools \
+can achieve, not on raw unaided human expertise requirements.
 
 Respond with ONLY valid JSON:
 {{
@@ -172,7 +277,11 @@ Respond with ONLY valid JSON:
       "ethical_risk_level": "low",
       "sustainability_model": "SaaS for municipalities at $99/month",
       "defensibility_notes": "Data moat from municipal API integrations",
-      "market_timing_notes": "Open data mandates expanding"
+      "market_timing_notes": "Open data mandates expanding",
+      "inverse_score": {{
+        "terrible_conditions": ["condition 1", "condition 2"],
+        "inverse_confidence": 4.5
+      }}
     }}
   ]
 }}
@@ -218,16 +327,28 @@ didn't anticipate. Think like:
    - Obsolescence: "In 2 years this'll be irrelevant because..."
    - Timing: "This is too early/too late because..."
    - Defensibility: "A competitor could clone this in [X] days"
+   - Expertise gap: "Building this requires domain expertise in [X] that \
+the builder likely lacks"
 
 3. DEFENSE: For each attack, attempt a counterargument. Be fair.
+   CRITICAL: When attacking on expertise gaps, ALWAYS evaluate whether \
+AI tools (LLMs, code gen, document parsing, domain-specific APIs) can \
+bridge that gap. If a non-expert developer + AI can realistically \
+deliver the core value, the expertise attack is NOT fatal. Only mark \
+expertise gaps as fatal when the domain requires hands-on physical \
+skills, professional licensure with legal liability, or real-time \
+human judgment that AI cannot currently replicate.
 
 4. FEASIBILITY ASSESSMENT (score each 1-5, where 5 is best/lowest risk):
    - technical_risk, data_availability, regulatory_risk, cost_infra_month
    - time_to_prototype, maintenance_burden, llm_capability_fit
    - defensibility, market_timing
-   For llm_capability_fit, consider what Claude Code is strong at (text, \
-code gen, API integration, web apps) vs weak at (real-time data, custom \
-visual design, native mobile, audio/video, hardware).
+   For llm_capability_fit, consider what AI is strong at (text analysis, \
+code gen, API integration, web apps, document parsing, data analysis, \
+domain knowledge synthesis, regulatory text interpretation, pattern \
+recognition) vs weak at (real-time data, custom visual design, native \
+mobile, audio/video, hardware, physical skills). Score HIGH when AI \
+can substitute for domain expertise the builder may lack.
 
 5. KILL CRITERIA: For surviving ideas, define 2-3 conditions that should \
 abort a build if discovered during execution.
@@ -357,3 +478,103 @@ def build_immersion_context(domain_briefs: list[dict] | None) -> str:
         if brief.get("pressure_points"):
             lines.append("Pressure points: " + "; ".join(brief["pressure_points"]))
     return "\n".join(lines)
+
+
+def build_refinement_context(
+    mutations: list[dict] | None,
+    attack_patterns: list[dict] | None,
+) -> str:
+    """Build context from previous failed ideas to guide refinement round."""
+    if not mutations and not attack_patterns:
+        return ""
+
+    lines = ["LEARNING FROM PREVIOUS ROUND (Refinement Context):"]
+
+    if mutations:
+        lines.append("\nSuggested mutations from MUTATE ideas:")
+        for m in mutations[:5]:  # Top 5 mutations to avoid overwhelming
+            idea_title = m.get("idea_title", "")
+            mutation = m.get("suggested_mutation", "")
+            if mutation:
+                lines.append(f"- [{idea_title}]: {mutation}")
+
+    if attack_patterns:
+        lines.append("\nCommon fatal attacks to avoid in new ideas:")
+        for pattern in attack_patterns[:5]:  # Top 5 patterns
+            pattern_text = pattern.get("pattern", "")
+            frequency = pattern.get("frequency", 0)
+            if pattern_text:
+                lines.append(f"- [{frequency}x]: {pattern_text}")
+
+    lines.append(
+        "\nUSE THIS: Incorporate these learnings into divergence. "
+        "Generate NEW ideas that address these mutations and avoid these attack patterns."
+    )
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Meta-Learning: Distilled playbook + score calibration
+# ---------------------------------------------------------------------------
+
+META_LEARN_SYSTEM = (
+    "You are a meta-learning engine. Analyze ideation pipeline data and "
+    "produce compact, actionable insights. Be terse. No fluff. "
+    "You MUST respond with valid JSON only."
+)
+
+META_LEARN_USER = """\
+Analyze these results from {run_count} ideation runs.
+
+SCORE DISTRIBUTION (score→verdict): {score_verdicts}
+KILL REASONS (truncated): {kill_reasons}
+ATTACK PATTERNS: {attack_patterns}
+DOMAIN HEAT MAP: {domain_heat}
+
+Distill into a compact playbook (max 200 words) with:
+1. SCORING BIAS: Are scores inflated? Which dimensions are consistently over/under-rated?
+2. FATAL PATTERNS: Top 3 reasons ideas die (one sentence each)
+3. WINNING TRAITS: What surviving ideas have in common
+4. DOMAIN GAPS: Underexplored domains worth targeting
+5. ANTI-PATTERNS: 3 idea shapes to avoid generating
+
+Respond with ONLY valid JSON:
+{{
+  "playbook": "The compact playbook text (200 words max)",
+  "score_calibration": {{
+    "bias_direction": "inflated|deflated|balanced",
+    "adjustment": "Brief instruction for scoring LLM (1 sentence)",
+    "weak_dimensions": ["dimension names that need harsher scoring"]
+  }},
+  "domain_recommendations": ["domain1", "domain2"],
+  "anti_patterns": ["pattern1", "pattern2", "pattern3"]
+}}
+"""
+
+
+def build_playbook_context(playbook: str) -> str:
+    """Inject distilled playbook into prompts (very compact)."""
+    if not playbook:
+        return ""
+    return (
+        "PLAYBOOK (learned from previous runs — follow these guidelines):\n"
+        f"{playbook}\n"
+    )
+
+
+def build_calibration_context(calibration: dict) -> str:
+    """Inject score calibration into CONVERGE prompt."""
+    if not calibration:
+        return ""
+    adj = calibration.get("adjustment", "")
+    weak = calibration.get("weak_dimensions", [])
+    if not adj and not weak:
+        return ""
+    lines = ["SCORE CALIBRATION (apply these corrections):"]
+    if adj:
+        lines.append(f"- {adj}")
+    if weak:
+        lines.append(f"- Score these dimensions MORE HARSHLY: {', '.join(weak)}")
+    return "\n".join(lines)
+

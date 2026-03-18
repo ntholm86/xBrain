@@ -102,6 +102,8 @@ class IdeaCard(BaseModel):
     sustainability_model: str = ""
     defensibility_notes: str = ""
     market_timing_notes: str = ""
+    inverse_terrible_conditions: list[str] = Field(default_factory=list)
+    inverse_confidence: float = 0.0
     llm_capability_fit: str = ""
     backlog_state: str = "active"
     stress_test_verdict: str = ""

@@ -38,6 +38,48 @@ def generate_idea_report(result: IdeateRunResult) -> str:
         f"{result.total_output_tokens:,} out"
     )
     lines.append("")
+
+    # Sort survivors for comparative summary
+    sorted_survivors = sorted(result.survivors, key=lambda c: c.composite_score, reverse=True)
+    
+    # Build a lookup for stress results (needed for all summaries)
+    stress_map: dict[str, StressTestResult] = {
+        s.idea_id: s for s in result.stress_test_results
+    }
+    
+    # Comparative Summary
+    if sorted_survivors:
+        lines.append("### Comparative Summary")
+        best_impact = max((c.score_breakdown.impact for c in sorted_survivors), default=0)
+        best_confidence = max((c.score_breakdown.confidence for c in sorted_survivors), default=0)
+        
+        # Find ideas with best metrics
+        highest_impact = next((c for c in sorted_survivors if c.score_breakdown.impact == best_impact), None)
+        highest_conf = next((c for c in sorted_survivors if c.score_breakdown.confidence == best_confidence), None)
+        
+        if highest_impact:
+            lines.append(f"- **Highest Impact:** {highest_impact.title} ({best_impact:.1f})")
+        if highest_conf:
+            lines.append(f"- **Highest Confidence:** {highest_conf.title} ({best_confidence:.1f})")
+        
+        # Effort-Impact Quadrant
+        lines.append("")
+        lines.append("### Effort-Impact Quadrant")
+        effort_threshold = 5.0  # Low effort threshold
+        impact_threshold = 7.5  # High impact threshold
+        
+        quick_wins = [c for c in sorted_survivors if c.score_breakdown.impact > impact_threshold and c.score_breakdown.effort > effort_threshold]
+        strategic = [c for c in sorted_survivors if c.score_breakdown.impact > impact_threshold and c.score_breakdown.effort <= effort_threshold]
+        low_impact = [c for c in sorted_survivors if c.score_breakdown.impact <= impact_threshold]
+        
+        if strategic:
+            lines.append(f"- **Quick Wins** (High Impact, Lower Effort): {', '.join(c.title for c in strategic[:2])}")
+        if quick_wins:
+            lines.append(f"- **Strategic** (High Impact, High Effort): {', '.join(c.title for c in quick_wins[:2])}")
+        if low_impact:
+            lines.append(f"- **Blue Sky** (Interesting but lower priority): {', '.join(c.title for c in low_impact[:2])}")
+        
+    lines.append("")
     lines.append("---")
     lines.append("")
 
@@ -56,16 +98,23 @@ def generate_idea_report(result: IdeateRunResult) -> str:
         lines.append("---")
         lines.append("")
 
-    # Build a lookup for stress results
-    stress_map: dict[str, StressTestResult] = {
-        s.idea_id: s for s in result.stress_test_results
-    }
+    # Ideas at a Glance
+    lines.append("## Ideas at a Glance")
+    lines.append("")
+    lines.append("| # | Title | Score | Effort | Verdict |")
+    lines.append("|---|-------|-------|--------|---------|")
+    for i, card in enumerate(sorted_survivors):
+        verdict = card.stress_test_verdict or (stress_map.get(card.id).verdict if stress_map.get(card.id) else "?")
+        lines.append(f"| {i+1} | {card.title[:50]}{'...' if len(card.title) > 50 else ''} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict} |")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
 
     # Detailed cards
     lines.append("## Ideas")
     lines.append("")
 
-    for i, card in enumerate(result.survivors):
+    for i, card in enumerate(sorted_survivors):
         stress = stress_map.get(card.id)
         verdict = card.stress_test_verdict or (stress.verdict if stress else "?")
         emoji = _verdict_emoji(verdict)
@@ -74,6 +123,14 @@ def generate_idea_report(result: IdeateRunResult) -> str:
         lines.append(f"**Verdict: {verdict}**")
         lines.append("")
         lines.append(f"> {card.rationale}")
+        lines.append("")
+
+        # Quick Reference Card
+        sb = card.score_breakdown
+        lines.append("**Quick Reference:**")
+        lines.append(f"- **Composite Score:** {card.composite_score:.1f} | **Effort:** {card.estimated_effort} | **Cost:** ${card.estimated_cost_usd_month:.0f}/mo")
+        market_snippet = (card.market_timing_notes[:60] + "...") if card.market_timing_notes and len(card.market_timing_notes) > 60 else (card.market_timing_notes or "TBD")
+        lines.append(f"- **Novelty:** {card.novelty_score:.2f} | **Confidence:** {sb.confidence:.1f}/10 | **Timing:** {market_snippet}")
         lines.append("")
 
         # Persona
@@ -87,14 +144,50 @@ def generate_idea_report(result: IdeateRunResult) -> str:
             lines.append(f"- **Motivation:** {p.motivation}")
         lines.append("")
 
+        # First Customer Profile (ICP)
+        lines.append("**First Customer Profile (ICP):**")
+        lines.append("- **Type:** Early adopter with acute pain point in domain")
+        lines.append(f"- **Size:** 5-50 person team / $5-50M ARR")
+        lines.append(f"- **Readiness:** High technical literacy, willing to pilot new tools")
+        lines.append("")
+
         # Score table
         _append_score_table(lines, card)
+        lines.append("")
+
+        # Key Assumptions
+        lines.append("**Key Assumptions (Critical Unknowns):**")
+        lines.append("1. Target persona exists and has sufficient budget/authority to buy")
+        lines.append("2. The stated pain point ranks in top 3 for the persona")
+        lines.append("3. LLM can reliably generate/validate core value proposition")
+        lines.append("4. Integration with existing tools is feasible within timeline")
+        lines.append("5. Market timing window remains open (not commoditized by competitors)")
         lines.append("")
 
         # Stress test details
         if stress:
             _append_stress_details(lines, stress)
             lines.append("")
+
+        # Competitive Landscape
+        if card.defensibility_notes:
+            lines.append("**Competitive Landscape:**")
+            defense_snippet = (card.defensibility_notes[:150] + "...") if len(card.defensibility_notes) > 150 else card.defensibility_notes
+            lines.append(f"- {defense_snippet}")
+            lines.append("")
+
+        # Timeline Alignment
+        lines.append("**Timeline Alignment:**")
+        if "high" in card.estimated_effort.lower():
+            lines.append("- **Status:** \"Build in 18+ months\" — strategic play, significant R&D required")
+            lines.append("- **Trigger:** Wait for market consolidation or customer pressure to validate")
+        elif "medium" in card.estimated_effort.lower():
+            lines.append("- **Status:** \"Build in 12-18 months\" — moderate scope, prove MVP first")
+            lines.append("- **Trigger:** Validate customer fit with 2-3 pilot interviews")
+        else:
+            lines.append("- **Status:** \"Quick prototype in 4-8 weeks\" — low-risk validation possible")
+            lines.append("- **Trigger:** Run spike immediately if strategic fit is high")
+        lines.append("")
 
         # Meta
         lines.append(f"**Domains:** {', '.join(card.domain_tags)}")
@@ -104,10 +197,6 @@ def generate_idea_report(result: IdeateRunResult) -> str:
         lines.append(f"**Estimated Cost:** ${card.estimated_cost_usd_month:.0f}/month")
         if card.sustainability_model:
             lines.append(f"**Sustainability:** {card.sustainability_model}")
-        if card.defensibility_notes:
-            lines.append(f"**Defensibility:** {card.defensibility_notes}")
-        if card.market_timing_notes:
-            lines.append(f"**Market Timing:** {card.market_timing_notes}")
         lines.append("")
         lines.append("---")
         lines.append("")
@@ -144,6 +233,12 @@ def _append_score_table(lines: list[str], card: IdeaCard) -> None:
     lines.append(f"| Cost | {sb.cost:.1f} | (-) |")
     lines.append(f"| Ethical Risk | {sb.ethical_risk:.1f} | (-) |")
     lines.append(f"| **Composite** | **{card.composite_score:.1f}** | |")
+    if card.inverse_terrible_conditions:
+        lines.append("")
+        lines.append(f"**Inverse Score (Fragility Check):** {card.inverse_confidence:.1f}/10")
+        lines.append("")
+        for cond in card.inverse_terrible_conditions:
+            lines.append(f"- ⚠ {cond}")
 
 
 def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:

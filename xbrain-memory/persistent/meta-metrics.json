@@ -52,5 +52,77 @@
     "build_count": 0,
     "tokens_in": 9538,
     "tokens_out": 21813
+  },
+  {
+    "run_id": "run-20260318-153131",
+    "timestamp": "2026-03-18T15:31:31.111976+00:00",
+    "ideas_generated": 20,
+    "candidates": 8,
+    "build_count": 2,
+    "tokens_in": 10636,
+    "tokens_out": 31127
+  },
+  {
+    "run_id": "run-20260318-153633",
+    "timestamp": "2026-03-18T15:36:33.797614+00:00",
+    "ideas_generated": 22,
+    "candidates": 8,
+    "build_count": 0,
+    "tokens_in": 9446,
+    "tokens_out": 22238
+  },
+  {
+    "run_id": "run-20260318-154515",
+    "timestamp": "2026-03-18T15:45:15.650196+00:00",
+    "ideas_generated": 20,
+    "candidates": 8,
+    "build_count": 0,
+    "tokens_in": 9592,
+    "tokens_out": 21616
+  },
+  {
+    "run_id": "run-20260318-155916",
+    "timestamp": "2026-03-18T15:59:16.438055+00:00",
+    "ideas_generated": 2,
+    "candidates": 1,
+    "build_count": 0,
+    "tokens_in": 9625,
+    "tokens_out": 18819
+  },
+  {
+    "run_id": "run-20260318-161602",
+    "timestamp": "2026-03-18T16:16:02.229097+00:00",
+    "ideas_generated": 3,
+    "candidates": 1,
+    "build_count": 0,
+    "tokens_in": 20388,
+    "tokens_out": 27880
+  },
+  {
+    "run_id": "run-20260318-171338",
+    "timestamp": "2026-03-18T17:13:38.757243+00:00",
+    "ideas_generated": 5,
+    "candidates": 3,
+    "build_count": 1,
+    "tokens_in": 7558,
+    "tokens_out": 12201
+  },
+  {
+    "run_id": "run-20260318-172119",
+    "timestamp": "2026-03-18T17:21:19.290923+00:00",
+    "ideas_generated": 13,
+    "candidates": 5,
+    "build_count": 2,
+    "tokens_in": 9059,
+    "tokens_out": 17084
+  },
+  {
+    "run_id": "run-20260318-175522",
+    "timestamp": "2026-03-18T17:55:22.236603+00:00",
+    "ideas_generated": 8,
+    "candidates": 3,
+    "build_count": 1,
+    "tokens_in": 8921,
+    "tokens_out": 16830
   }
 ]

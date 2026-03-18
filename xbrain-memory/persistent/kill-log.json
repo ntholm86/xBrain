@@ -8,5 +8,10 @@
     "id": "idea-001",
     "title": "Legislative Impact Simulator",
     "reason": "Legislators don't make decisions based on data. They make decisions based on ideology, constituent pressure, and lobbyist money. You're selling a tool to a market that doesn't want it. Even if they wanted it, the problem is unsolvable—legislative impact is fundamentally unpredictable. Any model you build will be wrong, and legislators will ignore it."
+  },
+  {
+    "id": "idea-012",
+    "title": "Peer-to-Peer Lån Gennem Lokale Sociale Netværk",
+    "reason": "Hvis låntager ikke betaler tilbage, ødelægger det venskabet og långiver mister penge uden sikkerhed. Regulering som bank er dyrt og komplekst. Danske banker er allerede villige til at give små lån."
   }
 ]

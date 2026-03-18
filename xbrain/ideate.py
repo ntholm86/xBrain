@@ -25,17 +25,26 @@ from xbrain.output import generate_idea_report
 from xbrain.prompts import (
     CONVERGE_SYSTEM,
     CONVERGE_USER,
+    DEDUP_SYSTEM,
+    DEDUP_USER,
+    DIVERGE_GAPFILL_SYSTEM,
+    DIVERGE_GAPFILL_USER,
     DIVERGE_SYSTEM,
     DIVERGE_USER,
     IMMERSE_SYSTEM,
     IMMERSE_USER,
+    META_LEARN_SYSTEM,
+    META_LEARN_USER,
     STRESS_TEST_SYSTEM,
     STRESS_TEST_USER,
     build_brief_context,
+    build_calibration_context,
     build_constraint_context,
     build_domain_context,
     build_immersion_context,
     build_memory_context,
+    build_playbook_context,
+    build_refinement_context,
 )
 
 
@@ -98,6 +107,9 @@ class IdeatePipeline:
             constraints=constraints or [],
         )
 
+        # Phase -1 — Meta-Learn (distill playbook if enough runs accumulated)
+        self._maybe_distill_playbook()
+
         # Phase 0 — Immerse (optional)
         domain_briefs: list[DomainBrief] = []
         if domains:
@@ -107,6 +119,18 @@ class IdeatePipeline:
         # Phase 1 — Diverge
         raw_ideas = self._phase_diverge(domains, constraints, domain_briefs, brief_text)
         result.raw_ideas = raw_ideas
+
+        # Phase 1b — Dedup + Gap Analysis
+        raw_ideas, gaps, overrepresented = self._phase_dedup(raw_ideas)
+
+        # Phase 1c — Gap-Fill Divergence (multi-turn)
+        if gaps:
+            gap_ideas = self._phase_diverge_gapfill(
+                gaps, overrepresented, raw_ideas, domains, brief_text
+            )
+            if gap_ideas:
+                raw_ideas.extend(gap_ideas)
+                result.raw_ideas = raw_ideas
 
         # Phase 2 — Converge
         candidates = self._phase_converge(raw_ideas)
@@ -120,19 +144,83 @@ class IdeatePipeline:
         survivors = self._merge_survivors(candidates, stress_results)
         result.survivors = survivors
 
+        # Check if any ideas survived with BUILD verdict — if not, trigger iterative refinement loop
+        build_count = sum(1 for s in stress_results if s.verdict == "BUILD")
+        refinement_round = 0
+        max_refinement_rounds = 3
+        refinement_error = None
+        
+        try:
+            while build_count == 0 and refinement_round < max_refinement_rounds:
+                refinement_round += 1
+                _log("IDEATE", f"")
+                _log("IDEATE", f"Refinement Round {refinement_round}/{max_refinement_rounds}: No BUILD verdicts found. Extracting learnings...")
+                
+                # Run refinement phase
+                refinement_survivors = self._phase_refine(
+                    raw_ideas, survivors, stress_results, domains, constraints, domain_briefs, brief_text,
+                    iteration=refinement_round
+                )
+                
+                if not refinement_survivors:
+                    _log("REFINE", "  No refined candidates generated. Stopping refinement loop.")
+                    break
+                
+                # Re-run stress test on refined ideas
+                refinement_stress = self._phase_stress_test(refinement_survivors)
+                
+                # Merge refinement survivors and stress results into the result
+                result.survivors.extend(refinement_survivors)
+                result.stress_test_results.extend(refinement_stress)
+                
+                # Re-merge to update verdicts
+                survivors = self._merge_survivors(survivors + refinement_survivors, result.stress_test_results)
+                result.survivors = survivors
+                
+                # Check for BUILD verdicts in this refinement round
+                build_count = sum(1 for s in refinement_stress if s.verdict == "BUILD")
+                mutate_count = sum(1 for s in refinement_stress if s.verdict == "MUTATE")
+                kill_count = sum(1 for s in refinement_stress if s.verdict == "KILL")
+                
+                _log("IDEATE", f"  Refinement round {refinement_round} results: {build_count} BUILD, {mutate_count} MUTATE, {kill_count} KILL")
+                
+                if build_count > 0:
+                    _log("IDEATE", f"  ✓ SUCCESS: {build_count} idea(s) passed all quality gates!")
+                    break
+                elif refinement_round < max_refinement_rounds:
+                    _log("IDEATE", f"  → Will continue refining ({refinement_round}/{max_refinement_rounds})")
+            
+            if build_count == 0 and refinement_round >= max_refinement_rounds:
+                _log("IDEATE", f"")
+                _log("IDEATE", f"Reached maximum refinement rounds ({max_refinement_rounds}). Proceeding with {len(survivors)} candidates.")
+        
+        except Exception as e:
+            refinement_error = e
+            _log("IDEATE", f"")
+            _log("IDEATE", f"⚠ Refinement error after round {refinement_round}: {str(e)}")
+            _log("IDEATE", f"Proceeding with round {refinement_round} results.")
+
         # Token totals
         result.total_input_tokens = self.llm.total_input_tokens
         result.total_output_tokens = self.llm.total_output_tokens
 
-        # Write outputs
-        self._write_outputs(run_dir, result)
+        # Write outputs (do this BEFORE any other processing to ensure files exist)
+        try:
+            self._write_outputs(run_dir, result)
+            _log("IDEATE", f"✓ Outputs written to {run_dir}/")
+        except Exception as write_error:
+            _log("IDEATE", f"✗ Failed to write outputs: {write_error}")
+            if refinement_error:
+                raise refinement_error  # Raise refinement error if outputs failed
+            else:
+                raise write_error
 
         # Persist to memory
         self._update_memory(result)
 
         # Print completion
-        build_count = sum(1 for s in stress_results if s.verdict == "BUILD")
-        _log("IDEATE", f"Pipeline 1 finished.  {build_count} ideas with BUILD verdict.")
+        final_build_count = sum(1 for s in result.stress_test_results if s.verdict == "BUILD")
+        _log("IDEATE", f"Pipeline 1 finished.  {final_build_count} ideas with BUILD verdict.")
         _log("IDEATE", f"Reports written to {run_dir}/")
         _log("IDEATE", f"  idea-report.md  — human-readable ranked report")
         _log("IDEATE", f"  idea-cards.json  — machine-readable Idea Cards")
@@ -151,6 +239,61 @@ class IdeatePipeline:
     # ------------------------------------------------------------------
     # Phase implementations
     # ------------------------------------------------------------------
+
+    def _maybe_distill_playbook(self) -> None:
+        """Run meta-learning distillation every 3 runs to compress learnings."""
+        runs_since = self.memory.runs_since_last_distill()
+        if runs_since < 3:
+            return  # Not enough new data to justify distillation
+
+        _log("META", f"Distilling playbook from {runs_since} new runs...")
+
+        # Gather compact data for distillation
+        score_history = self.memory.get_score_history_compact()
+        if not score_history:
+            return
+
+        kill_log = self.memory.get_kill_log()
+        kill_reasons = [
+            k.get("reason", "")[:80] for k in kill_log[-10:]
+        ]
+        attack_patterns = self.memory.get_attack_patterns()
+        domain_heat = self.memory.get_domain_heat_map()
+        total_runs = len(self.memory.get_meta_metrics())
+
+        # Compact score→verdict string: "7.5→M, 6.8→K, 8.1→B"
+        score_verdicts = ", ".join(
+            f"{sv['s']}→{sv['v'][0]}" for sv in score_history[-30:]
+        )
+
+        prompt = META_LEARN_USER.format(
+            run_count=total_runs,
+            score_verdicts=score_verdicts,
+            kill_reasons="; ".join(kill_reasons[:5]),
+            attack_patterns="; ".join(
+                p.get("pattern", "")[:60] for p in (attack_patterns or [])[:5]
+            ),
+            domain_heat=json.dumps(domain_heat),
+        )
+
+        data = self.llm.generate_json(META_LEARN_SYSTEM, prompt, temperature=0.3)
+
+        playbook = data.get("playbook", "")
+        calibration = data.get("score_calibration", {})
+
+        if playbook:
+            self.memory.save_playbook(playbook, total_runs)
+            _log("META", f"  Playbook distilled ({len(playbook)} chars)")
+
+        if calibration:
+            self.memory.save_score_calibration(calibration)
+            bias = calibration.get("bias_direction", "?")
+            weak = calibration.get("weak_dimensions", [])
+            _log("META", f"  Score calibration: bias={bias}, weak={weak}")
+
+        anti_patterns = data.get("anti_patterns", [])
+        if anti_patterns:
+            _log("META", f"  Anti-patterns: {'; '.join(anti_patterns[:3])}")
 
     def _phase_immerse(self, domains: list[str]) -> list[DomainBrief]:
         _log("IMMERSE", f"Deep-diving into: {', '.join(domains)}")
@@ -195,6 +338,7 @@ class IdeatePipeline:
             memory_context=memory_ctx,
             immersion_context=immersion_ctx,
             brief_context=brief_ctx,
+            playbook_context=build_playbook_context(self.memory.get_playbook()),
         )
 
         data = self.llm.generate_json(self._sys(DIVERGE_SYSTEM), prompt, temperature=0.9)
@@ -214,17 +358,108 @@ class IdeatePipeline:
 
         return ideas
 
+    def _phase_dedup(
+        self, raw_ideas: list[RawIdea],
+    ) -> tuple[list[RawIdea], list[str], list[str]]:
+        """Semantic deduplication: collapse near-identical ideas, identify gaps."""
+        if len(raw_ideas) < 4:
+            return raw_ideas, [], []
+
+        _log("DEDUP", f"Analyzing {len(raw_ideas)} ideas for duplicates...")
+
+        ideas_json = json.dumps(
+            [{"id": i.id, "concept": i.concept, "domain_tags": i.domain_tags}
+             for i in raw_ideas],
+            indent=2, ensure_ascii=False,
+        )
+
+        prompt = DEDUP_USER.format(
+            idea_count=len(raw_ideas),
+            ideas_json=ideas_json,
+        )
+
+        data = self.llm.generate_json(
+            self._sys(DEDUP_SYSTEM), prompt, temperature=0.2,
+        )
+
+        keep_ids = set(data.get("keep", [i.id for i in raw_ideas]))
+        removed = data.get("remove", [])
+        gaps = data.get("gap_areas", [])
+        overrepresented = data.get("overrepresented_themes", [])
+
+        if removed:
+            _log("DEDUP", f"  Removed {len(removed)} duplicates:")
+            for r in removed[:3]:
+                _log("DEDUP", f"    - {r.get('id', '?')} ≈ {r.get('duplicate_of', '?')}: {r.get('reason', '')[:60]}")
+
+        if overrepresented:
+            _log("DEDUP", f"  Over-represented: {'; '.join(overrepresented[:3])}")
+
+        if gaps:
+            _log("DEDUP", f"  Gaps found: {'; '.join(gaps[:3])}")
+
+        filtered = [i for i in raw_ideas if i.id in keep_ids]
+        _log("DEDUP", f"  {len(raw_ideas)} → {len(filtered)} unique ideas")
+
+        return filtered, gaps, overrepresented
+
+    def _phase_diverge_gapfill(
+        self,
+        gaps: list[str],
+        overrepresented: list[str],
+        existing_ideas: list[RawIdea],
+        domains: list[str] | None,
+        brief_text: str | None,
+    ) -> list[RawIdea]:
+        """Multi-turn divergence: generate new ideas to fill gaps from round 1."""
+        # Cap at half of original idea count to keep total manageable
+        gap_count = min(len(gaps) + 2, max(3, self.cfg.ideas_per_round // 2))
+        _log("DIVERGE", f"Round 2 — gap-filling {len(gaps)} gaps with {gap_count} new ideas...")
+
+        prompt = DIVERGE_GAPFILL_USER.format(
+            idea_count=gap_count,
+            brief_context=build_brief_context(brief_text),
+            domain_context=build_domain_context(domains, self.cfg.DEFAULT_DOMAINS),
+            playbook_context=build_playbook_context(self.memory.get_playbook()),
+            overrepresented="; ".join(overrepresented),
+            gaps="; ".join(gaps),
+            previous_titles="; ".join(i.concept[:60] for i in existing_ideas[:10]),
+        )
+
+        data = self.llm.generate_json(
+            self._sys(DIVERGE_GAPFILL_SYSTEM), prompt, temperature=0.95,
+        )
+
+        ideas_raw = data.get("ideas", [])
+        gap_ideas = [RawIdea(**item) for item in ideas_raw]
+
+        _log("DIVERGE", f"  Gap-fill generated {len(gap_ideas)} new ideas")
+        if gap_ideas:
+            techniques = {}
+            for idea in gap_ideas:
+                techniques[idea.source_technique] = techniques.get(idea.source_technique, 0) + 1
+            _log("DIVERGE", f"  Techniques: {', '.join(f'{k} ({v})' for k, v in techniques.items())}")
+
+        return gap_ideas
+
     def _phase_converge(self, raw_ideas: list[RawIdea]) -> list[IdeaCard]:
         _log("CONVERGE", f"Clustering and scoring {len(raw_ideas)} ideas...")
 
-        ideas_json = json.dumps(
-            [i.model_dump() for i in raw_ideas], indent=2, ensure_ascii=False,
-        )
+        # Send only essential fields to keep prompt compact
+        ideas_compact = [
+            {"id": i.id, "concept": i.concept, "domain_tags": i.domain_tags,
+             "source_technique": i.source_technique}
+            for i in raw_ideas
+        ]
+        ideas_json = json.dumps(ideas_compact, indent=2, ensure_ascii=False)
+
+        calibration_ctx = build_calibration_context(self.memory.get_score_stats())
 
         prompt = CONVERGE_USER.format(
             idea_count=len(raw_ideas),
             top_n=self.cfg.converge_top_n,
             ideas_json=ideas_json,
+            calibration_context=calibration_ctx,
         )
 
         data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5)
@@ -293,9 +528,154 @@ class IdeatePipeline:
 
         return results
 
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
+    def _phase_refine(
+        self,
+        raw_ideas: list[RawIdea],
+        candidates: list[IdeaCard],
+        stress_results: list[StressTestResult],
+        domains: list[str] | None,
+        constraints: list[str] | None,
+        domain_briefs: list[DomainBrief],
+        brief_text: str | None,
+        iteration: int = 1,
+    ) -> list[IdeaCard]:
+        """Refinement phase: extract learnings from failed ideas and generate improved ideas.
+        
+        Iteration controls learning aggressiveness:
+        - Iteration 1: Extract top mutations + attack patterns
+        - Iteration 2+: Extract more patterns, tighter constraints, lower creativity
+        """
+        _log("REFINE", f"Refinement Iteration {iteration}: Analyzing failures and learning patterns...")
+
+        # Extract mutations from MUTATE ideas (suggest specific improvements)
+        mutations = []
+        for c in candidates:
+            stress = next((s for s in stress_results if s.idea_id == c.id), None)
+            if stress and stress.verdict == "MUTATE" and stress.suggested_mutation:
+                mutations.append({
+                    "idea_id": c.id,
+                    "idea_title": c.title,
+                    "suggested_mutation": stress.suggested_mutation,
+                })
+
+        _log("REFINE", f"  Mutations extracted: {len(mutations)} suggested improvements from MUTATE verdicts")
+        if mutations[:2]:
+            for m in mutations[:2]:
+                _log("REFINE", f"    - {m['idea_title']}: {m['suggested_mutation'][:80]}")
+
+        # Extract attack patterns (what kills ideas repeatedly?)
+        attack_counter = {}
+        for s in stress_results:
+            if s.strongest_argument:
+                key = s.strongest_argument[:80]
+                attack_counter[key] = attack_counter.get(key, {"count": 0, "text": s.strongest_argument})
+                attack_counter[key]["count"] += 1
+
+        # On later iterations, be more aggressive: extract more patterns
+        max_patterns = 5 if iteration == 1 else 10
+        attack_patterns = [
+            {"pattern": v["text"], "frequency": v["count"]}
+            for v in sorted(attack_counter.values(), key=lambda x: -x["count"])[:max_patterns]
+        ]
+
+        _log("REFINE", f"  Attack patterns identified: {len(attack_patterns)} recurring threat vectors")
+        if attack_patterns[:2]:
+            for p in attack_patterns[:2]:
+                _log("REFINE", f"    - [{p['frequency']}x] {p['pattern'][:70]}")
+
+        _log("REFINE", f"  Extracted {len(mutations)} mutations and {len(attack_patterns)} attack patterns")
+
+        # Build refinement context for diverge phase
+        refinement_ctx = build_refinement_context(mutations, attack_patterns)
+        _log("REFINE", f"  Learning context prepared: {len(mutations[:5])} mutations + {len(attack_patterns[:5])} patterns")
+
+        # Diverge with refinement context — fewer ideas on later iterations for quality focus
+        domain_ctx = build_domain_context(domains, self.cfg.DEFAULT_DOMAINS)
+        constraint_ctx = build_constraint_context(constraints)
+        memory_ctx = build_memory_context(
+            self.memory.past_idea_count(),
+            self.memory.get_domain_heat_map(),
+            self.memory.killed_idea_titles(),
+        )
+        immersion_ctx = build_immersion_context(
+            [b.model_dump() for b in domain_briefs] if domain_briefs else None
+        )
+        brief_ctx = build_brief_context(brief_text)
+
+        # Adjust idea count by iteration: 1st=50%, 2nd=33%, 3rd=25%
+        ideas_divisor = 2 if iteration == 1 else (3 if iteration == 2 else 4)
+        diverge_ideas_count = max(4, self.cfg.ideas_per_round // ideas_divisor)
+        
+        prompt = DIVERGE_USER.format(
+            idea_count=diverge_ideas_count,
+            domain_context=domain_ctx,
+            constraint_context=constraint_ctx,
+            memory_context=memory_ctx,
+            immersion_context=immersion_ctx,
+            brief_context=brief_ctx,
+            playbook_context=build_playbook_context(self.memory.get_playbook()),
+        )
+
+        # Append refinement context to the prompt
+        refined_prompt = prompt + "\n\n" + refinement_ctx
+
+        # Adjust temperature: less creative on later iterations (more focused on solving problems)
+        temperature = max(0.5, 0.9 - (iteration * 0.15))
+        _log("REFINE", f"  DIVERGE: Generating {diverge_ideas_count} focused ideas (temperature={temperature:.2f})...")
+        
+        data = self.llm.generate_json(self._sys(DIVERGE_SYSTEM), refined_prompt, temperature=temperature)
+        ideas_raw = data.get("ideas", [])
+
+        refined_raw_ideas = []
+        for item in ideas_raw:
+            refined_raw_ideas.append(RawIdea(**item))
+
+        techniques = {}
+        for idea in refined_raw_ideas:
+            techniques[idea.source_technique] = techniques.get(idea.source_technique, 0) + 1
+        tech_str = ", ".join(f"{k} ({v})" for k, v in techniques.items())
+        _log("REFINE", f"  DIVERGE result: {len(refined_raw_ideas)} ideas — {tech_str}")
+
+        # Converge on refined ideas
+        ideas_json = json.dumps(
+            [i.model_dump() for i in refined_raw_ideas], indent=2, ensure_ascii=False,
+        )
+
+        converge_top_n = max(2, self.cfg.converge_top_n // ideas_divisor)
+        prompt = CONVERGE_USER.format(
+            idea_count=len(refined_raw_ideas),
+            top_n=converge_top_n,
+            ideas_json=ideas_json,
+            calibration_context=build_calibration_context(self.memory.get_score_stats()),
+        )
+
+        _log("REFINE", f"  CONVERGE: Scoring {len(refined_raw_ideas)} ideas, selecting top {converge_top_n}...")
+        data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5)
+
+        clustering = data.get("clustering_summary", "")
+        if clustering:
+            _log("REFINE", f"    Clustering: {clustering[:100]}...")
+
+        candidates_raw = data.get("candidates", [])
+        refined_candidates = []
+        for c in candidates_raw:
+            card = self._parse_candidate(c)
+            refined_candidates.append(card)
+
+        _log("REFINE", f"  CONVERGE result: {len(refined_candidates)} candidates ready for stress test")
+        for i, c in enumerate(refined_candidates[:3]):
+            _log("REFINE", f"    #{i+1} [{c.composite_score:.1f}] {c.title}")
+
+        # Save refinement run to memory
+        self.memory.save_refinement_run({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "iteration": iteration,
+            "refined_ideas_count": len(refined_candidates),
+            "mutations_extracted": len(mutations),
+            "attack_patterns_extracted": len(attack_patterns),
+        })
+
+        return refined_candidates
 
     def _parse_candidate(self, c: dict) -> IdeaCard:
         """Parse a candidate dict from the LLM into an IdeaCard with computed score."""
@@ -322,6 +702,8 @@ class IdeatePipeline:
             sustainability_model=c.get("sustainability_model", ""),
             defensibility_notes=c.get("defensibility_notes", ""),
             market_timing_notes=c.get("market_timing_notes", ""),
+            inverse_terrible_conditions=c.get("inverse_score", {}).get("terrible_conditions", []),
+            inverse_confidence=c.get("inverse_score", {}).get("inverse_confidence", 0.0),
         )
 
     def _parse_stress_result(self, r: dict) -> StressTestResult:
@@ -388,7 +770,8 @@ class IdeatePipeline:
     def _update_memory(self, result: IdeateRunResult) -> None:
         """Persist run data to cross-session memory."""
         ideas_for_archive = [
-            {"id": c.id, "title": c.title, "score": c.composite_score, "verdict": c.stress_test_verdict}
+            {"id": c.id, "title": c.title, "score": c.composite_score,
+             "verdict": c.stress_test_verdict, "domains": c.domain_tags}
             for c in result.survivors
         ]
         killed = [
@@ -397,6 +780,32 @@ class IdeatePipeline:
             }
             for c in result.survivors if c.stress_test_verdict == "KILL"
         ]
+
+        # Extract mutations from MUTATE ideas
+        mutations = []
+        for c in result.survivors:
+            if c.stress_test_verdict == "MUTATE":
+                stress = next((s for s in result.stress_test_results if s.idea_id == c.id), None)
+                if stress and stress.suggested_mutation:
+                    mutations.append({
+                        "idea_id": c.id,
+                        "idea_title": c.title,
+                        "suggested_mutation": stress.suggested_mutation,
+                    })
+
+        # Extract attack patterns (most common strongest_arguments)
+        attack_counter = {}
+        for s in result.stress_test_results:
+            if s.strongest_argument:
+                key = s.strongest_argument[:80]  # Use first 80 chars as key
+                attack_counter[key] = attack_counter.get(key, {"count": 0, "text": s.strongest_argument})
+                attack_counter[key]["count"] += 1
+
+        attack_patterns = [
+            {"pattern": v["text"], "frequency": v["count"]}
+            for v in sorted(attack_counter.values(), key=lambda x: -x["count"])[:5]
+        ]
+
         domains_used: set[str] = set()
         for c in result.survivors:
             domains_used.update(c.domain_tags)
@@ -413,6 +822,12 @@ class IdeatePipeline:
         }
 
         self.memory.save_run(ideas_for_archive, list(domains_used), killed, metrics)
+
+        # Save mutations and attack patterns for refinement learning
+        if mutations:
+            self.memory.save_mutations(mutations)
+        if attack_patterns:
+            self.memory.save_attack_patterns(attack_patterns)
 
     def _sys(self, base_prompt: str) -> str:
         """Inject language instruction into a system prompt if set."""

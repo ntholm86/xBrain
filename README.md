@@ -1,6 +1,6 @@
 # xBrain — AI Idea Engine
 
-Generate, score, and stress-test project ideas using Claude.
+Generate, score, stress-test, and refine project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then attacks every idea like a hostile VC — so only the genuinely strong ones survive.
 
 ## Setup
 
@@ -21,7 +21,7 @@ Generate, score, and stress-test project ideas using Claude.
 python -m xbrain ideate
 ```
 
-That's it. This scans all domains, generates 20 ideas, scores the top 8, and stress-tests them. Results appear in `xbrain-runs/run-YYYYMMDD-HHMMSS/`.
+That's it. This scans all domains, generates ideas, deduplicates, fills gaps, scores, and stress-tests them. Results appear in `xbrain-runs/run-YYYYMMDD-HHMMSS/`.
 
 ## The Output
 
@@ -166,6 +166,79 @@ XBRAIN_MODEL=claude-haiku-4-5-20251001  # Which Claude model to use
 XBRAIN_MAX_TOKENS=16384             # Max output tokens per API call
 ```
 
+## How It Works
+
+xBrain runs a multi-phase pipeline where each phase builds on the last. The key insight: most ideation tools generate ideas and stop. xBrain generates ideas, then actively tries to destroy them — and the ideas that survive are the ones worth building.
+
+### Pipeline Architecture
+
+```
+IMMERSE → DIVERGE → DEDUP → GAP-FILL → CONVERGE → STRESS TEST → REFINE → META-LEARN
+```
+
+**Phase 0 — IMMERSE** (optional, when `--domains` is provided)
+Deep-dive domain research. For each domain, the AI maps tensions, incentive structures, regulatory landscape, existing players, historical failures, and underserved populations. This builds context that makes later idea generation more grounded.
+
+**Phase 1 — DIVERGE** (Round 1)
+Raw idea generation. Uses five techniques simultaneously:
+1. **Domain Scan** — identify unsolved problems per domain
+2. **Cross-Domain Collision** — force novel intersections between unrelated fields
+3. **Contrarian Inversion** — flip conventional assumptions and build on the opposite
+4. **Contextual Constraints** — apply real-world constraints (offline, free, no PII)
+5. **AI-Augmentable Gap Detection** — find ideas where AI bridges the expertise gap, so a developer without domain credentials can still deliver expert-level value
+
+**Phase 1b — DEDUP** (Semantic Deduplication)
+Analyzes all raw ideas for semantic duplicates — same concept, different words. Collapses near-identical ideas and identifies which themes are over-represented and which areas have gaps. This prevents the scoring phase from wasting cycles on copies.
+
+**Phase 1c — DIVERGE GAP-FILL** (Round 2)
+Multi-turn divergence. Takes the gaps identified by dedup and generates new ideas specifically designed to fill those gaps. Uses higher creativity (temperature=0.95) and is explicitly told NOT to repeat over-represented themes. This forces diversity.
+
+**Phase 2 — CONVERGE**
+Clusters, scores, and ranks. Each idea gets:
+- A specific **persona** (who exactly would use this?)
+- **8-dimension scoring**: impact, confidence, effort, cost, ethical risk, sustainability, defensibility, market timing
+- **Inverse scoring** ("what would need to be TRUE for this to be TERRIBLE?") — breaks the tendency to score everything 7-8 by forcing the AI to articulate failure conditions. If the idea is fragile (inverse_confidence > 6), positive scores get reduced
+- **Score calibration** from the meta-learning playbook (if available)
+
+**Phase 3 — STRESS TEST**
+Devil's Advocate mode. Each idea is attacked from 9 angles:
+- Prior art, adoption failure, technical blockers, problem reframe, negative externalities, obsolescence, timing, defensibility, and expertise gaps
+- For expertise gap attacks, the AI evaluates whether AI tools can bridge the gap — only truly unbridgeable gaps (licensure, physical skills) count as fatal
+- Each idea gets a verdict: **BUILD**, **MUTATE**, **KILL**, or **INCUBATE**
+
+**Phase 4 — REFINE** (if no BUILD verdicts)
+Iterative refinement loop (up to 3 rounds). Extracts mutations from MUTATE ideas and attack patterns from the stress test, then re-runs diverge+converge+stress with progressively tighter constraints and lower creativity. Each round learns from the failures of the previous round.
+
+**Phase 5 — META-LEARN** (every 3 runs)
+Cross-session learning. Distills accumulated results into a compact playbook:
+- **Score calibration**: detects if scores are inflated/deflated and which dimensions need harsher scoring
+- **Fatal patterns**: top reasons ideas die (injected into future DIVERGE to avoid repeating mistakes)
+- **Anti-patterns**: idea shapes to stop generating
+- **Domain gaps**: underexplored areas worth targeting
+
+The playbook is injected into future runs as fixed-size context (~200 tokens), replacing the growing raw data that would otherwise bloat prompts over time.
+
+### Persistent Memory
+
+xBrain remembers across runs. Files in `xbrain-memory/persistent/`:
+
+| File | Purpose |
+|------|---------|
+| `idea-archive.json` | All ideas ever generated (scores, verdicts, domains) |
+| `kill-log.json` | Ideas that were killed and why |
+| `domain-heat-map.json` | Which domains have been explored (avoids repetition) |
+| `meta-metrics.json` | Run statistics (token usage, build rates) |
+| `playbook.json` | Distilled meta-learning playbook |
+| `score-calibration.json` | Score bias detection and correction |
+
+### The Report
+
+Each run generates `idea-report.md` with:
+- **Ideas at a Glance** — quick comparison table
+- **Comparative Summary** — highest impact, highest confidence
+- **Effort-Impact Quadrant** — quick wins vs strategic bets
+- Per-idea: persona, 8-dimension scores, **inverse fragility check**, stress test attacks/defenses, feasibility matrix, kill criteria, competitive landscape, timeline alignment
+
 ## Cost
 
-Each run makes 3-4 API calls. Approximate cost per run with Haiku: **$0.02–$0.10**.
+Each run makes 5-6 API calls (immerse + diverge + dedup + gap-fill + converge + stress test). Approximate cost per run with Haiku: **$0.03–$0.15**.
