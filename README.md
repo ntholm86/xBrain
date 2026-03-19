@@ -144,6 +144,17 @@ XBRAIN_CHEAP_MODEL=claude-haiku-4-5-20251001
 XBRAIN_BEST_MODEL=claude-sonnet-4-20250514
 ```
 
+### `estimate` — Preview costs
+
+Estimate API cost before running, with per-phase breakdown and strategy comparison. No API calls made.
+
+```
+python -m xbrain estimate --ideas 20 --top 8
+python -m xbrain estimate --ideas 30 --top 10 --domains health fintech --strategy balanced
+```
+
+Accepts `--ideas`, `--top`, `--domains`, `--constraints`, and `--strategy`.
+
 ## Examples
 
 **Open-ended brainstorm:**
@@ -297,13 +308,259 @@ XBRAIN_BEST_MODEL=claude-sonnet-4-20250514     # Model for critical phases (bala
 
 xBrain runs a multi-phase pipeline where each phase builds on the last. The key insight: most ideation tools generate ideas and stop. xBrain generates ideas, then actively tries to destroy them — and the ideas that survive are the ones worth building.
 
-### Pipeline Architecture
+### Pipeline Architecture (Detailed)
 
 ```
-CONSTRAINT CHECK → IMMERSE → DIVERGE → DEDUP → GAP-FILL → CONVERGE → ATTACK → DEFEND → REBUTTAL → REFINE → META-LEARN
-                                                                                                                   ↓
-                                                                                                              SPECIFY (Pipeline 2)
+                                    xBrain Pipeline: Prompt to Report
+                                    ==================================
+
+  USER INPUT                                    PERSISTENT MEMORY
+  +---------------------+                       +----------------------------+
+  | --brief  (text/file)|                       | xbrain-memory/persistent/  |
+  | --domains           |                       |   idea-archive.json        |
+  | --constraints       |                       |   kill-log.json            |
+  | --ideas N           |                       |   domain-heat-map.json     |
+  | --top N             |                       |   playbook.json            |
+  | --lang              |                       |   score-calibration.json   |
+  | --strategy          |                       |   idea-lineage.json        |
+  +--------+------------+                       |   idea-genes.json          |
+           |                                    |   mutation-archive.json    |
+           v                                    |   attack-patterns.json     |
+  +========================================+    |   meta-metrics.json        |
+  | PHASE -1: META-LEARN                   |    |   refinement-history.json  |
+  | (every 3 runs — runs FIRST)            |    +----------+-----------------+
+  |                                        |<---reads------+
+  |  Reads past run metrics, score history,|               |
+  |  kill reasons, attack patterns.        |               |
+  |  Distills into compact playbook        |               |
+  |  (~200 tokens) + score calibration.    |               |
+  |                                        |               |
+  |  Output: playbook.json,               |               |
+  |          score-calibration.json        |---writes----->+
+  +==================+=====================+
+                     |
+                     v
+  +========================================+
+  | PHASE -0.5: CONSTRAINT CHECK           |
+  | (auto, when 2+ constraints)            |
+  |                                        |
+  |  Detects logical contradictions.       |
+  |  Warns but does NOT block pipeline.    |
+  |  e.g. "offline" vs "real-time sync"    |
+  +==================+=====================+
+                     |
+                     v
+  +========================================+
+  | PHASE 0: IMMERSE                       |
+  | (optional, when --domains provided)    |
+  |                                        |
+  |  Per-domain deep dive:                 |
+  |    - Incentive structures              |
+  |    - Regulatory landscape              |
+  |    - Existing players & blind spots    |
+  |    - Historical failures               |
+  |    - Technology gaps                   |
+  |    - Underserved populations           |
+  |                                        |
+  |  Output: DomainBrief[] (JSON)          |
+  +==================+=====================+
+                     |
+                     v
+  +========================================+       +==========================+
+  | PHASE 1: DIVERGE (Round 1)             |       | Injected Context:        |
+  | temp=0.9                               |<------| - Playbook (meta-learn)  |
+  |                                        |       | - Domain briefs          |
+  |  Generate N raw idea seeds using       |       | - Memory (past ideas,    |
+  |  5 simultaneous techniques:            |       |   killed titles, domain  |
+  |                                        |       |   heat map)              |
+  |  1. Domain Scan                        |       | - Brief text             |
+  |  2. Cross-Domain Collision             |       | - Constraints            |
+  |  3. Contrarian Inversion              |       +==========================+
+  |  4. Contextual Constraints             |
+  |  5. AI-Augmentable Gap Detection       |
+  |                                        |
+  |  Output: RawIdea[] (id, concept,       |
+  |    source_technique, domain_tags,      |
+  |    novelty_signal)                     |
+  +==================+=====================+
+                     |
+                     v
+  +========================================+
+  | PHASE 1b: DEDUP                        |
+  | (Semantic Deduplication)               |
+  |                                        |
+  |  Collapse near-identical ideas.        |
+  |  Identify:                             |
+  |    - Over-represented themes           |
+  |    - Gap areas (missing topics)        |
+  |                                        |
+  |  Output: filtered RawIdea[],           |
+  |    gaps[], overrepresented[]           |
+  +==================+=====================+
+                     |
+                     v
+  +========================================+
+  | PHASE 1c: DIVERGE GAP-FILL (Round 2)  |
+  | temp=0.95 (max creativity)             |
+  |                                        |
+  |  Generate new ideas ONLY in gap areas. |
+  |  Explicitly avoids over-represented    |
+  |  themes. Up to 50% of original count.  |
+  |                                        |
+  |  Output: additional RawIdea[]          |
+  |    (merged with Round 1 results)       |
+  +==================+=====================+
+                     |
+                     v
+  +========================================+
+  | PHASE 2: CONVERGE                      |
+  | temp=0.5                               |
+  |                                        |
+  |  Cluster, score, rank. Select top N.   |
+  |                                        |
+  |  Per idea:                             |
+  |    - Target persona (who/pain/context) |
+  |    - 8-dim scoring (0-10 each):        |
+  |      (+) impact, confidence,           |
+  |          sustainability, defensibility,|
+  |          market_timing                 |
+  |      (-) effort, cost, ethical_risk    |
+  |    - Score reasoning per dimension     |
+  |    - Inverse scoring (fragility check) |
+  |    - Composite = weighted sum + 3.0    |
+  |      clamped to [0, 10]               |
+  |    - Calibration from meta-learn       |
+  |                                        |
+  |  Output: IdeaCard[] (top N, ranked)    |
+  +==================+=====================+
+                     |
+                     v
+  +=================================================================+
+  | PHASE 3: STRESS TEST (3-Round Adversarial Debate)               |
+  | ALL ideas tested IN PARALLEL (async API calls per idea)         |
+  |                                                                 |
+  |  +-----------------------------------------------------------+ |
+  |  | Round 1/3: ATTACK (Devil's Advocate)         temp=0.4      | |
+  |  |                                                            | |
+  |  |  9 structured attack angles per idea:                      | |
+  |  |  Prior art, Adoption failure, Technical blocker,           | |
+  |  |  Problem reframe, Negative externalities, Obsolescence,    | |
+  |  |  Timing, Defensibility, Expertise gap                      | |
+  |  |  + 1 freeform devastating attack                           | |
+  |  +------------------------------+----------------------------+ |
+  |                                  |                              |
+  |                                  v                              |
+  |  +-----------------------------------------------------------+ |
+  |  | Round 2/3: DEFEND (Idea Champion)            temp=0.4      | |
+  |  |  (uses slim context: ID + title + score only)              | |
+  |  |                                                            | |
+  |  |  Per attack: counter-argument + strengths ignored + pivot  | |
+  |  |  Outcome per exchange: SURVIVED / WEAKENED / FATAL         | |
+  |  +------------------------------+----------------------------+ |
+  |                                  |                              |
+  |                                  v                              |
+  |  +-----------------------------------------------------------+ |
+  |  | Round 3/3: REBUTTAL + VERDICT (Neutral Judge) temp=0.3    | |
+  |  |  (uses slim context: ID + title + score only)              | |
+  |  |                                                            | |
+  |  |  Attacker rebuts defenses, defender gives final word.      | |
+  |  |  Judge renders per-idea:                                   | |
+  |  |    - Feasibility matrix (9 dims, 1-5 scale)               | |
+  |  |    - Kill criteria (abort conditions)                      | |
+  |  |    - Verdict: BUILD / MUTATE / KILL / INCUBATE             | |
+  |  +-----------------------------------------------------------+ |
+  +=========================+=======================================+
+                            |
+                            v
+                   +--------+--------+
+                   | Any BUILD       |
+                   | verdicts?       |
+                   +--------+--------+
+                   YES |         | NO
+                       |         v
+                       |  +========================================+
+                       |  | PHASE 4: REFINE (up to 3 rounds)       |
+                       |  |                                        |
+                       |  |  Round loop (temp: 0.75->0.60->0.50):  |
+                       |  |                                        |
+                       |  |  1. Extract mutations from MUTATE      |
+                       |  |  2. Extract fatal attack patterns      |
+                       |  |     (top 5 round 1, top 10 later)      |
+                       |  |  3. Re-DIVERGE with learnings injected |
+                       |  |     (50%->33%->25% of idea count)      |
+                       |  |  4. Re-CONVERGE + Re-STRESS TEST       |
+                       |  |  5. Merge survivors (title dedup)      |
+                       |  |                                        |
+                       |  |  Stop when BUILD found or 3 rounds hit |
+                       |  +==================+=====================+
+                       |                     |
+                       +<--------------------+
+                       |
+                       v
+  +========================================+
+  | PHASE 5: MEMORY UPDATE                 |
+  | (automatic, every run)                 |
+  |                                        |
+  |  Writes to xbrain-memory/persistent/:  |
+  |    - Idea archive (all survivors)      |
+  |    - Kill log (KILL ideas + reasons)   |
+  |    - Mutation archive                  |
+  |    - Attack patterns                   |  +---> feeds into
+  |    - Domain heat map                   |  |     future runs
+  |    - Idea lineage (idea->run graph)    |  |     via META-LEARN
+  |    - Idea genes (score >= 6.5)         |  |
+  |    - Run metrics                       +--+
+  +==================+=====================+
+                     |
+                     v
+  +========================================+
+  | OUTPUT FILES (xbrain-runs/<run-id>/)   |
+  |                                        |
+  |  idea-report.md ............ Flagship  |
+  |    human-readable ranked report with   |
+  |    full adversarial debates, scores,   |
+  |    personas, feasibility matrices.     |
+  |                                        |
+  |  idea-cards.json ........... Machine-  |
+  |    readable survivor data.             |
+  |                                        |
+  |  idea-log.json ............. Full      |
+  |    pipeline trace (all phases).        |
+  |                                        |
+  |  stress-test-report.json ... All       |
+  |    adversarial debate results.         |
+  +==================+=====================+
+                     |
+                     | Human reviews report,
+                     | picks a BUILD idea
+                     v
+  +========================================+
+  | PIPELINE 2: SPECIFY                    |
+  | python -m xbrain specify              |
+  |   --idea idea-cards.json --select ID   |
+  |                                        |
+  |  Converts idea into actionable spec:   |
+  |    - User stories + acceptance criteria|
+  |    - Architecture + tech stack         |
+  |    - API contracts (REST endpoints)    |
+  |    - Data model + relationships        |
+  |    - 10-15 dev tasks (ordered)         |
+  |    - Risks & mitigations               |
+  |    - MVP scope (2-week sprint)         |
+  |    - Kill criteria                     |
+  |                                        |
+  |  Output: spec-<id>.md + spec-<id>.json |
+  +========================================+
 ```
+
+**Phase -1 — META-LEARN** (every 3 runs, runs at pipeline start)
+Cross-session learning. Before any ideation begins, distills accumulated results from previous runs into a compact playbook:
+- **Score calibration**: detects if scores are inflated/deflated and which dimensions need harsher scoring
+- **Fatal patterns**: top reasons ideas die (injected into DIVERGE to avoid repeating mistakes)
+- **Anti-patterns**: idea shapes to stop generating
+- **Domain gaps**: underexplored areas worth targeting
+
+The playbook is injected into future runs as fixed-size context (~200 tokens), replacing the growing raw data that would otherwise bloat prompts over time. Only triggers after 3+ runs have accumulated since the last distillation.
 
 **Phase -0.5 — CONSTRAINT CHECK** (automatic, when 2+ constraints provided)
 Analyzes constraints for logical contradictions. Warns about conflicts and suggests resolutions. Non-blocking — the pipeline continues regardless.
@@ -373,14 +630,16 @@ Iterative refinement loop — up to 3 rounds. Triggered when the stress test pro
 
 The loop stops as soon as a BUILD verdict is found or 3 rounds are exhausted. This is how xBrain iterates toward quality — each round learns from the specific failure modes of the previous round.
 
-**Phase 5 — META-LEARN** (every 3 runs)
-Cross-session learning. Distills accumulated results into a compact playbook:
-- **Score calibration**: detects if scores are inflated/deflated and which dimensions need harsher scoring
-- **Fatal patterns**: top reasons ideas die (injected into future DIVERGE to avoid repeating mistakes)
-- **Anti-patterns**: idea shapes to stop generating
-- **Domain gaps**: underexplored areas worth targeting
-
-The playbook is injected into future runs as fixed-size context (~200 tokens), replacing the growing raw data that would otherwise bloat prompts over time.
+**Phase 5 — MEMORY UPDATE** (automatic, end of every run)
+Persists all run data to cross-session memory:
+- **Idea archive**: all survivors (ID, title, score, verdict, domains) appended to the archive
+- **Kill log**: KILL ideas and their strongest fatal argument recorded for future avoidance
+- **Mutations**: MUTATE ideas with suggested improvements saved for refinement learning
+- **Attack patterns**: recurring fatal arguments extracted and stored
+- **Domain heat map**: domains used in this run tallied for exploration tracking
+- **Lineage**: idea→run relationships recorded for cross-run lineage browsing
+- **Idea genes**: high-scoring ideas (score ≥ 6.5) decomposed into reusable solution patterns (capped at 100 genes)
+- **Run metrics**: token usage, build rate, and timestamps logged
 
 ### Persistent Memory
 
