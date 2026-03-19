@@ -1702,5 +1702,101 @@
       "hearing_health",
       "medtech"
     ]
+  },
+  {
+    "id": "idea-001_merged_020",
+    "title": "Instruktør-effektivitets-dashboard med telematics-data og consulting-service",
+    "score": 7.5,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "data_analytics",
+      "driving_education",
+      "B2B_consulting",
+      "technology"
+    ]
+  },
+  {
+    "id": "idea-004_merged_gap-003",
+    "title": "Corporate fleet-training-service med arbejdsmiljø-sikkerhed-integration",
+    "score": 7.3,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "driving_education",
+      "B2B",
+      "workplace_safety",
+      "premium_service"
+    ]
+  },
+  {
+    "id": "idea-016",
+    "title": "Sommerkursus for udlændinges kørekort-anerkendelse og dansk-prøve",
+    "score": 7.1,
+    "verdict": "BUILD_WITH_PIVOT_TO_B2B",
+    "domains": [
+      "driving_education",
+      "immigration",
+      "niche_market",
+      "language_barrier"
+    ]
+  },
+  {
+    "id": "idea-002_merged_gap-008",
+    "title": "Transparens-portal for køreskoler med public rating og elev-progression-tracking",
+    "score": 6.9,
+    "verdict": "BUILD",
+    "domains": [
+      "market_transparency",
+      "platform",
+      "driving_education",
+      "data_analytics"
+    ]
+  },
+  {
+    "id": "idea-010_merged_gap-009",
+    "title": "Senior-sikkerhed-og-livslang-læring-program for 60+ chauffører",
+    "score": 6.7,
+    "verdict": "BUILD_WITH_PIVOT",
+    "domains": [
+      "driving_education",
+      "senior_market",
+      "safety",
+      "aging_population"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Outcome-based køreprøve-forberedelse-abonnement med resultat-garanti",
+    "score": 6.6,
+    "verdict": "BUILD_WITH_MANDATORY_PIVOT_TO_B2B",
+    "domains": [
+      "driving_education",
+      "digital_products",
+      "outcome_based",
+      "risk_reversal"
+    ]
+  },
+  {
+    "id": "idea-017",
+    "title": "Køre-mentor-matching-platform med peer-coaching-model",
+    "score": 6.3,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "driving_education",
+      "peer_mentoring",
+      "community",
+      "platform"
+    ]
+  },
+  {
+    "id": "idea-021",
+    "title": "Køre-prøve-forberedelse-podcast med sponsorships og lead-generation",
+    "score": 6.1,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "driving_education",
+      "content_marketing",
+      "brand_building",
+      "lead_generation"
+    ]
   }
 ]
