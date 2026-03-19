@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import json
+
 from xbrain.models import IdeaCard, IdeateRunResult, StressTestResult
 
 
@@ -224,17 +228,41 @@ def _verdict_emoji(verdict: str) -> str:
 
 def _append_score_table(lines: list[str], card: IdeaCard) -> None:
     sb = card.score_breakdown
-    lines.append("| Dimension | Score | Direction |")
-    lines.append("|-----------|-------|-----------|")
-    lines.append(f"| Impact | {sb.impact:.1f} | (+) |")
-    lines.append(f"| Confidence | {sb.confidence:.1f} | (+) |")
-    lines.append(f"| Sustainability | {sb.sustainability:.1f} | (+) |")
-    lines.append(f"| Defensibility | {sb.defensibility:.1f} | (+) |")
-    lines.append(f"| Market Timing | {sb.market_timing:.1f} | (+) |")
-    lines.append(f"| Effort | {sb.effort:.1f} | (-) |")
-    lines.append(f"| Cost | {sb.cost:.1f} | (-) |")
-    lines.append(f"| Ethical Risk | {sb.ethical_risk:.1f} | (-) |")
-    lines.append(f"| **Composite** | **{card.composite_score:.1f}** | |")
+    sr = card.score_reasoning
+    has_reasoning = bool(sr)
+
+    if has_reasoning:
+        lines.append("| Dimension | Score | Direction | Reasoning |")
+        lines.append("|-----------|-------|-----------|-----------|")
+    else:
+        lines.append("| Dimension | Score | Direction |")
+        lines.append("|-----------|-------|-----------|")
+
+    dims = [
+        ("Impact", sb.impact, "(+)", "impact"),
+        ("Confidence", sb.confidence, "(+)", "confidence"),
+        ("Sustainability", sb.sustainability, "(+)", "sustainability"),
+        ("Defensibility", sb.defensibility, "(+)", "defensibility"),
+        ("Market Timing", sb.market_timing, "(+)", "market_timing"),
+        ("Effort", sb.effort, "(-)", "effort"),
+        ("Cost", sb.cost, "(-)", "cost"),
+        ("Ethical Risk", sb.ethical_risk, "(-)", "ethical_risk"),
+    ]
+
+    for label, val, direction, key in dims:
+        reason = sr.get(key, "")
+        if has_reasoning and reason:
+            lines.append(f"| {label} | {val:.1f} | {direction} | {reason} |")
+        elif has_reasoning:
+            lines.append(f"| {label} | {val:.1f} | {direction} | — |")
+        else:
+            lines.append(f"| {label} | {val:.1f} | {direction} |")
+
+    if has_reasoning:
+        lines.append(f"| **Composite** | **{card.composite_score:.1f}** | | |")
+    else:
+        lines.append(f"| **Composite** | **{card.composite_score:.1f}** | |")
+
     if card.inverse_terrible_conditions:
         lines.append("")
         lines.append(f"**Inverse Score (Fragility Check):** {card.inverse_confidence:.1f}/10")
@@ -256,6 +284,28 @@ def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
     if stress.suggested_mutation:
         lines.append(f"- **Suggested Mutation:** {stress.suggested_mutation}")
     lines.append("")
+
+    # Adversarial Debate Case
+    if stress.debate_rounds:
+        lines.append("#### Adversarial Debate")
+        lines.append("")
+        for rnd in stress.debate_rounds:
+            outcome_emoji = {"SURVIVED": "\u2705", "FATAL": "\u274c", "WEAKENED": "\u26a0\ufe0f"}.get(rnd.outcome, "\u2753")
+            lines.append(f"**{rnd.angle}** {outcome_emoji} *{rnd.outcome}*")
+            lines.append("")
+            if rnd.attack:
+                lines.append(f"> **\U0001f525 Attacker:** {rnd.attack}")
+                lines.append("")
+            if rnd.defense:
+                lines.append(f"> **\U0001f6e1\ufe0f Defender:** {rnd.defense}")
+                lines.append("")
+            if rnd.attacker_rebuttal:
+                lines.append(f"> **\U0001f525 Attacker (rebuttal):** {rnd.attacker_rebuttal}")
+                lines.append("")
+            if rnd.defender_rebuttal:
+                lines.append(f"> **\U0001f6e1\ufe0f Defender (rebuttal):** {rnd.defender_rebuttal}")
+                lines.append("")
+        lines.append("")
 
     # Feasibility matrix
     fm = stress.feasibility_matrix
@@ -306,3 +356,138 @@ def _append_next_steps(lines: list[str], result: IdeateRunResult) -> None:
         lines.append("- Running `python -m xbrain ideate` again with different domains/constraints")
         lines.append("- Reviewing INCUBATE or MUTATE ideas for potential")
     lines.append("")
+
+
+# ------------------------------------------------------------------
+# Export generators (PMO Bridge)
+# ------------------------------------------------------------------
+
+def export_csv(cards: list[dict], stress_data: list[dict]) -> str:
+    """Export ideas as CSV importable into Jira/Linear/Asana."""
+    stress_map = {s["idea_id"]: s for s in stress_data}
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "ID", "Title", "Description", "Score", "Verdict", "Effort",
+        "Est. Cost ($/mo)", "Domains", "Persona", "Pain Point",
+        "Kill Criteria", "Priority",
+    ])
+
+    for card in cards:
+        sid = card.get("id", "")
+        stress = stress_map.get(sid, {})
+        sb = card.get("score_breakdown", {})
+        persona = card.get("primary_persona", {})
+        kill = stress.get("kill_criteria", [])
+
+        # Map score to priority
+        score = card.get("composite_score", 0)
+        priority = "Critical" if score >= 7.5 else "High" if score >= 6.5 else "Medium" if score >= 5.5 else "Low"
+
+        writer.writerow([
+            sid,
+            card.get("title", ""),
+            card.get("rationale", ""),
+            f"{score:.1f}",
+            card.get("stress_test_verdict", ""),
+            card.get("estimated_effort", ""),
+            f"{card.get('estimated_cost_usd_month', 0):.0f}",
+            ", ".join(card.get("domain_tags", [])),
+            persona.get("who", ""),
+            persona.get("pain", ""),
+            "; ".join(kill[:3]),
+            priority,
+        ])
+
+    return buf.getvalue()
+
+
+def export_markdown_tasks(cards: list[dict], stress_data: list[dict]) -> str:
+    """Export ideas as a markdown task list for project management."""
+    stress_map = {s["idea_id"]: s for s in stress_data}
+    lines: list[str] = []
+
+    lines.append("# xBrain - Project Task Export")
+    lines.append("")
+
+    for card in cards:
+        sid = card.get("id", "")
+        title = card.get("title", "")
+        score = card.get("composite_score", 0)
+        verdict = card.get("stress_test_verdict", "")
+        effort = card.get("estimated_effort", "")
+        persona = card.get("primary_persona", {})
+        stress = stress_map.get(sid, {})
+
+        lines.append(f"## [{verdict}] {title} (Score: {score:.1f})")
+        lines.append("")
+        lines.append(f"> {card.get('rationale', '')}")
+        lines.append("")
+        lines.append(f"- **Effort:** {effort}")
+        lines.append(f"- **Est. Cost:** ${card.get('estimated_cost_usd_month', 0):.0f}/mo")
+        lines.append(f"- **Target User:** {persona.get('who', 'TBD')}")
+        lines.append(f"- **Pain:** {persona.get('pain', 'TBD')}")
+        lines.append("")
+
+        # Tasks
+        lines.append("### Tasks")
+        lines.append("")
+        lines.append(f"- [ ] Validate customer fit (interview 2-3 target personas)")
+        lines.append(f"- [ ] Design MVP scope and architecture")
+        lines.append(f"- [ ] Build prototype ({effort} effort)")
+        lines.append(f"- [ ] Run pilot with early adopters")
+        lines.append("")
+
+        # Kill criteria as acceptance gates
+        kill = stress.get("kill_criteria", [])
+        if kill:
+            lines.append("### Kill Criteria (abort if true)")
+            lines.append("")
+            for kc in kill:
+                lines.append(f"- [ ] {kc}")
+            lines.append("")
+
+        lines.append("---")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def export_jira_json(cards: list[dict], stress_data: list[dict]) -> str:
+    """Export ideas as Jira-compatible JSON (bulk import format)."""
+    stress_map = {s["idea_id"]: s for s in stress_data}
+    issues = []
+
+    for card in cards:
+        sid = card.get("id", "")
+        stress = stress_map.get(sid, {})
+        score = card.get("composite_score", 0)
+        persona = card.get("primary_persona", {})
+        kill = stress.get("kill_criteria", [])
+
+        priority = "Critical" if score >= 7.5 else "High" if score >= 6.5 else "Medium" if score >= 5.5 else "Low"
+
+        description_parts = [
+            card.get("rationale", ""),
+            "",
+            f"*Score:* {score:.1f} | *Effort:* {card.get('estimated_effort', '')} | *Verdict:* {card.get('stress_test_verdict', '')}",
+            "",
+            f"*Target Persona:* {persona.get('who', '')}",
+            f"*Pain Point:* {persona.get('pain', '')}",
+        ]
+
+        if kill:
+            description_parts.extend(["", "*Kill Criteria:*"])
+            for kc in kill:
+                description_parts.append(f"* {kc}")
+
+        issues.append({
+            "summary": card.get("title", ""),
+            "description": "\n".join(description_parts),
+            "priority": priority,
+            "labels": card.get("domain_tags", []),
+            "issueType": "Story",
+        })
+
+    return json.dumps({"issues": issues}, indent=2, ensure_ascii=False)

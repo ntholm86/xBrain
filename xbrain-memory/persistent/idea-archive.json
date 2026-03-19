@@ -849,5 +849,540 @@
       "infrastructure",
       "developer_tools"
     ]
+  },
+  {
+    "id": "gap-009-merged",
+    "title": "Idea Implementation Telemetry: Close-the-Loop Feedback for Scoring Calibration",
+    "score": 6.6,
+    "verdict": "INCUBATE",
+    "domains": [
+      "lifecycle_management",
+      "feedback_loops",
+      "model_calibration",
+      "reproducibility"
+    ]
+  },
+  {
+    "id": "gap-007-merged",
+    "title": "Data Access Mapper + Feasibility Oracle: Pre-Flight Constraint Validation",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "constraint_validation",
+      "data_access",
+      "feasibility",
+      "estimation"
+    ]
+  },
+  {
+    "id": "gap-008",
+    "title": "Idea Lineage Gene Bank: Meta-Learning Pattern Extraction for Predictive Scoring",
+    "score": 6.3,
+    "verdict": "INCUBATE",
+    "domains": [
+      "meta_learning",
+      "pattern_extraction",
+      "predictive_scoring"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Idea Validation Loop: Real-World Stakeholder Feasibility Interviews",
+    "score": 6.2,
+    "verdict": "BUILD",
+    "domains": [
+      "user_research",
+      "validation",
+      "stakeholder_alignment"
+    ]
+  },
+  {
+    "id": "gap-005-merged",
+    "title": "Explainability Dashboard: Transparent Idea Scoring for Non-Technical Stakeholders",
+    "score": 6.1,
+    "verdict": "BUILD",
+    "domains": [
+      "explainability",
+      "transparency",
+      "stakeholder_trust",
+      "visualization"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Plugin System: Extensible Scoring Dimensions and Custom Attack Vectors",
+    "score": 5.9,
+    "verdict": "INCUBATE",
+    "domains": [
+      "developer_tools",
+      "extensibility",
+      "software_architecture"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "PMO Bridge: Direct Export to Jira/Linear/Asana with Auto-Generated Specs",
+    "score": 5.7,
+    "verdict": "BUILD",
+    "domains": [
+      "integration",
+      "project_management",
+      "stakeholder_enablement"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Cognitive Bias Audit: Detect and Correct Ideation Process Failures",
+    "score": 5.5,
+    "verdict": "INCUBATE",
+    "domains": [
+      "bias_detection",
+      "ideation_quality",
+      "process_integrity"
+    ]
+  },
+  {
+    "id": "gap-002-merged-with-121",
+    "title": "Legal Transparency Engine with Regulatory Auto-Filing",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "legal",
+      "technology",
+      "regulatory_integration",
+      "transparency",
+      "civic_participation"
+    ]
+  },
+  {
+    "id": "idea-128",
+    "title": "Test Result Forensics: Compliance Evidence Engine",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "legal",
+      "security",
+      "compliance"
+    ]
+  },
+  {
+    "id": "idea-128",
+    "title": "Test Result Forensics: Compliance Evidence Engine",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "legal",
+      "security",
+      "compliance"
+    ]
+  },
+  {
+    "id": "idea-128",
+    "title": "Test Coverage Forensics: Regulatory-Mapped Safety-Critical Path Validator",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "legal",
+      "security"
+    ]
+  },
+  {
+    "id": "idea-128",
+    "title": "Test Coverage Forensics: Regulatory-Mapped Safety-Critical Path Validator",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "legal",
+      "security"
+    ]
+  },
+  {
+    "id": "idea-128-merged",
+    "title": "Safety-Critical Test Quality Validator",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "legal",
+      "security"
+    ]
+  },
+  {
+    "id": "idea-128-merged",
+    "title": "Safety-Critical Test Quality Validator",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "legal",
+      "security"
+    ]
+  },
+  {
+    "id": "idea-129",
+    "title": "Consent Archaeology: Historical Agreement Forensics",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "privacy",
+      "ethics",
+      "legal",
+      "consumer_rights"
+    ]
+  },
+  {
+    "id": "idea-129",
+    "title": "Consent Archaeology: Historical Agreement Forensics",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "privacy",
+      "ethics",
+      "legal",
+      "consumer_rights"
+    ]
+  },
+  {
+    "id": "idea-129-merged",
+    "title": "Worker-Controlled Labor Rights Evidence Ledger",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "labor_rights",
+      "privacy",
+      "legal"
+    ]
+  },
+  {
+    "id": "idea-129-merged",
+    "title": "Worker-Controlled Labor Rights Evidence Ledger",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "labor_rights",
+      "privacy",
+      "legal"
+    ]
+  },
+  {
+    "id": "gap-003-merged-with-122",
+    "title": "Labor Rights Forensics with Predictive Remediation",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "labor_rights",
+      "justice",
+      "technology",
+      "real_time_prevention",
+      "supply_chain",
+      "ethics"
+    ]
+  },
+  {
+    "id": "idea-129",
+    "title": "Consent Violation Audit Engine: Proactive Historical Compliance Forensics",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "legal",
+      "privacy",
+      "compliance"
+    ]
+  },
+  {
+    "id": "idea-129",
+    "title": "Consent Violation Audit Engine: Proactive Historical Compliance Forensics",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "legal",
+      "privacy",
+      "compliance"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "Unintended Consequence Forecaster",
+    "score": 7.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "systems_thinking",
+      "decision_theory",
+      "cognitive_science"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Execution Fidelity Tracker",
+    "score": 7.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "systems_thinking",
+      "decision_theory",
+      "cognitive_science"
+    ]
+  },
+  {
+    "id": "idea-007-merged-008",
+    "title": "Organizational Learning Loop with Cross-Domain Pattern Detection",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "systems_thinking",
+      "decision_theory",
+      "artificial_intelligence"
+    ]
+  },
+  {
+    "id": "idea-007-merged-008",
+    "title": "Organizational Learning Loop with Cross-Domain Pattern Detection",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "systems_thinking",
+      "decision_theory",
+      "artificial_intelligence"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Adversarial Idea Stress-Testing Engine",
+    "score": 7.2,
+    "verdict": "BUILD",
+    "domains": [
+      "artificial_intelligence",
+      "decision_theory"
+    ]
+  },
+  {
+    "id": "idea-009-merged-011-merged-013-merged-016",
+    "title": "Constraint-Aware Ideation Engine with Regulatory, Debt & Assumption Auditing",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_theory",
+      "systems_thinking",
+      "artificial_intelligence"
+    ]
+  },
+  {
+    "id": "idea-003-merged-015",
+    "title": "Adaptive Prompt Mutation Engine with Idea Refinement Loop",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "evolutionary_computation"
+    ]
+  },
+  {
+    "id": "idea-009-merged-011-merged-013-merged-016",
+    "title": "Constraint-Aware Ideation Engine with Regulatory, Debt & Assumption Auditing",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_theory",
+      "systems_thinking",
+      "artificial_intelligence"
+    ]
+  },
+  {
+    "id": "idea-003-merged-015",
+    "title": "Adaptive Prompt Mutation Engine with Idea Refinement Loop",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "evolutionary_computation"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Collaborative Disagreement Engine",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "cognitive_science",
+      "decision_theory",
+      "systems_thinking"
+    ]
+  },
+  {
+    "id": "idea-001-merged-002",
+    "title": "Self-Evaluating Ideation Auditor with Meta-Bias Detection",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "decision_theory",
+      "systems_thinking"
+    ]
+  },
+  {
+    "id": "idea-001-merged-002",
+    "title": "Self-Evaluating Ideation Auditor with Meta-Bias Detection",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "decision_theory",
+      "systems_thinking"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Adaptive Phase Confidence Engine",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "decision_theory",
+      "systems_thinking"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Ideation Learning Loop",
+    "score": 7.1,
+    "verdict": "BUILD",
+    "domains": [
+      "systems_thinking",
+      "decision_theory",
+      "artificial_intelligence"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Adaptive Phase Confidence Engine",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "decision_theory",
+      "systems_thinking"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Ideation Learning Loop",
+    "score": 7.1,
+    "verdict": "BUILD",
+    "domains": [
+      "systems_thinking",
+      "decision_theory",
+      "artificial_intelligence"
+    ]
+  },
+  {
+    "id": "gap-006",
+    "title": "Moral Reasoning Module",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "cognitive_science",
+      "decision_theory",
+      "systems_thinking"
+    ]
+  },
+  {
+    "id": "gap-008",
+    "title": "Stakeholder-Centered ROI Estimator",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_theory",
+      "systems_thinking",
+      "cognitive_science"
+    ]
+  },
+  {
+    "id": "idea-004-merged-012",
+    "title": "Stakeholder Consequence Mapper with Adversarial Simulation",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_theory",
+      "systems_thinking",
+      "cognitive_science"
+    ]
+  },
+  {
+    "id": "idea-004-merged-012",
+    "title": "Stakeholder Consequence Mapper with Adversarial Simulation",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_theory",
+      "systems_thinking",
+      "cognitive_science"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Stakeholder Consequence Mapper",
+    "score": 6.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_theory",
+      "systems_thinking",
+      "cognitive_science"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Stakeholder Consequence Mapper",
+    "score": 6.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_theory",
+      "systems_thinking",
+      "cognitive_science"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Introspective Ideation Agent",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "systems_thinking"
+    ]
+  },
+  {
+    "id": "idea-010",
+    "title": "Stakeholder-Driven Ideation Pivot",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_theory",
+      "systems_thinking"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "Cross-Sector Solution Archaeology",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "systems_thinking",
+      "cognitive_science",
+      "evolutionary_computation"
+    ]
+  },
+  {
+    "id": "gap-010",
+    "title": "Idea Immune System",
+    "score": 6.4,
+    "verdict": "",
+    "domains": [
+      "evolutionary_computation",
+      "decision_theory",
+      "systems_thinking"
+    ]
   }
 ]

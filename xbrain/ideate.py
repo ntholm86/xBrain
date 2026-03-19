@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,6 +13,7 @@ from xbrain.config import Config
 from xbrain.llm import LLMClient
 from xbrain.memory import MemoryStore
 from xbrain.models import (
+    DebateExchange,
     DomainBrief,
     FeasibilityMatrix,
     IdeaCard,
@@ -23,6 +26,10 @@ from xbrain.models import (
 )
 from xbrain.output import generate_idea_report
 from xbrain.prompts import (
+    ADVERSARIAL_DEFENSE_SYSTEM,
+    ADVERSARIAL_DEFENSE_USER,
+    ADVERSARIAL_REBUTTAL_SYSTEM,
+    ADVERSARIAL_REBUTTAL_USER,
     CONSTRAINT_CHECK_SYSTEM,
     CONSTRAINT_CHECK_USER,
     CONVERGE_SYSTEM,
@@ -52,6 +59,15 @@ from xbrain.prompts import (
 
 def _log(tag: str, msg: str) -> None:
     print(f"[{tag:<9s}] {msg}")
+    sys.stdout.flush()
+
+
+def _log_phase_header(phase: str, description: str) -> None:
+    """Print a visible phase separator for console readability."""
+    print()
+    print(f"{'=' * 60}")
+    print(f"  {phase}: {description}")
+    print(f"{'=' * 60}")
     sys.stdout.flush()
 
 
@@ -88,7 +104,7 @@ class IdeatePipeline:
     ) -> Path:
         """Execute the full ideation pipeline and return the run directory."""
         self._language = language
-        run_id = self._make_run_id()
+        run_id = self._make_run_id(brief_text)
         run_dir = self.cfg.runs_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -134,10 +150,12 @@ class IdeatePipeline:
         # Phase 0 — Immerse (optional)
         domain_briefs: list[DomainBrief] = []
         if domains:
+            _log_phase_header("IMMERSE", f"Deep-diving into {', '.join(domains)}")
             domain_briefs = self._phase_immerse(domains)
             result.domain_briefs = domain_briefs
 
         # Phase 1 — Diverge
+        _log_phase_header("DIVERGE", "Generating raw idea seeds")
         raw_ideas = self._phase_diverge(domains, constraints, domain_briefs, brief_text)
         result.raw_ideas = raw_ideas
 
@@ -154,10 +172,12 @@ class IdeatePipeline:
                 result.raw_ideas = raw_ideas
 
         # Phase 2 — Converge
+        _log_phase_header("CONVERGE", f"Scoring and ranking {len(raw_ideas)} ideas")
         candidates = self._phase_converge(raw_ideas)
         result.candidates = candidates
 
         # Phase 3 — Stress Test
+        _log_phase_header("STRESS TEST", f"Adversarial debate for {len(candidates)} candidates")
         stress_results = self._phase_stress_test(candidates)
         result.stress_test_results = stress_results
 
@@ -225,6 +245,16 @@ class IdeatePipeline:
         result.total_input_tokens = self.llm.total_input_tokens
         result.total_output_tokens = self.llm.total_output_tokens
 
+        # Deduplicate stress test results to match deduplicated survivors
+        survivor_ids = {c.id for c in result.survivors}
+        seen_stress_ids: set[str] = set()
+        unique_stress: list[StressTestResult] = []
+        for st in result.stress_test_results:
+            if st.idea_id in survivor_ids and st.idea_id not in seen_stress_ids:
+                seen_stress_ids.add(st.idea_id)
+                unique_stress.append(st)
+        result.stress_test_results = unique_stress
+
         # Write outputs (do this BEFORE any other processing to ensure files exist)
         try:
             self._write_outputs(run_dir, result)
@@ -239,23 +269,54 @@ class IdeatePipeline:
         # Persist to memory
         self._update_memory(result)
 
-        # Print completion
-        final_build_count = sum(1 for s in result.stress_test_results if s.verdict == "BUILD")
-        _log("IDEATE", f"Pipeline 1 finished.  {final_build_count} ideas with BUILD verdict.")
-        _log("IDEATE", f"Reports written to {run_dir}/")
-        _log("IDEATE", f"  idea-report.md  — human-readable ranked report")
-        _log("IDEATE", f"  idea-cards.json  — machine-readable Idea Cards")
-        _log("IDEATE", f"  idea-log.json    — full trace")
-        _log("IDEATE", f"  stress-test-report.json — adversarial analysis")
-        _log("IDEATE", "")
-        _log("IDEATE", "Review the report. When ready, run:")
-        _log(
-            "IDEATE",
-            f"  python -m xbrain specify --idea {run_dir}/idea-cards.json --select <idea-id>",
-        )
-        _log("IDEATE", f"Tokens used: {result.total_input_tokens:,} in / {result.total_output_tokens:,} out")
+        # ── Completion Summary ─────────────────────────────────────────
         cost_info = self.actual_cost()
-        _log("IDEATE", f"Actual cost: ${cost_info['total_cost_usd']:.4f}")
+        final_build = sum(1 for s in result.stress_test_results if s.verdict == "BUILD")
+        final_mutate = sum(1 for s in result.stress_test_results if s.verdict == "MUTATE")
+        final_kill = sum(1 for s in result.stress_test_results if s.verdict == "KILL")
+        final_incubate = sum(1 for s in result.stress_test_results if s.verdict == "INCUBATE")
+
+        sorted_survivors = sorted(result.survivors, key=lambda c: c.composite_score, reverse=True)
+
+        print()
+        print("=" * 60)
+        print("  xBrain Pipeline Complete")
+        print("=" * 60)
+        print()
+        print(f"  Ideas generated:  {len(result.raw_ideas)}")
+        print(f"  After scoring:    {len(result.candidates)}")
+        print(f"  Verdicts:         {final_build} BUILD  |  {final_mutate} MUTATE  |  {final_kill} KILL  |  {final_incubate} INCUBATE")
+        if refinement_round > 0:
+            print(f"  Refinement:       {refinement_round} round(s)")
+        print()
+
+        if sorted_survivors:
+            print("  Top ideas:")
+            for i, c in enumerate(sorted_survivors[:5]):
+                verdict = c.stress_test_verdict or "?"
+                emoji = {"BUILD": "+", "MUTATE": "~", "KILL": "x", "INCUBATE": "?"}.get(verdict, " ")
+                print(f"    [{emoji}] #{i+1}  {c.composite_score:.1f}  {c.title}")
+            print()
+
+        print(f"  Output directory: {run_dir}")
+        print(f"    idea-report.md           Human-readable ranked report")
+        print(f"    idea-cards.json          Machine-readable Idea Cards")
+        print(f"    idea-log.json            Full pipeline trace")
+        print(f"    stress-test-report.json  Adversarial debate results")
+        print()
+        print(f"  Tokens: {result.total_input_tokens:,} in / {result.total_output_tokens:,} out")
+        print(f"  Cost:   ${cost_info['total_cost_usd']:.4f}")
+        print()
+
+        if final_build > 0:
+            best = next((c for c in sorted_survivors if c.stress_test_verdict == "BUILD"), sorted_survivors[0])
+            print(f"  Next step:")
+            print(f"    python -m xbrain specify --idea {run_dir}/idea-cards.json --select {best.id}")
+        else:
+            print(f"  No BUILD verdicts. Review MUTATE ideas or re-run with different constraints.")
+
+        print()
+        sys.stdout.flush()
 
         return run_dir
 
@@ -546,50 +607,203 @@ class IdeatePipeline:
 
         _log("CONVERGE", f"  {len(candidates)} candidates scored.  (UNCALIBRATED)")
         for i, c in enumerate(candidates[:5]):
-            _log("CONVERGE", f"  #{i+1} [{c.composite_score:.1f}] \"{c.title}\" — {', '.join(c.domain_tags)}")
+            _log("CONVERGE", f"  #{i+1} [{c.composite_score:.1f}] \"{c.title}\"")
+            _log("CONVERGE", f"       Domains: {', '.join(c.domain_tags)}")
+            if c.primary_persona.who:
+                _log("CONVERGE", f"       Persona: {c.primary_persona.who}")
+            if c.primary_persona.pain:
+                _log("CONVERGE", f"       Pain: {c.primary_persona.pain[:80]}")
 
         return candidates
 
     def _phase_stress_test(self, candidates: list[IdeaCard]) -> list[StressTestResult]:
-        _log("STRESS", f"Devil's Advocate attacking {len(candidates)} candidates...")
+        _log("STRESS", f"Adversarial debate for {len(candidates)} candidates...")
+        _log("STRESS", "")
 
-        candidates_json = json.dumps(
+        candidates_compact = [
+            {
+                "id": c.id,
+                "title": c.title,
+                "rationale": c.rationale,
+                "composite_score": c.composite_score,
+                "domain_tags": c.domain_tags,
+                "primary_persona": c.primary_persona.model_dump(),
+                "score_breakdown": c.score_breakdown.model_dump(),
+            }
+            for c in candidates
+        ]
+        candidates_json = json.dumps(candidates_compact, indent=2, ensure_ascii=False)
+
+        # ── Round 1: Devil's Advocate attacks ──────────────────────────
+        _log("STRESS", "Round 1/3 — Devil's Advocate attacking...")
+
+        attack_prompt = STRESS_TEST_USER.format(
+            candidate_count=len(candidates),
+            candidates_json=candidates_json,
+        )
+
+        attack_data = self.llm.generate_json(
+            self._sys(STRESS_TEST_SYSTEM), attack_prompt, temperature=0.4,
+            model_override=self._model_for_phase("stress"), phase="stress-attack",
+        )
+
+        attack_results_raw = attack_data.get("results", [])
+        for ar in attack_results_raw:
+            idea_id = ar.get("idea_id", "?")
+            title = next((c.title for c in candidates if c.id == idea_id), idea_id)
+            attacks = ar.get("structured_attacks", [])
+            _log("STRESS", f"  {title}")
+            _log("STRESS", f"    Freeform: {ar.get('freeform_attack', '')[:100]}")
+            for atk in attacks[:3]:
+                _log("STRESS", f"    - {atk[:90]}")
+            if len(attacks) > 3:
+                _log("STRESS", f"    ... and {len(attacks) - 3} more attacks")
+
+        # ── Round 2: Idea Champion defends ─────────────────────────────
+        _log("STRESS", "")
+        _log("STRESS", "Round 2/3 — Idea Champion defending...")
+
+        attacks_json = json.dumps(
             [
                 {
-                    "id": c.id,
-                    "title": c.title,
-                    "rationale": c.rationale,
-                    "composite_score": c.composite_score,
-                    "domain_tags": c.domain_tags,
-                    "primary_persona": c.primary_persona.model_dump(),
-                    "score_breakdown": c.score_breakdown.model_dump(),
+                    "idea_id": ar.get("idea_id", ""),
+                    "freeform_attack": ar.get("freeform_attack", ""),
+                    "structured_attacks": ar.get("structured_attacks", []),
                 }
-                for c in candidates
+                for ar in attack_results_raw
             ],
             indent=2,
             ensure_ascii=False,
         )
 
-        prompt = STRESS_TEST_USER.format(
+        defense_prompt = ADVERSARIAL_DEFENSE_USER.format(
             candidate_count=len(candidates),
             candidates_json=candidates_json,
+            attacks_json=attacks_json,
         )
 
-        data = self.llm.generate_json(self._sys(STRESS_TEST_SYSTEM), prompt, temperature=0.4,
-                                       model_override=self._model_for_phase("stress"), phase="stress")
+        defense_data = self.llm.generate_json(
+            self._sys(ADVERSARIAL_DEFENSE_SYSTEM), defense_prompt, temperature=0.4,
+            model_override=self._model_for_phase("stress"), phase="stress-defense",
+        )
 
-        results_raw = data.get("results", [])
-        results = []
-        for r in results_raw:
-            st = self._parse_stress_result(r)
-            results.append(st)
-            _log(
-                "STRESS",
-                f"  {st.idea_id}: ATTACKS {st.attacks_made}, "
-                f"SURVIVED {st.attacks_survived} → {st.verdict}",
+        defenses_raw = defense_data.get("defenses", [])
+        defense_map: dict[str, dict] = {}
+        for d in defenses_raw:
+            idea_id = d.get("idea_id", "")
+            defense_map[idea_id] = d
+            title = next((c.title for c in candidates if c.id == idea_id), idea_id)
+            exchanges = d.get("exchanges", [])
+            _log("STRESS", f"  {title}")
+            for ex in exchanges[:3]:
+                outcome = ex.get("outcome", "?")
+                _log("STRESS", f"    [{outcome:>8s}] {ex.get('angle', '?')}: {ex.get('defense', '')[:80]}")
+            if len(exchanges) > 3:
+                _log("STRESS", f"    ... and {len(exchanges) - 3} more defenses")
+
+        # ── Round 3: Judge runs rebuttal round + verdict ───────────────
+        _log("STRESS", "")
+        _log("STRESS", "Round 3/3 — Final rebuttals and verdict...")
+
+        debate_json = json.dumps(
+            [
+                {
+                    "idea_id": ar.get("idea_id", ""),
+                    "attacks": ar.get("structured_attacks", []),
+                    "freeform_attack": ar.get("freeform_attack", ""),
+                    "defenses": defense_map.get(ar.get("idea_id", ""), {}).get("exchanges", []),
+                }
+                for ar in attack_results_raw
+            ],
+            indent=2,
+            ensure_ascii=False,
+        )
+
+        rebuttal_prompt = ADVERSARIAL_REBUTTAL_USER.format(
+            candidate_count=len(candidates),
+            candidates_json=candidates_json,
+            debate_json=debate_json,
+        )
+
+        rebuttal_data = self.llm.generate_json(
+            self._sys(ADVERSARIAL_REBUTTAL_SYSTEM), rebuttal_prompt, temperature=0.3,
+            model_override=self._model_for_phase("stress"), phase="stress-rebuttal",
+        )
+
+        # ── Assemble final StressTestResults ───────────────────────────
+        rebuttal_results_raw = rebuttal_data.get("results", [])
+        rebuttal_map: dict[str, dict] = {r.get("idea_id", ""): r for r in rebuttal_results_raw}
+
+        results: list[StressTestResult] = []
+        for ar in attack_results_raw:
+            idea_id = ar.get("idea_id", "")
+            defense_info = defense_map.get(idea_id, {})
+            rebuttal_info = rebuttal_map.get(idea_id, {})
+
+            # Build debate rounds from all three phases
+            debate_rounds: list[DebateExchange] = []
+            attack_list = ar.get("structured_attacks", [])
+            defense_exchanges = defense_info.get("exchanges", [])
+            rebuttal_exchanges = rebuttal_info.get("exchanges", [])
+
+            # Map defense and rebuttal exchanges by angle
+            defense_by_angle = {ex.get("angle", "").lower(): ex for ex in defense_exchanges}
+            rebuttal_by_angle = {ex.get("angle", "").lower(): ex for ex in rebuttal_exchanges}
+
+            # Standard attack angles
+            angles = [
+                "Prior art", "Adoption failure", "Technical blocker",
+                "Problem reframe", "Negative externalities", "Obsolescence",
+                "Timing", "Defensibility", "Expertise gap",
+            ]
+
+            for i, attack_text in enumerate(attack_list):
+                angle = angles[i] if i < len(angles) else f"Attack {i+1}"
+                angle_key = angle.lower()
+
+                dex = defense_by_angle.get(angle_key, {})
+                rex = rebuttal_by_angle.get(angle_key, {})
+
+                debate_rounds.append(DebateExchange(
+                    angle=angle,
+                    attack=attack_text,
+                    defense=dex.get("defense", ""),
+                    attacker_rebuttal=rex.get("attacker_rebuttal", ""),
+                    defender_rebuttal=rex.get("defender_rebuttal", ""),
+                    outcome=rex.get("final_outcome", dex.get("outcome", "")),
+                ))
+
+            # Use rebuttal verdict as source of truth, fall back to attack data
+            fm_raw = rebuttal_info.get("feasibility_matrix", ar.get("feasibility_matrix", {}))
+            fm = FeasibilityMatrix(**fm_raw)
+
+            st = StressTestResult(
+                idea_id=idea_id,
+                freeform_attack=ar.get("freeform_attack", ""),
+                structured_attacks=attack_list,
+                defenses=ar.get("defenses", []),
+                debate_rounds=debate_rounds,
+                attacks_made=rebuttal_info.get("attacks_made", ar.get("attacks_made", len(attack_list))),
+                attacks_survived=rebuttal_info.get("attacks_survived", ar.get("attacks_survived", 0)),
+                attacks_fatal=rebuttal_info.get("attacks_fatal", ar.get("attacks_fatal", 0)),
+                strongest_argument=rebuttal_info.get("strongest_argument", ar.get("strongest_argument", "")),
+                strongest_defense=rebuttal_info.get("strongest_defense", defense_info.get("strongest_defense", "")),
+                suggested_mutation=rebuttal_info.get("suggested_mutation", ar.get("suggested_mutation", "")),
+                feasibility_matrix=fm,
+                feasibility_verdict=rebuttal_info.get("feasibility_verdict", ar.get("feasibility_verdict", "")),
+                llm_capability_fit=rebuttal_info.get("llm_capability_fit", ar.get("llm_capability_fit", "")),
+                kill_criteria=rebuttal_info.get("kill_criteria", ar.get("kill_criteria", [])),
+                verdict=rebuttal_info.get("verdict", ar.get("verdict", "")),
             )
+            results.append(st)
 
-        verdicts = {}
+            title = next((c.title for c in candidates if c.id == idea_id), idea_id)
+            survived = st.attacks_survived
+            fatal = st.attacks_fatal
+            _log("STRESS", f"  {title}: {survived} survived, {fatal} fatal → {st.verdict}")
+
+        _log("STRESS", "")
+        verdicts: dict[str, int] = {}
         for r in results:
             verdicts[r.verdict] = verdicts.get(r.verdict, 0) + 1
         _log("STRESS", f"  Verdicts: {verdicts}")
@@ -772,6 +986,7 @@ class IdeatePipeline:
             sustainability_model=c.get("sustainability_model", ""),
             defensibility_notes=c.get("defensibility_notes", ""),
             market_timing_notes=c.get("market_timing_notes", ""),
+            score_reasoning=c.get("score_reasoning", {}),
             inverse_terrible_conditions=c.get("inverse_score", {}).get("terrible_conditions", []),
             inverse_confidence=c.get("inverse_score", {}).get("inverse_confidence", 0.0),
         )
@@ -800,7 +1015,7 @@ class IdeatePipeline:
     def _merge_survivors(
         self, candidates: list[IdeaCard], stress_results: list[StressTestResult],
     ) -> list[IdeaCard]:
-        """Merge stress test results into candidate cards and return all (sorted by score)."""
+        """Merge stress test results into candidate cards, deduplicate, and return sorted."""
         result_map = {r.idea_id: r for r in stress_results}
         survivors = []
         for card in candidates:
@@ -811,7 +1026,21 @@ class IdeatePipeline:
                 card.llm_capability_fit = st.llm_capability_fit
             survivors.append(card)
         survivors.sort(key=lambda c: c.composite_score, reverse=True)
-        return survivors
+
+        # Deduplicate by normalized title — keep highest-scored version
+        seen_titles: dict[str, int] = {}
+        unique: list[IdeaCard] = []
+        dupes = 0
+        for card in survivors:
+            key = card.title.strip().lower()
+            if key in seen_titles:
+                dupes += 1
+                continue
+            seen_titles[key] = len(unique)
+            unique.append(card)
+        if dupes:
+            _log("MERGE", f"  Removed {dupes} duplicate idea(s) by title")
+        return unique
 
     def _write_outputs(self, run_dir: Path, result: IdeateRunResult) -> None:
         """Write all pipeline outputs to disk."""
@@ -946,8 +1175,18 @@ class IdeatePipeline:
         return base_prompt
 
     @staticmethod
-    def _make_run_id() -> str:
-        return "run-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    def _make_run_id(brief_text: str | None = None) -> str:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        if not brief_text:
+            return ts
+        # Normalize unicode, keep ASCII letters/digits, collapse whitespace to hyphens
+        slug = unicodedata.normalize("NFKD", brief_text).encode("ascii", "ignore").decode()
+        slug = re.sub(r"[^a-zA-Z0-9\s-]", "", slug)
+        slug = re.sub(r"[\s_-]+", "-", slug).strip("-").lower()
+        # Truncate to ~40 chars on a word boundary
+        if len(slug) > 40:
+            slug = slug[:40].rsplit("-", 1)[0]
+        return f"{ts}-{slug}" if slug else ts
 
     # ------------------------------------------------------------------
     # Model routing
@@ -1002,6 +1241,8 @@ class IdeatePipeline:
         _add("gapfill", 1500, 2000)
         _add("converge", 2000 + ideas_per_round * 80, 5000 + converge_top_n * 500)
         _add("stress", 2000 + converge_top_n * 300, 5000 + converge_top_n * 800)
+        _add("stress-defense", 2000 + converge_top_n * 500, 4000 + converge_top_n * 600)
+        _add("stress-rebuttal", 2000 + converge_top_n * 600, 5000 + converge_top_n * 700)
 
         total_cost = 0.0
         for p in phases:

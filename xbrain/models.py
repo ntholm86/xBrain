@@ -45,11 +45,22 @@ class FeasibilityMatrix(BaseModel):
     market_timing: int = Field(ge=1, le=5, default=3)
 
 
+class DebateExchange(BaseModel):
+    """A single attack-defense-rebuttal exchange in the adversarial debate."""
+    angle: str = ""                 # e.g. "Prior art", "Adoption failure"
+    attack: str = ""
+    defense: str = ""
+    attacker_rebuttal: str = ""
+    defender_rebuttal: str = ""
+    outcome: str = ""               # SURVIVED / FATAL / WEAKENED
+
+
 class StressTestResult(BaseModel):
     idea_id: str
     freeform_attack: str = ""
     structured_attacks: list[str] = Field(default_factory=list)
     defenses: list[str] = Field(default_factory=list)
+    debate_rounds: list[DebateExchange] = Field(default_factory=list)
     attacks_made: int = 0
     attacks_survived: int = 0
     attacks_fatal: int = 0
@@ -102,6 +113,7 @@ class IdeaCard(BaseModel):
     sustainability_model: str = ""
     defensibility_notes: str = ""
     market_timing_notes: str = ""
+    score_reasoning: dict[str, str] = Field(default_factory=dict)
     inverse_terrible_conditions: list[str] = Field(default_factory=list)
     inverse_confidence: float = 0.0
     llm_capability_fit: str = ""

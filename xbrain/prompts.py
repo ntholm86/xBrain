@@ -319,6 +319,16 @@ Respond with ONLY valid JSON:
       "sustainability_model": "SaaS for municipalities at $99/month",
       "defensibility_notes": "Data moat from municipal API integrations",
       "market_timing_notes": "Open data mandates expanding",
+      "score_reasoning": {{
+        "impact": "Why this score — what affected population, severity, urgency",
+        "confidence": "Why this score — evidence strength, certainty level",
+        "effort": "Why this score — complexity factors, AI leverage",
+        "cost": "Why this score — infrastructure needs",
+        "ethical_risk": "Why this score — misuse potential",
+        "sustainability": "Why this score — revenue model viability",
+        "defensibility": "Why this score — moats, switching costs",
+        "market_timing": "Why this score — readiness, regulatory window"
+      }},
       "inverse_score": {{
         "terrible_conditions": ["condition 1", "condition 2"],
         "inverse_confidence": 4.5
@@ -456,10 +466,147 @@ Respond with ONLY valid JSON:
 }}
 """
 
+# ---------------------------------------------------------------------------
+# Phase 3b: ADVERSARIAL DEFENSE — Defender rebuts attacker's arguments
+# ---------------------------------------------------------------------------
+
+ADVERSARIAL_DEFENSE_SYSTEM = (
+    "You are a passionate advocate and strategic defender of startup ideas. "
+    "Your job is to find every possible strength, counter-argument, and "
+    "creative pivot that makes an idea viable despite attacks. Be specific, "
+    "evidence-based, and resourceful. A weak defense means a worthy idea dies. "
+    "You MUST respond with valid JSON only — no markdown, no commentary."
+)
+
+ADVERSARIAL_DEFENSE_USER = """\
+You are defending {candidate_count} idea(s) against a Devil's Advocate. \
+The attacker has made their case. Now construct the STRONGEST possible defense.
+
+CANDIDATES:
+{candidates_json}
+
+ATTACKER'S ARGUMENTS:
+{attacks_json}
+
+For EACH idea, respond to EVERY attack with a specific, evidence-based defense:
+
+1. For each structured attack, provide a direct counter-argument. Don't just \
+dismiss — acknowledge valid points and explain how they can be mitigated.
+
+2. Identify STRENGTHS the attacker ignored — what makes this idea resilient?
+
+3. Propose PIVOTS: if an attack reveals a real weakness, how could the idea \
+adapt to neutralize it?
+
+4. Rate each exchange: did the defense SURVIVE (convincing counter), get \
+WEAKENED (partial counter), or is it FATAL (no viable defense)?
+
+Respond with ONLY valid JSON:
+{{
+  "defenses": [
+    {{
+      "idea_id": "idea-001",
+      "exchanges": [
+        {{
+          "angle": "Prior art",
+          "attack_summary": "The attacker's argument...",
+          "defense": "Why this attack fails or how to mitigate...",
+          "strengths_ignored": "What the attacker missed...",
+          "pivot_if_needed": "How to adapt if the attack has merit...",
+          "outcome": "SURVIVED"
+        }}
+      ],
+      "overall_defense_strength": "strong",
+      "strongest_defense": "The single most compelling defense across all angles"
+    }}
+  ]
+}}
+"""
 
 # ---------------------------------------------------------------------------
-# Helpers to fill templates
+# Phase 3c: ADVERSARIAL REBUTTAL — Attacker and Defender respond to each other
 # ---------------------------------------------------------------------------
+
+ADVERSARIAL_REBUTTAL_SYSTEM = (
+    "You are a neutral judge overseeing a debate between a Devil's Advocate "
+    "(attacker) and an Idea Champion (defender). Each side has made their "
+    "initial arguments. Now facilitate ONE final rebuttal round where each "
+    "side responds to the other's strongest points, then render a verdict. "
+    "You MUST respond with valid JSON only — no markdown, no commentary."
+)
+
+ADVERSARIAL_REBUTTAL_USER = """\
+Judge this adversarial debate for {candidate_count} idea(s). Each idea has \
+been attacked and defended. Now run the FINAL REBUTTAL round and render verdicts.
+
+CANDIDATES:
+{candidates_json}
+
+DEBATE SO FAR:
+{debate_json}
+
+For EACH idea:
+
+1. ATTACKER REBUTTAL: Given the defender's arguments, what does the attacker \
+say in response? The attacker should target the weakest defenses and expose \
+any hand-waving.
+
+2. DEFENDER REBUTTAL: Given the attacker's new points, what is the defender's \
+final response? The defender should double down on the strongest points and \
+concede what can't be defended.
+
+3. FINAL VERDICT: Based on the full debate, what is the outcome?
+
+4. FEASIBILITY ASSESSMENT (score each 1-5, where 5 is best/lowest risk):
+   - technical_risk, data_availability, regulatory_risk, cost_infra_month
+   - time_to_prototype, maintenance_burden, llm_capability_fit
+   - defensibility, market_timing
+
+5. KILL CRITERIA: For surviving ideas, define 2-3 conditions that should \
+abort a build if discovered during execution.
+
+Respond with ONLY valid JSON:
+{{
+  "results": [
+    {{
+      "idea_id": "idea-001",
+      "exchanges": [
+        {{
+          "angle": "Prior art",
+          "attacker_rebuttal": "The attacker's response to the defense...",
+          "defender_rebuttal": "The defender's final word...",
+          "final_outcome": "SURVIVED"
+        }}
+      ],
+      "strongest_argument": "The single most devastating attack across all rounds",
+      "strongest_defense": "The single most compelling defense across all rounds",
+      "suggested_mutation": "How the idea should change (empty string if BUILD)",
+      "feasibility_matrix": {{
+        "technical_risk": 4,
+        "data_availability": 3,
+        "regulatory_risk": 4,
+        "cost_infra_month": 4,
+        "time_to_prototype": 3,
+        "maintenance_burden": 3,
+        "llm_capability_fit": 4,
+        "defensibility": 3,
+        "market_timing": 4
+      }},
+      "feasibility_verdict": "BUILDABLE",
+      "llm_capability_fit": "strong",
+      "kill_criteria": [
+        "Abort if key data API access is denied",
+        "Abort if scope exceeds 3x original estimate"
+      ],
+      "attacks_made": 9,
+      "attacks_survived": 6,
+      "attacks_fatal": 1,
+      "attacks_weakened": 2,
+      "verdict": "BUILD"
+    }}
+  ]
+}}
+"""
 
 def build_brief_context(brief_text: str | None) -> str:
     if not brief_text:
@@ -478,7 +625,15 @@ def build_brief_context(brief_text: str | None) -> str:
 def build_domain_context(domains: list[str] | None, default_domains: list[str]) -> str:
     if domains:
         return f"FOCUS DOMAINS: {', '.join(domains)}"
-    return f"SCAN BROADLY — suggested starting domains include: {', '.join(default_domains)} (but explore beyond these if relevant)"
+    return (
+        "SCAN ALL DOMAINS — no domain restrictions. Explore every field of human "
+        "activity: technology, science, health, finance, education, agriculture, "
+        "logistics, entertainment, government, law, art, sports, manufacturing, "
+        "energy, real estate, social impact, defense, space, food, fashion, "
+        "religion, philosophy, psychology, and ANY other domain you can think of. "
+        "Do NOT anchor on a small set of familiar domains. Go maximally wide. "
+        "The best ideas often come from domains nobody thought to look at."
+    )
 
 
 def build_constraint_context(constraints: list[str] | None) -> str:

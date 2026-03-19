@@ -143,6 +143,35 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Filter by verdict",
     )
 
+    # --- export ---
+    export_p = sub.add_parser(
+        "export",
+        help="Export ideas to CSV, Markdown tasks, or Jira JSON for project management",
+    )
+    export_p.add_argument(
+        "--run",
+        required=True,
+        metavar="PATH",
+        help="Path to a run folder (e.g. ./xbrain-runs/run-20260318-190218)",
+    )
+    export_p.add_argument(
+        "--format",
+        choices=["csv", "md", "jira"],
+        default="csv",
+        help="Export format: csv (Jira/Linear import), md (Markdown tasks), jira (Jira JSON). Default: csv",
+    )
+    export_p.add_argument(
+        "--all",
+        action="store_true",
+        dest="export_all",
+        help="Export all ideas (default: BUILD only)",
+    )
+    export_p.add_argument(
+        "--output",
+        metavar="FILE",
+        help="Write to file instead of stdout",
+    )
+
     return parser
 
 
@@ -350,6 +379,53 @@ def _cmd_lineage(args: argparse.Namespace) -> None:
     print(f"Total ideas tracked: {total} | BUILD: {builds} | Idea genes: {genes}")
 
 
+def _cmd_export(args: argparse.Namespace) -> None:
+    run_dir = Path(args.run)
+    if not run_dir.is_dir():
+        print(f"ERROR: Run folder not found: {args.run}", file=sys.stderr)
+        sys.exit(1)
+
+    cards_path = run_dir / "idea-cards.json"
+    stress_path = run_dir / "stress-test-report.json"
+
+    if not cards_path.exists():
+        print(f"ERROR: idea-cards.json not found in {run_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    cards = json.loads(cards_path.read_text(encoding="utf-8"))
+    stress_data = json.loads(stress_path.read_text(encoding="utf-8")) if stress_path.exists() else []
+
+    # Filter to BUILD only unless --all
+    if not args.export_all:
+        cards = [c for c in cards if c.get("stress_test_verdict") == "BUILD"]
+        if not cards:
+            print("No BUILD ideas found. Use --all to export all ideas.", file=sys.stderr)
+            sys.exit(0)
+
+    from xbrain.output import export_csv, export_jira_json, export_markdown_tasks
+
+    fmt = args.format
+    if fmt == "csv":
+        content = export_csv(cards, stress_data)
+        ext = ".csv"
+    elif fmt == "md":
+        content = export_markdown_tasks(cards, stress_data)
+        ext = ".md"
+    elif fmt == "jira":
+        content = export_jira_json(cards, stress_data)
+        ext = ".json"
+    else:
+        print(f"ERROR: Unknown format: {fmt}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.output:
+        out_path = Path(args.output)
+        out_path.write_text(content, encoding="utf-8")
+        print(f"Exported {len(cards)} idea(s) to {out_path}")
+    else:
+        sys.stdout.buffer.write(content.encode("utf-8"))
+
+
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
@@ -367,6 +443,8 @@ def main() -> None:
             _cmd_estimate(args)
         elif args.command == "lineage":
             _cmd_lineage(args)
+        elif args.command == "export":
+            _cmd_export(args)
     except KeyboardInterrupt:
         print("\nAborted.", file=sys.stderr)
         sys.exit(130)
