@@ -1360,7 +1360,7 @@ class IdeatePipeline:
             async def _limited(idx: int, coro):
                 async with sem:
                     if idx > 0:
-                        await asyncio.sleep(0.5 * idx)  # stagger launches
+                        await asyncio.sleep(0.3)  # brief stagger to avoid burst
                     return await coro
             tasks = [_limited(i, c) for i, c in enumerate(coros)]
             return await asyncio.gather(*tasks)

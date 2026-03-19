@@ -1547,5 +1547,106 @@
       "civic_participation",
       "social_infrastructure"
     ]
+  },
+  {
+    "id": "gap-001-merged",
+    "title": "Hearing Aid Device-as-Service with BNPL Financing",
+    "score": 7.5,
+    "verdict": "BUILD with mandatory pivots: (1) Outcome-based pricing with success metrics, (2) Integrated audiological support, (3) B2B2C partnerships with retailers, (4) Lean team with domain expert advisors. The core idea survives, but execution must address structural adoption failure through risk management, not just financing.",
+    "domains": [
+      "medical_devices",
+      "fintech",
+      "saas_health",
+      "emerging_markets",
+      "accessibility"
+    ]
+  },
+  {
+    "id": "gap-007-merged",
+    "title": "Senior Living Ecosystem Integration Platform",
+    "score": 7.4,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "elderly_care",
+      "B2B",
+      "institutional",
+      "logistics",
+      "saas_health"
+    ]
+  },
+  {
+    "id": "idea-002-merged",
+    "title": "Audiologist AI Workflow Automation SaaS",
+    "score": 7.3,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "saas_health",
+      "audiology",
+      "ai_augmentable",
+      "workflow_automation"
+    ]
+  },
+  {
+    "id": "idea-004-merged",
+    "title": "Tinnitus Digital Therapeutic SaaS",
+    "score": 7.3,
+    "verdict": "BUILD",
+    "domains": [
+      "digital_therapeutics",
+      "audiology",
+      "medical_devices",
+      "saas_health"
+    ]
+  },
+  {
+    "id": "gap-005-merged",
+    "title": "Multilingual Audiology-as-a-Service Platform",
+    "score": 7.3,
+    "verdict": "BUILD_WITH_PIVOT",
+    "domains": [
+      "localization",
+      "cultural_competency",
+      "B2B",
+      "global_expansion",
+      "saas_health"
+    ]
+  },
+  {
+    "id": "idea-017-merged",
+    "title": "Hearing Aid Performance Analytics & RWE Platform",
+    "score": 7.2,
+    "verdict": "BUILD with pivots",
+    "domains": [
+      "medical_devices",
+      "saas_health",
+      "health_insurance",
+      "analytics",
+      "real_world_evidence"
+    ]
+  },
+  {
+    "id": "idea-001-merged",
+    "title": "Hearing Aid as Continuous Health Monitor",
+    "score": 7.1,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "wearable_technology",
+      "health_insurance",
+      "digital_health",
+      "remote_monitoring"
+    ]
+  },
+  {
+    "id": "idea-021-merged",
+    "title": "Hearing Aid Failure Prediction & Proactive Logistics",
+    "score": 7.0,
+    "verdict": "BUILD with pivots: Launch direct-to-WSA first (lower adoption friction than manufacturers). Secure domain expert/partnership within 6 months. Validate failure prediction hypothesis with pilot data before full product build. Plan for platform strategy to build defensibility as market evolves.",
+    "domains": [
+      "medical_devices",
+      "saas_health",
+      "ai_augmentable",
+      "logistics",
+      "predictive_maintenance"
+    ]
   }
 ]

@@ -15,6 +15,10 @@ import anthropic
 class LLMClient:
     """Sends prompts to Claude and returns parsed JSON."""
 
+    # Rolling window for token-aware throttling (output tokens/min).
+    _OUTPUT_TOKEN_LIMIT = 8000   # stay under 10k/min with headroom
+    _WINDOW_SECONDS = 60
+
     def __init__(self, api_key: str, model: str, max_tokens: int = 16384):
         self.client = anthropic.Anthropic(api_key=api_key)
         self._async_client = anthropic.AsyncAnthropic(api_key=api_key)
@@ -24,6 +28,8 @@ class LLMClient:
         self.total_output_tokens = 0
         self._phase_token_log: list[dict] = []
         self._token_lock = threading.Lock()
+        # Token-aware throttling: list of (timestamp, output_tokens)
+        self._token_window: list[tuple[float, int]] = []
 
     def generate_json(
         self,
@@ -76,6 +82,7 @@ class LLMClient:
 
         for attempt in range(max_retries):
             try:
+                await self._throttle()
                 response = await self._async_client.messages.create(
                     model=use_model,
                     max_tokens=self.max_tokens,
@@ -84,14 +91,16 @@ class LLMClient:
                     temperature=temperature,
                 )
                 break
-            except (anthropic.RateLimitError, anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
+            except anthropic.RateLimitError as e:
                 if attempt == max_retries - 1:
                     raise
-                # Longer backoff for rate limits: 15s, 30s, 60s, 60s, 60s
-                if isinstance(e, anthropic.RateLimitError):
-                    wait = min(60, 15 * (2 ** attempt))
-                else:
-                    wait = 2 ** attempt
+                wait = self._get_retry_after(e) or min(60, 15 * (2 ** attempt))
+                print(f"[RETRY] RateLimitError, attempt {attempt + 1}/{max_retries}, waiting {wait:.0f}s...", file=sys.stderr)
+                await asyncio.sleep(wait)
+            except (anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
+                if attempt == max_retries - 1:
+                    raise
+                wait = 2 ** attempt
                 print(f"[RETRY] {type(e).__name__}, attempt {attempt + 1}/{max_retries}, waiting {wait}s...", file=sys.stderr)
                 await asyncio.sleep(wait)
 
@@ -111,6 +120,39 @@ class LLMClient:
                 "input_tokens": usage.input_tokens,
                 "output_tokens": usage.output_tokens,
             })
+            self._token_window.append((time.time(), usage.output_tokens))
+
+    def _tokens_in_window(self) -> int:
+        """Return total output tokens in the rolling window."""
+        cutoff = time.time() - self._WINDOW_SECONDS
+        with self._token_lock:
+            self._token_window = [(t, n) for t, n in self._token_window if t > cutoff]
+            return sum(n for _, n in self._token_window)
+
+    async def _throttle(self) -> None:
+        """Wait if we're approaching the output token rate limit."""
+        while True:
+            used = self._tokens_in_window()
+            if used < self._OUTPUT_TOKEN_LIMIT:
+                return
+            # Calculate how long until enough tokens expire from the window
+            cutoff = time.time() - self._WINDOW_SECONDS
+            with self._token_lock:
+                oldest = min((t for t, _ in self._token_window if t > cutoff), default=time.time())
+            wait = max(1.0, oldest + self._WINDOW_SECONDS - time.time() + 0.5)
+            print(f"[THROTTLE] {used}/{self._OUTPUT_TOKEN_LIMIT} output tokens/min used, pausing {wait:.0f}s...", file=sys.stderr)
+            await asyncio.sleep(wait)
+
+    @staticmethod
+    def _get_retry_after(e: anthropic.RateLimitError) -> float:
+        """Extract retry-after from the API response headers, fallback to default."""
+        try:
+            val = e.response.headers.get("retry-after")
+            if val:
+                return max(1.0, float(val))
+        except (AttributeError, ValueError):
+            pass
+        return 0
 
     # ------------------------------------------------------------------
 
