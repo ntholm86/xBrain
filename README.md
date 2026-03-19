@@ -1,8 +1,8 @@
 # xBrain — AI Idea Engine
 
-Generate, score, stress-test, and refine project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then attacks every idea like a hostile VC — so only the genuinely strong ones survive.
+Generate, score, stress-test, and refine project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then runs a 3-round adversarial debate — attacker vs defender with rebuttals — so only the genuinely strong ones survive.
 
-Now with **cost forecasting**, **constraint conflict detection**, **project spec generation**, and **idea lineage tracking**.
+Now with **adversarial debate stress testing**, **cost forecasting**, **constraint conflict detection**, **project spec generation**, **idea lineage tracking**, **score explainability**, and **PMO export** (CSV/Jira/Markdown).
 
 ## Setup
 
@@ -23,7 +23,7 @@ Now with **cost forecasting**, **constraint conflict detection**, **project spec
 python -m xbrain ideate
 ```
 
-That's it. This scans all domains, generates ideas, deduplicates, fills gaps, scores, and stress-tests them. Results appear in `xbrain-runs/run-YYYYMMDD-HHMMSS/`.
+That's it. Without `--domains`, the engine scans across ALL domains with no restrictions — technology, science, health, finance, agriculture, entertainment, and everything beyond. Use `--domains` to focus on specific areas. It generates ideas, deduplicates, fills gaps, scores, and stress-tests them through an adversarial debate. Results appear in `xbrain-runs/YYYYMMDD-HHMMSS-<brief-slug>/`.
 
 ## The Output
 
@@ -34,7 +34,7 @@ Each run creates a folder in `xbrain-runs/` containing:
 | **idea-report.md** | The main document to read — ranked ideas with scores, verdicts, and analysis |
 | idea-cards.json | Machine-readable idea data |
 | idea-log.json | Full pipeline trace |
-| stress-test-report.json | Detailed adversarial analysis |
+| stress-test-report.json | Adversarial debate results (attacker vs defender) |
 
 Open **idea-report.md** to review your ideas.
 
@@ -70,7 +70,7 @@ python -m xbrain ideate --domains "developer tools" gaming education
 python -m xbrain ideate --domains "B2B SaaS" "climate tech" logistics
 ```
 
-Without `--domains`, the engine scans broadly across many fields.
+Without `--domains`, the engine scans across all fields with no restrictions.
 
 ### `--constraints` — Add requirements
 
@@ -120,6 +120,30 @@ python -m xbrain ideate --brief "problem.txt" --lang spanish
 
 Default: english.
 
+### `--strategy` — Model routing
+
+Control which model handles which pipeline phase. Saves money by routing cheap phases to Haiku and expensive phases to a stronger model.
+
+```
+# Use one model for everything (default)
+python -m xbrain ideate --strategy single
+
+# Use cheapest model for all phases
+python -m xbrain ideate --strategy cheapest
+
+# Use Haiku for generation, best model for scoring/stress testing
+python -m xbrain ideate --strategy balanced
+
+# Use the best model for everything
+python -m xbrain ideate --strategy best
+```
+
+Configure which models are "cheap" and "best" in `.env`:
+```
+XBRAIN_CHEAP_MODEL=claude-haiku-4-5-20251001
+XBRAIN_BEST_MODEL=claude-sonnet-4-20250514
+```
+
 ## Examples
 
 **Open-ended brainstorm:**
@@ -147,36 +171,12 @@ python -m xbrain ideate --brief "AI-powered restaurant menu optimizer" --ideas 1
 python -m xbrain ideate --ideas 40 --top 15 --constraints "must cost under $100/month to run" "must not require user accounts"
 ```
 
-### `--strategy` — Model routing
-
-Control which model handles which pipeline phase. Saves money by routing cheap phases to Haiku and expensive phases to a stronger model.
-
-```
-# Use one model for everything (default)
-python -m xbrain ideate --strategy single
-
-# Use cheapest model for all phases
-python -m xbrain ideate --strategy cheapest
-
-# Use Haiku for generation, best model for scoring/stress testing
-python -m xbrain ideate --strategy balanced
-
-# Use the best model for everything
-python -m xbrain ideate --strategy best
-```
-
-Configure which models are "cheap" and "best" in `.env`:
-```
-XBRAIN_CHEAP_MODEL=claude-haiku-4-5-20251001
-XBRAIN_BEST_MODEL=claude-sonnet-4-20250514
-```
-
 ## Pipeline 2: Specify — Project Spec Generator
 
 After ideation, convert your top BUILD ideas into actionable project specs with user stories, API contracts, task breakdowns, and MVP scope.
 
 ```
-python -m xbrain specify --idea ./xbrain-runs/run-XXXXXX/idea-cards.json --select idea-003
+python -m xbrain specify --idea ./xbrain-runs/20260319-143002-restaurant-menu/idea-cards.json --select idea-003
 ```
 
 This generates:
@@ -198,30 +198,33 @@ The spec includes:
 
 ```
 # Generate spec in another language
-python -m xbrain specify --idea ./xbrain-runs/run-XXXXXX/idea-cards.json --select idea-003 --lang danish
+python -m xbrain specify --idea ./xbrain-runs/20260319-143002-restaurant-menu/idea-cards.json --select idea-003 --lang danish
 ```
 
-## Cost Forecasting
+## Export (PMO Bridge)
 
-Estimate API cost before running — no API calls made.
-
-```
-python -m xbrain estimate --ideas 20 --top 8 --domains health fintech
-```
-
-Output shows per-phase cost breakdown and compares all model routing strategies so you can pick the cheapest option.
-
-### Dry-run with cost
-
-The `--dry-run` flag now includes cost estimation:
+Export BUILD ideas to project management tools. Three formats:
 
 ```
-python -m xbrain ideate --brief problem.txt --domains health --dry-run
+# CSV (importable to Jira, Linear, Asana, Excel)
+python -m xbrain export --run ./xbrain-runs/20260319-143002-restaurant-menu --format csv
+
+# Markdown task list
+python -m xbrain export --run ./xbrain-runs/20260319-143002-restaurant-menu --format md
+
+# Jira-compatible JSON (bulk import)
+python -m xbrain export --run ./xbrain-runs/20260319-143002-restaurant-menu --format jira
 ```
 
-### Actual cost tracking
+By default, only BUILD ideas are exported. Use `--all` to include all ideas.
 
-Every report now includes actual cost after the run completes. The cost is shown in the terminal output and in the report header.
+Write to a file instead of stdout:
+
+```
+python -m xbrain export --run ./xbrain-runs/20260319-143002-restaurant-menu --format csv --output ideas.csv
+```
+
+The CSV includes: ID, title, description, score, verdict, effort, estimated cost, domains, persona, pain point, kill criteria, and auto-mapped priority (Critical/High/Medium/Low based on score).
 
 ## Constraint Conflict Detection
 
@@ -283,7 +286,7 @@ Edit `.env` to change defaults:
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...        # Required
-XBRAIN_MODEL=claude-haiku-4-5-20251001  # Which Claude model to use
+XBRAIN_MODEL=claude-sonnet-4-20250514   # Which Claude model to use (default)
 XBRAIN_MAX_TOKENS=16384             # Max output tokens per API call
 XBRAIN_MODEL_STRATEGY=single        # Model routing: single|cheapest|balanced|best
 XBRAIN_CHEAP_MODEL=claude-haiku-4-5-20251001   # Model for cheap phases (balanced strategy)
@@ -297,9 +300,9 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
 ### Pipeline Architecture
 
 ```
-CONSTRAINT CHECK → IMMERSE → DIVERGE → DEDUP → GAP-FILL → CONVERGE → STRESS TEST → REFINE → META-LEARN
-                                                                                                    ↓
-                                                                                               SPECIFY (Pipeline 2)
+CONSTRAINT CHECK → IMMERSE → DIVERGE → DEDUP → GAP-FILL → CONVERGE → ATTACK → DEFEND → REBUTTAL → REFINE → META-LEARN
+                                                                                                                   ↓
+                                                                                                              SPECIFY (Pipeline 2)
 ```
 
 **Phase -0.5 — CONSTRAINT CHECK** (automatic, when 2+ constraints provided)
@@ -324,19 +327,51 @@ Multi-turn divergence. Takes the gaps identified by dedup and generates new idea
 
 **Phase 2 — CONVERGE**
 Clusters, scores, and ranks. Each idea gets:
-- A specific **persona** (who exactly would use this?)
-- **8-dimension scoring**: impact, confidence, effort, cost, ethical risk, sustainability, defensibility, market timing
-- **Inverse scoring** ("what would need to be TRUE for this to be TERRIBLE?") — breaks the tendency to score everything 7-8 by forcing the AI to articulate failure conditions. If the idea is fragile (inverse_confidence > 6), positive scores get reduced
-- **Score calibration** from the meta-learning playbook (if available)
+- A specific **target persona** — not generic demographics, but a concrete person: who they are, what pain they feel, what context they work in, and what motivates them
+- A **first customer profile (ICP)** — the ideal early adopter type, organization size, and readiness level
+- **8-dimension scoring** (0-10 each):
 
-**Phase 3 — STRESS TEST**
-Devil's Advocate mode. Each idea is attacked from 9 angles:
-- Prior art, adoption failure, technical blockers, problem reframe, negative externalities, obsolescence, timing, defensibility, and expertise gaps
+| Dimension | Direction | Weight | What it measures |
+|-----------|-----------|--------|------------------|
+| Impact | Higher = better | 25% | How many people affected, how severe the pain |
+| Confidence | Higher = better | 20% | How proven is the approach, how reliable the evidence |
+| Sustainability | Higher = better | 10% | Revenue model strength, retention dynamics |
+| Defensibility | Higher = better | 10% | Moat, switching costs, network effects |
+| Market Timing | Higher = better | 5% | Is the window open now? |
+| Effort | Lower = better | -10% | Implementation complexity (scored assuming developer + AI tools) |
+| Cost | Lower = better | -10% | Infrastructure and operational costs |
+| Ethical Risk | Lower = better | -10% | Potential for misuse or harm |
+
+  Composite score formula: `(0.25 x impact + 0.20 x confidence + 0.10 x sustainability + 0.10 x defensibility + 0.05 x market_timing - 0.10 x effort - 0.10 x cost - 0.10 x ethical_risk) + 3.0`, clamped to 0-10.
+
+- **Score reasoning**: for each dimension, a human-readable explanation of WHY that score was given — makes scoring auditable by non-technical stakeholders
+- **Inverse scoring** ("what would need to be TRUE for this to be TERRIBLE?") — breaks the tendency to score everything 7-8 by forcing the AI to articulate failure conditions. If the idea is fragile (inverse_confidence > 6), positive scores get reduced
+- **Score calibration** from the meta-learning playbook (if available). Scores are marked UNCALIBRATED until the meta-learning phase has run (every 3 runs). After calibration, weak dimensions are scored more harshly and inflated/deflated scores are adjusted
+
+**Phase 3 — STRESS TEST (Adversarial Debate)**
+Three-round adversarial debate between a Devil's Advocate (attacker) and an Idea Champion (defender), judged by a neutral arbiter:
+
+- **Round 1 — Attack:** The Devil's Advocate attacks each idea from 9 angles: prior art, adoption failure, technical blockers, problem reframe, negative externalities, obsolescence, timing, defensibility, and expertise gaps
+- **Round 2 — Defense:** The Idea Champion responds to every attack with specific counter-arguments, identifies strengths the attacker ignored, and proposes pivots for valid weaknesses
+- **Round 3 — Rebuttal + Verdict:** A neutral judge facilitates final rebuttals from both sides, then renders verdicts based on the full debate
+
+The full debate (attack → defense → rebuttal) is visible in the report for each idea, letting you see exactly why an idea was approved or rejected.
+
+Additional outputs per idea:
 - For expertise gap attacks, the AI evaluates whether AI tools can bridge the gap — only truly unbridgeable gaps (licensure, physical skills) count as fatal
+- Each idea gets a **feasibility matrix** (9 dimensions, scored 1-5): technical risk, data availability, regulatory risk, infrastructure cost, time to prototype, maintenance burden, LLM capability fit, defensibility, and market timing
+- Each idea gets **kill criteria** — specific conditions under which to abort building
 - Each idea gets a verdict: **BUILD**, **MUTATE**, **KILL**, or **INCUBATE**
 
-**Phase 4 — REFINE** (if no BUILD verdicts)
-Iterative refinement loop (up to 3 rounds). Extracts mutations from MUTATE ideas and attack patterns from the stress test, then re-runs diverge+converge+stress with progressively tighter constraints and lower creativity. Each round learns from the failures of the previous round.
+**Phase 4 — REFINE** (automatic, if no BUILD verdicts)
+Iterative refinement loop — up to 3 rounds. Triggered when the stress test produces zero BUILD verdicts. Each round:
+1. **Extract mutations** — collects suggested improvements from every MUTATE verdict
+2. **Extract attack patterns** — identifies the most frequent fatal arguments (top 5 in round 1, top 10 in later rounds)
+3. **Re-generate** — runs a fresh DIVERGE with the mutations and patterns injected as context, using progressively lower creativity (temperature drops from 0.75 → 0.60 → 0.50) and fewer ideas (50% → 33% → 25% of original count)
+4. **Re-score and re-stress** — runs CONVERGE and STRESS TEST on the new batch
+5. **Merge survivors** — new BUILD ideas are merged with previous rounds. Title-based deduplication ensures the same concept (from different rounds) only appears once — the highest-scored version is kept
+
+The loop stops as soon as a BUILD verdict is found or 3 rounds are exhausted. This is how xBrain iterates toward quality — each round learns from the specific failure modes of the previous round.
 
 **Phase 5 — META-LEARN** (every 3 runs)
 Cross-session learning. Distills accumulated results into a compact playbook:
@@ -359,15 +394,54 @@ xBrain remembers across runs. Files in `xbrain-memory/persistent/`:
 | `meta-metrics.json` | Run statistics (token usage, build rates) |
 | `playbook.json` | Distilled meta-learning playbook |
 | `score-calibration.json` | Score bias detection and correction |
+| `idea-lineage.json` | Idea evolution graph (parent→child, run→idea) |
+| `idea-genes.json` | Reusable idea patterns extracted from high-scoring ideas |
+| `mutation-archive.json` | MUTATE ideas with their suggested mutations |
+| `attack-patterns.json` | Recurring attack patterns from stress tests |
+| `refinement-history.json` | History of refinement rounds |
 
 ### The Report
 
 Each run generates `idea-report.md` with:
-- **Ideas at a Glance** — quick comparison table
-- **Comparative Summary** — highest impact, highest confidence
-- **Effort-Impact Quadrant** — quick wins vs strategic bets
-- Per-idea: persona, 8-dimension scores, **inverse fragility check**, stress test attacks/defenses, feasibility matrix, kill criteria, competitive landscape, timeline alignment
+- **Summary** — ideas generated, scored, token usage, cost
+- **Comparative Summary** — highest impact idea, highest confidence idea
+- **Effort-Impact Quadrant** — categorizes ideas into Quick Wins (high impact, lower effort), Strategic (high impact, high effort), and Blue Sky (interesting but lower priority)
+- **Domain Briefs** — if IMMERSE ran, the full domain research (tensions, pressure points, regulatory windows)
+- **Ideas at a Glance** — quick comparison table with score, effort, and verdict
+- **Per-idea detail**:
+  - Target persona (who, pain, context, motivation)
+  - First customer profile (ICP type, org size, readiness)
+  - 8-dimension score table with reasoning per dimension
+  - Inverse fragility check (what would make this terrible?)
+  - Key assumptions (critical unknowns that must be validated)
+  - Stress test results: attacks made/survived/fatal, strongest attack, strongest defense, suggested mutation
+  - **Full adversarial debate** — each attack angle shown with attacker argument, defender response, attacker rebuttal, defender rebuttal, and outcome (SURVIVED/FATAL/WEAKENED)
+  - Feasibility matrix (9 dimensions, 1-5 scale)
+  - Kill criteria (abort conditions for the build phase)
+  - Competitive landscape and timeline alignment
+
+### Console Output
+
+Each pipeline phase prints a visual header, and at the end of a run, xBrain prints a structured completion summary:
+- Verdict breakdown (BUILD / MUTATE / KILL / INCUBATE counts)
+- Refinement rounds used (if any)
+- Top 5 ideas by score
+- Output file locations
+- Total tokens and cost
+- Suggested next command (e.g. `specify` for the top BUILD idea)
 
 ## Cost
 
-Each run makes 5-6 API calls (immerse + diverge + dedup + gap-fill + converge + stress test). Approximate cost per run with Haiku: **$0.03–$0.15**.
+Each run makes 8-10 API calls (constraint check + immerse + diverge + dedup + gap-fill + converge + 3 stress test calls). If the refinement loop triggers (no BUILD verdicts), each refinement round adds 5 more API calls (diverge + converge + 3 stress test calls), up to 3 rounds — so worst case is ~25 API calls.
+
+The actual cost (tokens in/out and dollar amount) is tracked and shown in the terminal output and in the report header.
+
+Approximate cost per run with Haiku: **$0.10–$0.30** (simple run), **$0.30–$0.60** (with refinement rounds). The adversarial debate (3 LLM calls per stress test round) adds ~$0.10–$0.15 compared to the previous single-call stress test.
+
+Use `python -m xbrain estimate` to preview costs before running (no API calls made):
+
+```
+python -m xbrain estimate --ideas 20 --top 8 --domains health fintech
+```
+
+The `--dry-run` flag on `ideate` also shows estimated cost.
