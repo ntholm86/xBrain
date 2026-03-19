@@ -39,16 +39,18 @@ class LLMClient:
         temperature: float = 0.7,
         model_override: str | None = None,
         phase: str = "",
+        max_tokens: int | None = None,
     ) -> dict | list:
         """Call the LLM and extract JSON from the response. Retries on transient errors."""
         use_model = model_override or self.model
+        use_max_tokens = max_tokens or self.max_tokens
         max_retries = 3
 
         for attempt in range(max_retries):
             try:
                 response = self.client.messages.create(
                     model=use_model,
-                    max_tokens=self.max_tokens,
+                    max_tokens=use_max_tokens,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}],
                     temperature=temperature,
@@ -75,9 +77,11 @@ class LLMClient:
         temperature: float = 0.7,
         model_override: str | None = None,
         phase: str = "",
+        max_tokens: int | None = None,
     ) -> dict | list:
         """Async version of generate_json for parallel LLM calls."""
         use_model = model_override or self.model
+        use_max_tokens = max_tokens or self.max_tokens
         max_retries = 6
 
         for attempt in range(max_retries):
@@ -85,7 +89,7 @@ class LLMClient:
                 await self._throttle()
                 response = await self._async_client.messages.create(
                     model=use_model,
-                    max_tokens=self.max_tokens,
+                    max_tokens=use_max_tokens,
                     system=system_prompt,
                     messages=[{"role": "user", "content": user_prompt}],
                     temperature=temperature,

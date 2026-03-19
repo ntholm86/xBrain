@@ -484,6 +484,7 @@ class IdeatePipeline:
         data = self.llm.generate_json(
             META_LEARN_SYSTEM, prompt, temperature=0.3,
             model_override=self._model_for_phase("meta"), phase="meta",
+            max_tokens=2048,
         )
 
         playbook = data.get("playbook", "")
@@ -516,6 +517,7 @@ class IdeatePipeline:
             data = self.llm.generate_json(
                 CONSTRAINT_CHECK_SYSTEM, prompt, temperature=0.2,
                 model_override=self._model_for_phase("constraints"), phase="constraints",
+                max_tokens=1024,
             )
 
             conflicts = data.get("conflicts", [])
@@ -542,6 +544,7 @@ class IdeatePipeline:
         data = self.llm.generate_json(
             self._sys(IMMERSE_SYSTEM), prompt, temperature=0.6,
             model_override=self._model_for_phase("immerse"), phase="immerse",
+            max_tokens=4096,
         )
         briefs_raw = data.get("domain_briefs", [])
 
@@ -592,6 +595,7 @@ class IdeatePipeline:
         data = self.llm.generate_json(
             self._sys(DIVERGE_SYSTEM), prompt, temperature=0.9,
             model_override=self._model_for_phase("diverge"), phase="diverge",
+            max_tokens=10240,
         )
         ideas_raw = data.get("ideas", [])
 
@@ -632,6 +636,7 @@ class IdeatePipeline:
         data = self.llm.generate_json(
             self._sys(DEDUP_SYSTEM), prompt, temperature=0.2,
             model_override=self._model_for_phase("dedup"), phase="dedup",
+            max_tokens=2048,
         )
 
         keep_ids = set(data.get("keep", [i.id for i in raw_ideas]))
@@ -681,6 +686,7 @@ class IdeatePipeline:
         data = self.llm.generate_json(
             self._sys(DIVERGE_GAPFILL_SYSTEM), prompt, temperature=0.95,
             model_override=self._model_for_phase("gapfill"), phase="gapfill",
+            max_tokens=8192,
         )
 
         ideas_raw = data.get("ideas", [])
@@ -716,7 +722,8 @@ class IdeatePipeline:
         )
 
         data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5,
-                                       model_override=self._model_for_phase("converge"), phase="converge")
+                                       model_override=self._model_for_phase("converge"), phase="converge",
+                                       max_tokens=12288)
 
         clustering = data.get("clustering_summary", "")
         if clustering:
@@ -746,17 +753,14 @@ class IdeatePipeline:
         _log("STRESS", f"Adversarial debate for {len(candidates)} candidates (parallel)...")
         _log("STRESS", "")
 
-        # Build per-idea compact dicts once
+        # Build per-idea compact dicts once (slim: no persona/score_breakdown to save tokens)
         compact_by_id: dict[str, dict] = {}
         for c in candidates:
             compact_by_id[c.id] = {
                 "id": c.id,
                 "title": c.title,
                 "rationale": c.rationale,
-                "composite_score": c.composite_score,
                 "domain_tags": c.domain_tags,
-                "primary_persona": c.primary_persona.model_dump(),
-                "score_breakdown": c.score_breakdown.model_dump(),
             }
 
         # Slim version for defense/rebuttal (no full persona/score breakdown)
@@ -784,6 +788,7 @@ class IdeatePipeline:
                 data = await self.llm.generate_json_async(
                     sys_attack, prompt, temperature=0.4,
                     model_override=stress_model, phase="stress-attack",
+                    max_tokens=4096,
                 )
                 raw = _unwrap_single(data, "results", c.id, "attack")
                 return AttackResponse.model_validate(raw)
@@ -820,6 +825,7 @@ class IdeatePipeline:
                 data = await self.llm.generate_json_async(
                     sys_defense, prompt, temperature=0.4,
                     model_override=stress_model, phase="stress-defense",
+                    max_tokens=6144,
                 )
                 raw = _unwrap_single(data, "defenses", ar.idea_id, "defense")
                 return DefenseResponse.model_validate(raw)
@@ -860,6 +866,7 @@ class IdeatePipeline:
                 data = await self.llm.generate_json_async(
                     sys_rebuttal, prompt, temperature=0.3,
                     model_override=stress_model, phase="stress-rebuttal",
+                    max_tokens=8192,
                 )
                 raw = _unwrap_single(data, "results", ar.idea_id, "rebuttal")
                 return RebuttalResponse.model_validate(raw)
@@ -1064,7 +1071,8 @@ class IdeatePipeline:
         _log("REFINE", f"  DIVERGE: Generating {diverge_ideas_count} focused ideas (temperature={temperature:.2f})...")
         
         data = self.llm.generate_json(self._sys(DIVERGE_SYSTEM), refined_prompt, temperature=temperature,
-                                       model_override=self._model_for_phase("refine"), phase="refine-diverge")
+                                       model_override=self._model_for_phase("refine"), phase="refine-diverge",
+                                       max_tokens=8192)
         ideas_raw = data.get("ideas", [])
 
         refined_raw_ideas = []
@@ -1092,7 +1100,8 @@ class IdeatePipeline:
 
         _log("REFINE", f"  CONVERGE: Scoring {len(refined_raw_ideas)} ideas, selecting top {converge_top_n}...")
         data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5,
-                                       model_override=self._model_for_phase("refine"), phase="refine-converge")
+                                       model_override=self._model_for_phase("refine"), phase="refine-converge",
+                                       max_tokens=12288)
 
         clustering = data.get("clustering_summary", "")
         if clustering:

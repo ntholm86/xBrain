@@ -381,30 +381,7 @@ didn't anticipate. Think like:
    - Expertise gap: "Building this requires domain expertise in [X] that \
 the builder likely lacks"
 
-3. DEFENSE: For each attack, attempt a counterargument. Be fair.
-   CRITICAL: When attacking on expertise gaps, ALWAYS evaluate whether \
-AI tools (LLMs, code gen, document parsing, domain-specific APIs) can \
-bridge that gap. If a non-expert developer + AI can realistically \
-deliver the core value, the expertise attack is NOT fatal. Only mark \
-expertise gaps as fatal when the domain requires hands-on physical \
-skills, professional licensure with legal liability, or real-time \
-human judgment that AI cannot currently replicate.
-
-4. FEASIBILITY ASSESSMENT (score each 1-5, where 5 is best/lowest risk):
-   - technical_risk, data_availability, regulatory_risk, cost_infra_month
-   - time_to_prototype, maintenance_burden, llm_capability_fit
-   - defensibility, market_timing
-   For llm_capability_fit, consider what AI is strong at (text analysis, \
-code gen, API integration, web apps, document parsing, data analysis, \
-domain knowledge synthesis, regulatory text interpretation, pattern \
-recognition) vs weak at (real-time data, custom visual design, native \
-mobile, audio/video, hardware, physical skills). Score HIGH when AI \
-can substitute for domain expertise the builder may lack.
-
-5. KILL CRITERIA: For surviving ideas, define 2-3 conditions that should \
-abort a build if discovered during execution.
-
-6. VERDICT:
+3. VERDICT:
    - BUILD: survived attacks, feasible, worth building now
    - MUTATE: good core but needs changes (describe mutation)
    - KILL: fatal flaws that can't be fixed
@@ -426,40 +403,11 @@ Respond with ONLY valid JSON:
         "Timing: ...",
         "Defensibility: ..."
       ],
-      "defenses": [
-        "Defense against freeform: ...",
-        "Defense against prior art: ...",
-        "Defense against adoption: ...",
-        "Defense against technical: ...",
-        "Defense against reframe: ...",
-        "Defense against externalities: ...",
-        "Defense against obsolescence: ...",
-        "Defense against timing: ...",
-        "Defense against defensibility: ..."
-      ],
       "attacks_made": 9,
       "attacks_survived": 6,
       "attacks_fatal": 3,
       "strongest_argument": "The single most compelling attack",
-      "strongest_defense": "The single most compelling defense",
       "suggested_mutation": "How the idea should change (empty if BUILD)",
-      "feasibility_matrix": {{
-        "technical_risk": 4,
-        "data_availability": 3,
-        "regulatory_risk": 4,
-        "cost_infra_month": 4,
-        "time_to_prototype": 3,
-        "maintenance_burden": 3,
-        "llm_capability_fit": 4,
-        "defensibility": 3,
-        "market_timing": 4
-      }},
-      "feasibility_verdict": "BUILDABLE",
-      "llm_capability_fit": "strong",
-      "kill_criteria": [
-        "Abort if key data API access is denied",
-        "Abort if scope exceeds 3x original estimate"
-      ],
       "verdict": "BUILD"
     }}
   ]

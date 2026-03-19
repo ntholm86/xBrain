@@ -1798,5 +1798,103 @@
       "brand_building",
       "lead_generation"
     ]
+  },
+  {
+    "id": "gap-006-merged",
+    "title": "Børnebeskyttelse-certificering og juridisk rammeværk",
+    "score": 7.9,
+    "verdict": "BUILD_MVP_FIRST",
+    "domains": [
+      "legal",
+      "insurance",
+      "child_safety",
+      "labor",
+      "compliance"
+    ]
+  },
+  {
+    "id": "idea-001-merged",
+    "title": "Kunstner-markedsplads med verificering og portfolio",
+    "score": 7.4,
+    "verdict": "BUILD_WITH_PIVOT_TO_B2B",
+    "domains": [
+      "B2B services",
+      "platform",
+      "entertainment",
+      "events"
+    ]
+  },
+  {
+    "id": "idea-017-merged",
+    "title": "Kunstner-kredentialisering og kompetence-certificering",
+    "score": 7.0,
+    "verdict": "VALIDATE_BEFORE_BUILD",
+    "domains": [
+      "platform",
+      "education",
+      "B2B services",
+      "labor"
+    ]
+  },
+  {
+    "id": "idea-009-merged",
+    "title": "Videnskabsbaseret team-building event curator",
+    "score": 6.7,
+    "verdict": "MUTATE_THEN_BUILD",
+    "domains": [
+      "B2B services",
+      "events",
+      "technology",
+      "education",
+      "HR"
+    ]
+  },
+  {
+    "id": "idea-016-merged",
+    "title": "AI-drevet performance-script og kostume-design generator",
+    "score": 6.7,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "technology",
+      "entertainment",
+      "B2B services",
+      "AI"
+    ]
+  },
+  {
+    "id": "idea-011-merged",
+    "title": "Seniorbosætnings-aktivitets-booking service",
+    "score": 6.7,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "B2B services",
+      "events",
+      "senior_market",
+      "healthcare"
+    ]
+  },
+  {
+    "id": "idea-006-merged",
+    "title": "Hybrid event production suite med performance-integration",
+    "score": 6.6,
+    "verdict": "BUILD_WITH_PIVOT_TO_B2B2C",
+    "domains": [
+      "events",
+      "technology",
+      "B2B services",
+      "platform"
+    ]
+  },
+  {
+    "id": "gap-008-merged",
+    "title": "Mesterlære-program og peer-mentoring netværk",
+    "score": 6.6,
+    "verdict": "BUILD_WITH_PIVOT",
+    "domains": [
+      "education",
+      "labor",
+      "community",
+      "mental_health"
+    ]
   }
 ]
