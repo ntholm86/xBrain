@@ -169,5 +169,32 @@
     "build_count": 3,
     "tokens_in": 43710,
     "tokens_out": 74610
+  },
+  {
+    "run_id": "20260319-065552-solo-developers-who-want-to-build",
+    "timestamp": "2026-03-19T06:55:52.717631+00:00",
+    "ideas_generated": 12,
+    "candidates": 4,
+    "build_count": 1,
+    "tokens_in": 58855,
+    "tokens_out": 84604
+  },
+  {
+    "run_id": "20260319-080730-solo-developers-who-want-to-build",
+    "timestamp": "2026-03-19T08:07:30.084073+00:00",
+    "ideas_generated": 8,
+    "candidates": 2,
+    "build_count": 1,
+    "tokens_in": 31406,
+    "tokens_out": 47210
+  },
+  {
+    "run_id": "20260319-081836-what-to-do-in-copenhagen-if-you-have",
+    "timestamp": "2026-03-19T08:18:36.024978+00:00",
+    "ideas_generated": 21,
+    "candidates": 8,
+    "build_count": 1,
+    "tokens_in": 108044,
+    "tokens_out": 155749
   }
 ]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import sys
@@ -13,13 +14,16 @@ from xbrain.config import Config
 from xbrain.llm import LLMClient
 from xbrain.memory import MemoryStore
 from xbrain.models import (
+    AttackResponse,
     DebateExchange,
+    DefenseResponse,
     DomainBrief,
     FeasibilityMatrix,
     IdeaCard,
     IdeateRunResult,
     Persona,
     RawIdea,
+    RebuttalResponse,
     ScoreBreakdown,
     StressTestResult,
     compute_composite_score,
@@ -58,7 +62,11 @@ from xbrain.prompts import (
 
 
 def _log(tag: str, msg: str) -> None:
-    print(f"[{tag:<9s}] {msg}")
+    line = f"[{tag:<9s}] {msg}"
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        print(line.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(sys.stdout.encoding or "utf-8", errors="replace"))
     sys.stdout.flush()
 
 
@@ -69,6 +77,87 @@ def _log_phase_header(phase: str, description: str) -> None:
     print(f"  {phase}: {description}")
     print(f"{'=' * 60}")
     sys.stdout.flush()
+
+
+# ------------------------------------------------------------------
+# LLM response helpers
+# ------------------------------------------------------------------
+
+def _unwrap_single(data: dict | list, wrapper_key: str, idea_id: str, phase: str) -> dict:
+    """Extract a single-item result from an LLM JSON response.
+
+    The prompts ask for ``{wrapper_key: [item, ...]}``, but when
+    ``candidate_count=1`` the LLM sometimes returns the item directly
+    without the wrapper array.  This helper handles both shapes and
+    always returns a plain dict suitable for Pydantic validation.
+    """
+    if isinstance(data, list):
+        # Rare: LLM returned a bare list
+        item = data[0] if data else {}
+        _log("STRESS", f"  [unwrap] {phase}/{idea_id}: bare list (len={len(data)})")
+    elif wrapper_key in data:
+        items = data[wrapper_key]
+        item = items[0] if items else {}
+    else:
+        # LLM omitted the wrapper — the dict IS the item
+        item = data
+        _log("STRESS", f"  [unwrap] {phase}/{idea_id}: wrapper '{wrapper_key}' missing, using raw dict")
+
+    if isinstance(item, dict):
+        item.setdefault("idea_id", idea_id)
+    return item
+
+
+_ANGLE_KEYWORDS = [
+    "prior", "adoption", "technical", "reframe",
+    "externali", "obsolesc", "timing", "defensib", "expertise",
+]
+
+
+def _coerce_str(item) -> str:
+    """Coerce an LLM value to a plain string.
+
+    The LLM sometimes returns dicts (e.g. {"point": "...", "opportunity": "..."})
+    where a plain string is expected.  Join all values into one string.
+    """
+    if isinstance(item, str):
+        return item
+    if isinstance(item, dict):
+        return "; ".join(str(v) for v in item.values() if v)
+    return str(item)
+
+
+def _match_exchange(exchanges: list, idx: int):
+    """Match a defense/rebuttal exchange to an attack by position.
+
+    Accepts either a list of Pydantic models (with .angle) or dicts.
+    Uses index-based matching (prompts list attacks in order), with a
+    keyword fallback for robustness when the LLM reorders items.
+    Returns the matched item or None.
+    """
+    if not exchanges:
+        return None
+
+    def _get_angle(ex) -> str:
+        return (getattr(ex, "angle", None) or (ex.get("angle", "") if isinstance(ex, dict) else "")).lower()
+
+    # Skip any leading freeform-defense entry
+    offset = 0
+    if "freeform" in _get_angle(exchanges[0]):
+        offset = 1
+
+    adj = idx + offset
+    if adj < len(exchanges):
+        return exchanges[adj]
+
+    # Keyword fallback
+    kw = _ANGLE_KEYWORDS[idx] if idx < len(_ANGLE_KEYWORDS) else ""
+    if kw:
+        for ex in exchanges:
+            if kw in _get_angle(ex):
+                return ex
+
+    return None
 
 
 class IdeatePipeline:
@@ -190,17 +279,36 @@ class IdeatePipeline:
         refinement_round = 0
         max_refinement_rounds = 3
         refinement_error = None
+
+        # Pre-build context once for all refinement rounds
+        _cached_ctx: dict[str, str] | None = None
         
         try:
             while build_count == 0 and refinement_round < max_refinement_rounds:
                 refinement_round += 1
                 _log("IDEATE", f"")
                 _log("IDEATE", f"Refinement Round {refinement_round}/{max_refinement_rounds}: No BUILD verdicts found. Extracting learnings...")
-                
+
+                if _cached_ctx is None:
+                    _cached_ctx = {
+                        "domain": build_domain_context(domains, self.cfg.DEFAULT_DOMAINS),
+                        "constraint": build_constraint_context(constraints),
+                        "memory": build_memory_context(
+                            self.memory.past_idea_count(),
+                            self.memory.get_domain_heat_map(),
+                            self.memory.killed_idea_titles(),
+                        ),
+                        "immersion": build_immersion_context(
+                            [b.model_dump() for b in domain_briefs] if domain_briefs else None
+                        ),
+                        "brief": build_brief_context(brief_text),
+                    }
+
                 # Run refinement phase
                 refinement_survivors = self._phase_refine(
                     raw_ideas, survivors, stress_results, domains, constraints, domain_briefs, brief_text,
-                    iteration=refinement_round
+                    iteration=refinement_round,
+                    cached_context=_cached_ctx,
                 )
                 
                 if not refinement_survivors:
@@ -347,7 +455,7 @@ class IdeatePipeline:
 
         # Compact score→verdict string: "7.5→M, 6.8→K, 8.1→B"
         score_verdicts = ", ".join(
-            f"{sv['s']}→{sv['v'][0]}" for sv in score_history[-30:]
+            f"{sv['s']}→{sv['v'][0] if sv.get('v') else '?'}" for sv in score_history[-30:]
         )
 
         prompt = META_LEARN_USER.format(
@@ -426,6 +534,11 @@ class IdeatePipeline:
 
         briefs = []
         for b in briefs_raw:
+            # Normalize list-of-str fields: LLM sometimes returns dicts instead of strings
+            for key in ("pressure_points", "key_tensions", "underserved_populations",
+                        "regulatory_windows", "technology_gaps"):
+                if key in b:
+                    b[key] = [_coerce_str(item) for item in b[key]]
             briefs.append(DomainBrief(**b))
             _log("IMMERSE", f"  {b.get('domain','?').upper()}: {len(b.get('pressure_points',[]))} pressure points")
 
@@ -617,11 +730,13 @@ class IdeatePipeline:
         return candidates
 
     def _phase_stress_test(self, candidates: list[IdeaCard]) -> list[StressTestResult]:
-        _log("STRESS", f"Adversarial debate for {len(candidates)} candidates...")
+        _log("STRESS", f"Adversarial debate for {len(candidates)} candidates (parallel)...")
         _log("STRESS", "")
 
-        candidates_compact = [
-            {
+        # Build per-idea compact dicts once
+        compact_by_id: dict[str, dict] = {}
+        for c in candidates:
+            compact_by_id[c.id] = {
                 "id": c.id,
                 "title": c.title,
                 "rationale": c.rationale,
@@ -630,125 +745,130 @@ class IdeatePipeline:
                 "primary_persona": c.primary_persona.model_dump(),
                 "score_breakdown": c.score_breakdown.model_dump(),
             }
-            for c in candidates
-        ]
-        candidates_json = json.dumps(candidates_compact, indent=2, ensure_ascii=False)
 
-        # ── Round 1: Devil's Advocate attacks ──────────────────────────
-        _log("STRESS", "Round 1/3 — Devil's Advocate attacking...")
+        # Slim version for defense/rebuttal (no full persona/score breakdown)
+        slim_by_id: dict[str, dict] = {}
+        for c in candidates:
+            slim_by_id[c.id] = {
+                "id": c.id,
+                "title": c.title,
+                "composite_score": c.composite_score,
+                "domain_tags": c.domain_tags,
+            }
 
-        attack_prompt = STRESS_TEST_USER.format(
-            candidate_count=len(candidates),
-            candidates_json=candidates_json,
-        )
+        stress_model = self._model_for_phase("stress")
+        sys_attack = self._sys(STRESS_TEST_SYSTEM)
+        sys_defense = self._sys(ADVERSARIAL_DEFENSE_SYSTEM)
+        sys_rebuttal = self._sys(ADVERSARIAL_REBUTTAL_SYSTEM)
 
-        attack_data = self.llm.generate_json(
-            self._sys(STRESS_TEST_SYSTEM), attack_prompt, temperature=0.4,
-            model_override=self._model_for_phase("stress"), phase="stress-attack",
-        )
+        # ── Round 1: Devil's Advocate attacks (parallel across ideas) ──
+        _log("STRESS", f"Round 1/3 — Devil's Advocate attacking ({len(candidates)} parallel calls)...")
 
-        attack_results_raw = attack_data.get("results", [])
-        for ar in attack_results_raw:
-            idea_id = ar.get("idea_id", "?")
-            title = next((c.title for c in candidates if c.id == idea_id), idea_id)
-            attacks = ar.get("structured_attacks", [])
+        async def _attack_one(c: IdeaCard) -> AttackResponse:
+            cj = json.dumps([compact_by_id[c.id]], ensure_ascii=False)
+            prompt = STRESS_TEST_USER.format(candidate_count=1, candidates_json=cj)
+            try:
+                data = await self.llm.generate_json_async(
+                    sys_attack, prompt, temperature=0.4,
+                    model_override=stress_model, phase="stress-attack",
+                )
+                raw = _unwrap_single(data, "results", c.id, "attack")
+                return AttackResponse.model_validate(raw)
+            except (ValueError, Exception) as e:
+                _log("STRESS", f"  [WARN] Attack failed for {c.id}: {e}")
+                return AttackResponse(idea_id=c.id, freeform_attack="(attack failed)", structured_attacks=[], verdict="INCUBATE")
+
+        attack_results = self._run_parallel([_attack_one(c) for c in candidates])
+
+        for ar in attack_results:
+            title = next((c.title for c in candidates if c.id == ar.idea_id), ar.idea_id)
             _log("STRESS", f"  {title}")
-            _log("STRESS", f"    Freeform: {ar.get('freeform_attack', '')[:100]}")
-            for atk in attacks[:3]:
+            _log("STRESS", f"    Freeform: {ar.freeform_attack[:100]}")
+            for atk in ar.structured_attacks[:3]:
                 _log("STRESS", f"    - {atk[:90]}")
-            if len(attacks) > 3:
-                _log("STRESS", f"    ... and {len(attacks) - 3} more attacks")
+            if len(ar.structured_attacks) > 3:
+                _log("STRESS", f"    ... and {len(ar.structured_attacks) - 3} more attacks")
 
-        # ── Round 2: Idea Champion defends ─────────────────────────────
+        # ── Round 2: Idea Champion defends (parallel, slim context) ────
         _log("STRESS", "")
-        _log("STRESS", "Round 2/3 — Idea Champion defending...")
+        _log("STRESS", f"Round 2/3 — Idea Champion defending ({len(candidates)} parallel calls)...")
 
-        attacks_json = json.dumps(
-            [
-                {
-                    "idea_id": ar.get("idea_id", ""),
-                    "freeform_attack": ar.get("freeform_attack", ""),
-                    "structured_attacks": ar.get("structured_attacks", []),
-                }
-                for ar in attack_results_raw
-            ],
-            indent=2,
-            ensure_ascii=False,
-        )
+        async def _defend_one(ar: AttackResponse) -> DefenseResponse:
+            slim_json = json.dumps([slim_by_id.get(ar.idea_id, {"id": ar.idea_id})], ensure_ascii=False)
+            atk_json = json.dumps([{
+                "idea_id": ar.idea_id,
+                "freeform_attack": ar.freeform_attack,
+                "structured_attacks": ar.structured_attacks,
+            }], ensure_ascii=False)
+            prompt = ADVERSARIAL_DEFENSE_USER.format(
+                candidate_count=1, candidates_json=slim_json, attacks_json=atk_json,
+            )
+            try:
+                data = await self.llm.generate_json_async(
+                    sys_defense, prompt, temperature=0.4,
+                    model_override=stress_model, phase="stress-defense",
+                )
+                raw = _unwrap_single(data, "defenses", ar.idea_id, "defense")
+                return DefenseResponse.model_validate(raw)
+            except (ValueError, Exception) as e:
+                _log("STRESS", f"  [WARN] Defense failed for {ar.idea_id}: {e}")
+                return DefenseResponse(idea_id=ar.idea_id, exchanges=[])
 
-        defense_prompt = ADVERSARIAL_DEFENSE_USER.format(
-            candidate_count=len(candidates),
-            candidates_json=candidates_json,
-            attacks_json=attacks_json,
-        )
+        defenses_list = self._run_parallel([_defend_one(ar) for ar in attack_results])
 
-        defense_data = self.llm.generate_json(
-            self._sys(ADVERSARIAL_DEFENSE_SYSTEM), defense_prompt, temperature=0.4,
-            model_override=self._model_for_phase("stress"), phase="stress-defense",
-        )
-
-        defenses_raw = defense_data.get("defenses", [])
-        defense_map: dict[str, dict] = {}
-        for d in defenses_raw:
-            idea_id = d.get("idea_id", "")
-            defense_map[idea_id] = d
-            title = next((c.title for c in candidates if c.id == idea_id), idea_id)
-            exchanges = d.get("exchanges", [])
+        defense_map: dict[str, DefenseResponse] = {}
+        for d in defenses_list:
+            defense_map[d.idea_id] = d
+            title = next((c.title for c in candidates if c.id == d.idea_id), d.idea_id)
             _log("STRESS", f"  {title}")
-            for ex in exchanges[:3]:
-                outcome = ex.get("outcome", "?")
-                _log("STRESS", f"    [{outcome:>8s}] {ex.get('angle', '?')}: {ex.get('defense', '')[:80]}")
-            if len(exchanges) > 3:
-                _log("STRESS", f"    ... and {len(exchanges) - 3} more defenses")
+            for ex in d.exchanges[:3]:
+                _log("STRESS", f"    [{ex.outcome:>8s}] {ex.angle}: {ex.defense[:80]}")
+            if len(d.exchanges) > 3:
+                _log("STRESS", f"    ... and {len(d.exchanges) - 3} more defenses")
 
-        # ── Round 3: Judge runs rebuttal round + verdict ───────────────
+        # ── Round 3: Judge runs rebuttal round + verdict (parallel, slim context) ──
         _log("STRESS", "")
-        _log("STRESS", "Round 3/3 — Final rebuttals and verdict...")
+        _log("STRESS", f"Round 3/3 — Final rebuttals and verdict ({len(candidates)} parallel calls)...")
 
-        debate_json = json.dumps(
-            [
-                {
-                    "idea_id": ar.get("idea_id", ""),
-                    "attacks": ar.get("structured_attacks", []),
-                    "freeform_attack": ar.get("freeform_attack", ""),
-                    "defenses": defense_map.get(ar.get("idea_id", ""), {}).get("exchanges", []),
-                }
-                for ar in attack_results_raw
-            ],
-            indent=2,
-            ensure_ascii=False,
-        )
+        async def _rebuttal_one(ar: AttackResponse) -> RebuttalResponse:
+            slim_json = json.dumps([slim_by_id.get(ar.idea_id, {"id": ar.idea_id})], ensure_ascii=False)
+            def_resp = defense_map.get(ar.idea_id)
+            def_exchanges = [ex.model_dump() for ex in def_resp.exchanges] if def_resp else []
+            debate = json.dumps([{
+                "idea_id": ar.idea_id,
+                "attacks": ar.structured_attacks,
+                "freeform_attack": ar.freeform_attack,
+                "defenses": def_exchanges,
+            }], ensure_ascii=False)
+            prompt = ADVERSARIAL_REBUTTAL_USER.format(
+                candidate_count=1, candidates_json=slim_json, debate_json=debate,
+            )
+            try:
+                data = await self.llm.generate_json_async(
+                    sys_rebuttal, prompt, temperature=0.3,
+                    model_override=stress_model, phase="stress-rebuttal",
+                )
+                raw = _unwrap_single(data, "results", ar.idea_id, "rebuttal")
+                return RebuttalResponse.model_validate(raw)
+            except (ValueError, Exception) as e:
+                _log("STRESS", f"  [WARN] Rebuttal failed for {ar.idea_id}: {e}")
+                return RebuttalResponse(idea_id=ar.idea_id, exchanges=[], verdict="INCUBATE")
 
-        rebuttal_prompt = ADVERSARIAL_REBUTTAL_USER.format(
-            candidate_count=len(candidates),
-            candidates_json=candidates_json,
-            debate_json=debate_json,
-        )
-
-        rebuttal_data = self.llm.generate_json(
-            self._sys(ADVERSARIAL_REBUTTAL_SYSTEM), rebuttal_prompt, temperature=0.3,
-            model_override=self._model_for_phase("stress"), phase="stress-rebuttal",
-        )
+        rebuttal_list = self._run_parallel([_rebuttal_one(ar) for ar in attack_results])
+        rebuttal_map: dict[str, RebuttalResponse] = {r.idea_id: r for r in rebuttal_list}
 
         # ── Assemble final StressTestResults ───────────────────────────
-        rebuttal_results_raw = rebuttal_data.get("results", [])
-        rebuttal_map: dict[str, dict] = {r.get("idea_id", ""): r for r in rebuttal_results_raw}
 
         results: list[StressTestResult] = []
-        for ar in attack_results_raw:
-            idea_id = ar.get("idea_id", "")
-            defense_info = defense_map.get(idea_id, {})
-            rebuttal_info = rebuttal_map.get(idea_id, {})
+        for ar in attack_results:
+            idea_id = ar.idea_id
+            defense_info = defense_map.get(idea_id)
+            rebuttal_info = rebuttal_map.get(idea_id)
 
             # Build debate rounds from all three phases
             debate_rounds: list[DebateExchange] = []
-            attack_list = ar.get("structured_attacks", [])
-            defense_exchanges = defense_info.get("exchanges", [])
-            rebuttal_exchanges = rebuttal_info.get("exchanges", [])
-
-            # Map defense and rebuttal exchanges by angle
-            defense_by_angle = {ex.get("angle", "").lower(): ex for ex in defense_exchanges}
-            rebuttal_by_angle = {ex.get("angle", "").lower(): ex for ex in rebuttal_exchanges}
+            defense_exchanges = defense_info.exchanges if defense_info else []
+            rebuttal_exchanges = rebuttal_info.exchanges if rebuttal_info else []
 
             # Standard attack angles
             angles = [
@@ -757,43 +877,60 @@ class IdeatePipeline:
                 "Timing", "Defensibility", "Expertise gap",
             ]
 
-            for i, attack_text in enumerate(attack_list):
+            for i, attack_text in enumerate(ar.structured_attacks):
                 angle = angles[i] if i < len(angles) else f"Attack {i+1}"
-                angle_key = angle.lower()
 
-                dex = defense_by_angle.get(angle_key, {})
-                rex = rebuttal_by_angle.get(angle_key, {})
+                dex = _match_exchange(defense_exchanges, i)
+                rex = _match_exchange(rebuttal_exchanges, i)
 
                 debate_rounds.append(DebateExchange(
                     angle=angle,
                     attack=attack_text,
-                    defense=dex.get("defense", ""),
-                    attacker_rebuttal=rex.get("attacker_rebuttal", ""),
-                    defender_rebuttal=rex.get("defender_rebuttal", ""),
-                    outcome=rex.get("final_outcome", dex.get("outcome", "")),
+                    defense=dex.defense if dex else "",
+                    attacker_rebuttal=rex.attacker_rebuttal if rex else "",
+                    defender_rebuttal=rex.defender_rebuttal if rex else "",
+                    outcome=(
+                        (rex.final_outcome if rex and rex.final_outcome else "")
+                        or (dex.outcome if dex else "")
+                    ),
                 ))
 
             # Use rebuttal verdict as source of truth, fall back to attack data
-            fm_raw = rebuttal_info.get("feasibility_matrix", ar.get("feasibility_matrix", {}))
+            fm_raw = (
+                rebuttal_info.feasibility_matrix if rebuttal_info and rebuttal_info.feasibility_matrix
+                else ar.feasibility_matrix
+            ) or {}
             fm = FeasibilityMatrix(**fm_raw)
+
+            def _pick(attr: str) -> str | int | list:
+                """Pick first non-empty value: rebuttal > attack."""
+                if rebuttal_info:
+                    val = getattr(rebuttal_info, attr, None)
+                    if val:  # non-empty string, non-zero int, non-empty list
+                        return val
+                return getattr(ar, attr)
 
             st = StressTestResult(
                 idea_id=idea_id,
-                freeform_attack=ar.get("freeform_attack", ""),
-                structured_attacks=attack_list,
-                defenses=ar.get("defenses", []),
+                freeform_attack=ar.freeform_attack,
+                structured_attacks=ar.structured_attacks,
+                defenses=ar.defenses,
                 debate_rounds=debate_rounds,
-                attacks_made=rebuttal_info.get("attacks_made", ar.get("attacks_made", len(attack_list))),
-                attacks_survived=rebuttal_info.get("attacks_survived", ar.get("attacks_survived", 0)),
-                attacks_fatal=rebuttal_info.get("attacks_fatal", ar.get("attacks_fatal", 0)),
-                strongest_argument=rebuttal_info.get("strongest_argument", ar.get("strongest_argument", "")),
-                strongest_defense=rebuttal_info.get("strongest_defense", defense_info.get("strongest_defense", "")),
-                suggested_mutation=rebuttal_info.get("suggested_mutation", ar.get("suggested_mutation", "")),
+                attacks_made=_pick("attacks_made") or len(ar.structured_attacks),
+                attacks_survived=_pick("attacks_survived"),
+                attacks_fatal=_pick("attacks_fatal"),
+                strongest_argument=_pick("strongest_argument"),
+                strongest_defense=(
+                    (rebuttal_info.strongest_defense if rebuttal_info else "")
+                    or (defense_info.strongest_defense if defense_info else "")
+                    or ar.strongest_defense
+                ),
+                suggested_mutation=_pick("suggested_mutation"),
                 feasibility_matrix=fm,
-                feasibility_verdict=rebuttal_info.get("feasibility_verdict", ar.get("feasibility_verdict", "")),
-                llm_capability_fit=rebuttal_info.get("llm_capability_fit", ar.get("llm_capability_fit", "")),
-                kill_criteria=rebuttal_info.get("kill_criteria", ar.get("kill_criteria", [])),
-                verdict=rebuttal_info.get("verdict", ar.get("verdict", "")),
+                feasibility_verdict=_pick("feasibility_verdict"),
+                llm_capability_fit=_pick("llm_capability_fit"),
+                kill_criteria=_pick("kill_criteria"),
+                verdict=_pick("verdict"),
             )
             results.append(st)
 
@@ -820,6 +957,7 @@ class IdeatePipeline:
         domain_briefs: list[DomainBrief],
         brief_text: str | None,
         iteration: int = 1,
+        cached_context: dict[str, str] | None = None,
     ) -> list[IdeaCard]:
         """Refinement phase: extract learnings from failed ideas and generate improved ideas.
         
@@ -871,18 +1009,25 @@ class IdeatePipeline:
         refinement_ctx = build_refinement_context(mutations, attack_patterns)
         _log("REFINE", f"  Learning context prepared: {len(mutations[:5])} mutations + {len(attack_patterns[:5])} patterns")
 
-        # Diverge with refinement context — fewer ideas on later iterations for quality focus
-        domain_ctx = build_domain_context(domains, self.cfg.DEFAULT_DOMAINS)
-        constraint_ctx = build_constraint_context(constraints)
-        memory_ctx = build_memory_context(
-            self.memory.past_idea_count(),
-            self.memory.get_domain_heat_map(),
-            self.memory.killed_idea_titles(),
-        )
-        immersion_ctx = build_immersion_context(
-            [b.model_dump() for b in domain_briefs] if domain_briefs else None
-        )
-        brief_ctx = build_brief_context(brief_text)
+        # Use cached context if available, otherwise build fresh
+        if cached_context:
+            domain_ctx = cached_context["domain"]
+            constraint_ctx = cached_context["constraint"]
+            memory_ctx = cached_context["memory"]
+            immersion_ctx = cached_context["immersion"]
+            brief_ctx = cached_context["brief"]
+        else:
+            domain_ctx = build_domain_context(domains, self.cfg.DEFAULT_DOMAINS)
+            constraint_ctx = build_constraint_context(constraints)
+            memory_ctx = build_memory_context(
+                self.memory.past_idea_count(),
+                self.memory.get_domain_heat_map(),
+                self.memory.killed_idea_titles(),
+            )
+            immersion_ctx = build_immersion_context(
+                [b.model_dump() for b in domain_briefs] if domain_briefs else None
+            )
+            brief_ctx = build_brief_context(brief_text)
 
         # Adjust idea count by iteration: 1st=50%, 2nd=33%, 3rd=25%
         ideas_divisor = 2 if iteration == 1 else (3 if iteration == 2 else 4)
@@ -1202,6 +1347,34 @@ class IdeatePipeline:
         if tier == "cheap":
             return self.cfg.cheap_model or None
         return (self.cfg.best_model or self.cfg.model) or None
+
+    # ------------------------------------------------------------------
+    # Async helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _run_parallel(coros: list, max_concurrent: int = 3) -> list:
+        """Run coroutines concurrently with a concurrency limit to avoid rate limits."""
+        async def _gather():
+            sem = asyncio.Semaphore(max_concurrent)
+            async def _limited(idx: int, coro):
+                async with sem:
+                    if idx > 0:
+                        await asyncio.sleep(0.5 * idx)  # stagger launches
+                    return await coro
+            tasks = [_limited(i, c) for i, c in enumerate(coros)]
+            return await asyncio.gather(*tasks)
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                return pool.submit(asyncio.run, _gather()).result()
+        return asyncio.run(_gather())
 
     # ------------------------------------------------------------------
     # Cost estimation

@@ -349,10 +349,10 @@ Clusters, scores, and ranks. Each idea gets:
 - **Score calibration** from the meta-learning playbook (if available). Scores are marked UNCALIBRATED until the meta-learning phase has run (every 3 runs). After calibration, weak dimensions are scored more harshly and inflated/deflated scores are adjusted
 
 **Phase 3 — STRESS TEST (Adversarial Debate)**
-Three-round adversarial debate between a Devil's Advocate (attacker) and an Idea Champion (defender), judged by a neutral arbiter:
+Three-round adversarial debate between a Devil's Advocate (attacker) and an Idea Champion (defender), judged by a neutral arbiter. Each idea is tested **in parallel** — all ideas run their attack/defense/rebuttal concurrently using async API calls, significantly reducing wall-clock time:
 
 - **Round 1 — Attack:** The Devil's Advocate attacks each idea from 9 angles: prior art, adoption failure, technical blockers, problem reframe, negative externalities, obsolescence, timing, defensibility, and expertise gaps
-- **Round 2 — Defense:** The Idea Champion responds to every attack with specific counter-arguments, identifies strengths the attacker ignored, and proposes pivots for valid weaknesses
+- **Round 2 — Defense:** The Idea Champion responds to every attack with specific counter-arguments, identifies strengths the attacker ignored, and proposes pivots for valid weaknesses. Uses slim context (ID + title + score only, not full candidate data) to reduce token cost
 - **Round 3 — Rebuttal + Verdict:** A neutral judge facilitates final rebuttals from both sides, then renders verdicts based on the full debate
 
 The full debate (attack → defense → rebuttal) is visible in the report for each idea, letting you see exactly why an idea was approved or rejected.
@@ -432,11 +432,15 @@ Each pipeline phase prints a visual header, and at the end of a run, xBrain prin
 
 ## Cost
 
-Each run makes 8-10 API calls (constraint check + immerse + diverge + dedup + gap-fill + converge + 3 stress test calls). If the refinement loop triggers (no BUILD verdicts), each refinement round adds 5 more API calls (diverge + converge + 3 stress test calls), up to 3 rounds — so worst case is ~25 API calls.
+The stress test runs **per-idea parallel API calls** — with 8 ideas, each round fires 8 concurrent requests instead of one batched request. This multiplies the number of API calls (8 ideas × 3 rounds = 24 stress calls) but dramatically reduces wall-clock time since all calls within a round execute simultaneously. Combined with the sequential phases (constraint check, immerse, diverge, dedup, gap-fill, converge), a typical run makes 30+ API calls but completes much faster than a sequential pipeline.
 
-The actual cost (tokens in/out and dollar amount) is tracked and shown in the terminal output and in the report header.
+If the refinement loop triggers (no BUILD verdicts), each refinement round adds diverge + converge + parallel stress test calls, up to 3 rounds.
 
-Approximate cost per run with Haiku: **$0.10–$0.30** (simple run), **$0.30–$0.60** (with refinement rounds). The adversarial debate (3 LLM calls per stress test round) adds ~$0.10–$0.15 compared to the previous single-call stress test.
+The actual cost (tokens in/out and dollar amount) is tracked and shown in the terminal output and in the report header. Defense and rebuttal rounds use **slim context** (just idea ID, title, and score instead of full candidate data), saving ~30-40% on input tokens for those phases.
+
+Approximate cost per run with Haiku: **$0.10–$0.30** (simple run), **$0.30–$0.60** (with refinement rounds).
+
+API calls include automatic **retry with exponential backoff** for rate limits, timeouts, and connection errors (up to 3 attempts).
 
 Use `python -m xbrain estimate` to preview costs before running (no API calls made):
 

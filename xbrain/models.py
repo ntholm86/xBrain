@@ -55,6 +55,72 @@ class DebateExchange(BaseModel):
     outcome: str = ""               # SURVIVED / FATAL / WEAKENED
 
 
+# ------------------------------------------------------------------
+# LLM response shapes (used for validation, not stored)
+# ------------------------------------------------------------------
+
+class AttackResponse(BaseModel):
+    """Shape returned by the attack-phase LLM for a single idea."""
+    idea_id: str = ""
+    freeform_attack: str = ""
+    structured_attacks: list[str] = Field(default_factory=list)
+    defenses: list[str] = Field(default_factory=list)
+    attacks_made: int = 0
+    attacks_survived: int = 0
+    attacks_fatal: int = 0
+    strongest_argument: str = ""
+    strongest_defense: str = ""
+    suggested_mutation: str = ""
+    feasibility_matrix: dict = Field(default_factory=dict)
+    feasibility_verdict: str = ""
+    llm_capability_fit: str = ""
+    kill_criteria: list[str] = Field(default_factory=list)
+    verdict: str = ""
+
+
+class DefenseExchangeItem(BaseModel):
+    """One angle's defense from the defense-phase LLM."""
+    angle: str = ""
+    attack_summary: str = ""
+    defense: str = ""
+    strengths_ignored: str = ""
+    pivot_if_needed: str = ""
+    outcome: str = ""
+
+
+class DefenseResponse(BaseModel):
+    """Shape returned by the defense-phase LLM for a single idea."""
+    idea_id: str = ""
+    exchanges: list[DefenseExchangeItem] = Field(default_factory=list)
+    overall_defense_strength: str = ""
+    strongest_defense: str = ""
+
+
+class RebuttalExchangeItem(BaseModel):
+    """One angle's rebuttal from the rebuttal-phase LLM."""
+    angle: str = ""
+    attacker_rebuttal: str = ""
+    defender_rebuttal: str = ""
+    final_outcome: str = ""
+
+
+class RebuttalResponse(BaseModel):
+    """Shape returned by the rebuttal-phase LLM for a single idea."""
+    idea_id: str = ""
+    exchanges: list[RebuttalExchangeItem] = Field(default_factory=list)
+    strongest_argument: str = ""
+    strongest_defense: str = ""
+    suggested_mutation: str = ""
+    feasibility_matrix: dict = Field(default_factory=dict)
+    feasibility_verdict: str = ""
+    llm_capability_fit: str = ""
+    kill_criteria: list[str] = Field(default_factory=list)
+    attacks_made: int = 0
+    attacks_survived: int = 0
+    attacks_fatal: int = 0
+    verdict: str = ""
+
+
 class StressTestResult(BaseModel):
     idea_id: str
     freeform_attack: str = ""

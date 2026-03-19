@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import sys
+import threading
+import time
 
 import anthropic
 
@@ -14,11 +17,13 @@ class LLMClient:
 
     def __init__(self, api_key: str, model: str, max_tokens: int = 16384):
         self.client = anthropic.Anthropic(api_key=api_key)
+        self._async_client = anthropic.AsyncAnthropic(api_key=api_key)
         self.model = model
         self.max_tokens = max_tokens
         self.total_input_tokens = 0
         self.total_output_tokens = 0
         self._phase_token_log: list[dict] = []
+        self._token_lock = threading.Lock()
 
     def generate_json(
         self,
@@ -29,27 +34,83 @@ class LLMClient:
         model_override: str | None = None,
         phase: str = "",
     ) -> dict | list:
-        """Call the LLM and extract JSON from the response."""
+        """Call the LLM and extract JSON from the response. Retries on transient errors."""
         use_model = model_override or self.model
-        response = self.client.messages.create(
-            model=use_model,
-            max_tokens=self.max_tokens,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-            temperature=temperature,
-        )
-        self.total_input_tokens += response.usage.input_tokens
-        self.total_output_tokens += response.usage.output_tokens
-        self._phase_token_log.append({
-            "phase": phase or "unknown",
-            "model": use_model,
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
-        })
+        max_retries = 3
+
+        for attempt in range(max_retries):
+            try:
+                response = self.client.messages.create(
+                    model=use_model,
+                    max_tokens=self.max_tokens,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}],
+                    temperature=temperature,
+                )
+                break
+            except (anthropic.RateLimitError, anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
+                if attempt == max_retries - 1:
+                    raise
+                wait = 2 ** attempt
+                print(f"[RETRY] {type(e).__name__}, attempt {attempt + 1}/{max_retries}, waiting {wait}s...", file=sys.stderr)
+                time.sleep(wait)
+
+        self._record_usage(use_model, phase, response.usage)
 
         text = response.content[0].text
         truncated = response.stop_reason == "max_tokens"
         return self._extract_json(text, truncated=truncated)
+
+    async def generate_json_async(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        temperature: float = 0.7,
+        model_override: str | None = None,
+        phase: str = "",
+    ) -> dict | list:
+        """Async version of generate_json for parallel LLM calls."""
+        use_model = model_override or self.model
+        max_retries = 6
+
+        for attempt in range(max_retries):
+            try:
+                response = await self._async_client.messages.create(
+                    model=use_model,
+                    max_tokens=self.max_tokens,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}],
+                    temperature=temperature,
+                )
+                break
+            except (anthropic.RateLimitError, anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
+                if attempt == max_retries - 1:
+                    raise
+                # Longer backoff for rate limits: 15s, 30s, 60s, 60s, 60s
+                if isinstance(e, anthropic.RateLimitError):
+                    wait = min(60, 15 * (2 ** attempt))
+                else:
+                    wait = 2 ** attempt
+                print(f"[RETRY] {type(e).__name__}, attempt {attempt + 1}/{max_retries}, waiting {wait}s...", file=sys.stderr)
+                await asyncio.sleep(wait)
+
+        self._record_usage(use_model, phase, response.usage)
+
+        text = response.content[0].text
+        truncated = response.stop_reason == "max_tokens"
+        return self._extract_json(text, truncated=truncated)
+
+    def _record_usage(self, model: str, phase: str, usage) -> None:
+        with self._token_lock:
+            self.total_input_tokens += usage.input_tokens
+            self.total_output_tokens += usage.output_tokens
+            self._phase_token_log.append({
+                "phase": phase or "unknown",
+                "model": model,
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+            })
 
     # ------------------------------------------------------------------
 

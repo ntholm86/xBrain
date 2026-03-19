@@ -285,13 +285,20 @@ def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
         lines.append(f"- **Suggested Mutation:** {stress.suggested_mutation}")
     lines.append("")
 
-    # Adversarial Debate Case
+    # Adversarial Debate
     if stress.debate_rounds:
         lines.append("#### Adversarial Debate")
         lines.append("")
+
         for rnd in stress.debate_rounds:
-            outcome_emoji = {"SURVIVED": "\u2705", "FATAL": "\u274c", "WEAKENED": "\u26a0\ufe0f"}.get(rnd.outcome, "\u2753")
-            lines.append(f"**{rnd.angle}** {outcome_emoji} *{rnd.outcome}*")
+            outcome_emoji = {
+                "SURVIVED": "\u2705", "FATAL": "\u274c", "WEAKENED": "\u26a0\ufe0f",
+            }.get(rnd.outcome.upper() if rnd.outcome else "", "\u2753")
+            outcome_label = rnd.outcome.upper() if rnd.outcome else ""
+            if outcome_label:
+                lines.append(f"**{rnd.angle}** {outcome_emoji} *{outcome_label}*")
+            else:
+                lines.append(f"**{rnd.angle}**")
             lines.append("")
             if rnd.attack:
                 lines.append(f"> **\U0001f525 Attacker:** {rnd.attack}")

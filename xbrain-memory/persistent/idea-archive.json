@@ -1384,5 +1384,168 @@
       "decision_theory",
       "systems_thinking"
     ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Multi-Tenant Database Isolation Validator: Security Audit CLI",
+    "score": 7.8,
+    "verdict": "BUILD WITH MUTATIONS",
+    "domains": [
+      "developer_tools",
+      "B2B SaaS"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Developer Onboarding Funnel Analyzer: Drop-Step Detector",
+    "score": 7.6,
+    "verdict": "BUILD",
+    "domains": [
+      "developer_tools",
+      "B2B SaaS",
+      "developer_experience"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Micro-SaaS Validation Engine: Problem-to-WTP Signal Mapper",
+    "score": 7.2,
+    "verdict": "BUILD_WITH_PIVOT_OPTION",
+    "domains": [
+      "developer_tools",
+      "B2B SaaS",
+      "decision_theory"
+    ]
+  },
+  {
+    "id": "idea-010",
+    "title": "Micro-SaaS Unit Economics Dashboard: Cohort-Benchmarked Metrics",
+    "score": 7.0,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "B2B SaaS",
+      "developer_tools",
+      "economic"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Compliance-First Config-as-Code Generator",
+    "score": 7.3,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "developer_tools",
+      "B2B_SaaS",
+      "regulatory",
+      "infrastructure"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Churn Prediction & Intervention Engine for Vertical SaaS",
+    "score": 7.2,
+    "verdict": "BUILD",
+    "domains": [
+      "vertical_saas",
+      "retention_engagement",
+      "consumer_facing"
+    ]
+  },
+  {
+    "id": "gap-002-merged",
+    "title": "Housing Commons Cooperative: Collective Ownership Platform",
+    "score": 7.6,
+    "verdict": "BUILD",
+    "domains": [
+      "housing_justice",
+      "cooperative_economics",
+      "legal_innovation",
+      "finance"
+    ]
+  },
+  {
+    "id": "gap-008-merged",
+    "title": "Shared Makerspace Commons: Cooperative Cultural Production Infrastructure",
+    "score": 7.1,
+    "verdict": "BUILD (with mutations: federation-first model, delegated governance, hybrid services, usage-based fees, phased hiring, lightweight MVP)",
+    "domains": [
+      "arts_infrastructure",
+      "cooperative_economics",
+      "cultural_production",
+      "labor_rights"
+    ]
+  },
+  {
+    "id": "idea-006-merged",
+    "title": "Subculture & Diaspora Archive: Community Self-Documentation Platform",
+    "score": 6.6,
+    "verdict": "CONDITIONAL BUILD - Requires significant pivots to organizational partnership model, nonprofit structure, and integration with existing tools. Not viable as venture-backed standalone platform. Viable as nonprofit infrastructure embedded in trusted organizations. Timing window is 2-5 years before AI companies absorb archival layer. Expertise gap is real and requires deep team composition (community organizer, security engineer, archivist, data governance expert, lawyer). LLM capability fit is weak—this requires domain expertise that cannot be substituted with AI.",
+    "domains": [
+      "cultural_anthropology",
+      "civic_tech",
+      "privacy",
+      "immigrant_integration",
+      "data_justice"
+    ]
+  },
+  {
+    "id": "gap-004-merged",
+    "title": "Disability-First Navigation & Accessibility Registry",
+    "score": 6.6,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "accessibility",
+      "disability_justice",
+      "civic_infrastructure",
+      "data_justice"
+    ]
+  },
+  {
+    "id": "idea-003-merged",
+    "title": "Negative Space Mapper: Copenhagen's Hidden Venue Commons",
+    "score": 6.5,
+    "verdict": "BUILD WITH SIGNIFICANT PIVOTS",
+    "domains": [
+      "urban_planning",
+      "civic_participation",
+      "real_estate",
+      "event_coordination"
+    ]
+  },
+  {
+    "id": "idea-018-merged",
+    "title": "Citizen Science Platform: Environmental & Social Observation Network",
+    "score": 6.3,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "citizen_science",
+      "environmental_justice",
+      "civic_tech",
+      "data_justice"
+    ]
+  },
+  {
+    "id": "idea-005-merged",
+    "title": "Institutional Knowledge Scraper: City Wisdom from Long-Term Residents",
+    "score": 6.2,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "labor_anthropology",
+      "knowledge_management",
+      "AI",
+      "civic_memory"
+    ]
+  },
+  {
+    "id": "gap-007-merged",
+    "title": "Restorative Justice Platform: Community Accountability & Harm Repair",
+    "score": 5.9,
+    "verdict": "BUILD with team repositioning and early-stage partnership validation",
+    "domains": [
+      "conflict_resolution",
+      "restorative_justice",
+      "civic_participation",
+      "social_infrastructure"
+    ]
   }
 ]
