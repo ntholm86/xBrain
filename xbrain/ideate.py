@@ -6,6 +6,7 @@ import asyncio
 import json
 import re
 import sys
+import time
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
@@ -197,6 +198,7 @@ class IdeatePipeline:
         run_dir = self.cfg.runs_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
+        t0 = time.monotonic()
         _log("IDEATE", f"Pipeline 1 started.  Run ID: {run_id}")
         if brief_text:
             preview = brief_text[:120] + ("..." if len(brief_text) > 120 else "")
@@ -240,11 +242,14 @@ class IdeatePipeline:
         domain_briefs: list[DomainBrief] = []
         if domains:
             _log_phase_header("IMMERSE", f"Deep-diving into {', '.join(domains)}")
+            tp = time.monotonic()
             domain_briefs = self._phase_immerse(domains)
+            _log("IMMERSE", f"done in {time.monotonic() - tp:.0f}s")
             result.domain_briefs = domain_briefs
 
         # Phase 1 — Diverge
         _log_phase_header("DIVERGE", "Generating raw idea seeds")
+        tp = time.monotonic()
         raw_ideas = self._phase_diverge(domains, constraints, domain_briefs, brief_text)
         result.raw_ideas = raw_ideas
 
@@ -259,15 +264,20 @@ class IdeatePipeline:
             if gap_ideas:
                 raw_ideas.extend(gap_ideas)
                 result.raw_ideas = raw_ideas
+        _log("DIVERGE", f"done in {time.monotonic() - tp:.0f}s")
 
         # Phase 2 — Converge
         _log_phase_header("CONVERGE", f"Scoring and ranking {len(raw_ideas)} ideas")
+        tp = time.monotonic()
         candidates = self._phase_converge(raw_ideas)
+        _log("CONVERGE", f"done in {time.monotonic() - tp:.0f}s")
         result.candidates = candidates
 
         # Phase 3 — Stress Test
         _log_phase_header("STRESS TEST", f"Adversarial debate for {len(candidates)} candidates")
+        tp = time.monotonic()
         stress_results = self._phase_stress_test(candidates)
+        _log("STRESS", f"done in {time.monotonic() - tp:.0f}s")
         result.stress_test_results = stress_results
 
         # Merge stress results into candidates to produce survivors
@@ -412,8 +422,11 @@ class IdeatePipeline:
         print(f"    idea-log.json            Full pipeline trace")
         print(f"    stress-test-report.json  Adversarial debate results")
         print()
-        print(f"  Tokens: {result.total_input_tokens:,} in / {result.total_output_tokens:,} out")
-        print(f"  Cost:   ${cost_info['total_cost_usd']:.4f}")
+        elapsed = time.monotonic() - t0
+        mins, secs = divmod(int(elapsed), 60)
+        print(f"  Elapsed: {mins}m {secs}s")
+        print(f"  Tokens:  {result.total_input_tokens:,} in / {result.total_output_tokens:,} out")
+        print(f"  Cost:    ${cost_info['total_cost_usd']:.4f}")
         print()
 
         if final_build > 0:
@@ -1353,14 +1366,14 @@ class IdeatePipeline:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _run_parallel(coros: list, max_concurrent: int = 3) -> list:
+    def _run_parallel(coros: list, max_concurrent: int = 8) -> list:
         """Run coroutines concurrently with a concurrency limit to avoid rate limits."""
         async def _gather():
             sem = asyncio.Semaphore(max_concurrent)
             async def _limited(idx: int, coro):
                 async with sem:
                     if idx > 0:
-                        await asyncio.sleep(0.3)  # brief stagger to avoid burst
+                        await asyncio.sleep(0.1)  # brief stagger to avoid burst
                     return await coro
             tasks = [_limited(i, c) for i, c in enumerate(coros)]
             return await asyncio.gather(*tasks)

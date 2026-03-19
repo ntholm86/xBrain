@@ -1648,5 +1648,59 @@
       "logistics",
       "predictive_maintenance"
     ]
+  },
+  {
+    "id": "idea-002-merged-012",
+    "title": "Occupational + Primary Care Hearing Health Integration Engine",
+    "score": 7.5,
+    "verdict": "BUILD_WITH_PIVOT",
+    "domains": [
+      "medtech",
+      "primary_care_integration",
+      "occupational_health",
+      "B2B",
+      "regulatory_compliance",
+      "healthcare_economics"
+    ]
+  },
+  {
+    "id": "idea-003-merged-011",
+    "title": "Outcome-Backed Financing + Circular Economy Platform",
+    "score": 7.1,
+    "verdict": "BUILD WITH PIVOTS",
+    "domains": [
+      "hearing_health",
+      "fintech",
+      "economic",
+      "consumer",
+      "circular_economy"
+    ]
+  },
+  {
+    "id": "idea-008-merged-013",
+    "title": "Real-World Evidence + Cognitive-Auditory Decline Detection Platform",
+    "score": 6.8,
+    "verdict": "BUILD with mutations",
+    "domains": [
+      "medtech",
+      "audiology",
+      "health_compliance",
+      "digital_biomarkers",
+      "healthcare_economics",
+      "comorbidity"
+    ]
+  },
+  {
+    "id": "gap-004-merged-007",
+    "title": "Open Hearing Aid Interoperability Marketplace & Standards Platform",
+    "score": 6.6,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "platform_strategy",
+      "interoperability",
+      "regulatory_standards",
+      "hearing_health",
+      "medtech"
+    ]
   }
 ]

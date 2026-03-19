@@ -16,7 +16,7 @@ class LLMClient:
     """Sends prompts to Claude and returns parsed JSON."""
 
     # Rolling window for token-aware throttling (output tokens/min).
-    _OUTPUT_TOKEN_LIMIT = 8000   # stay under 10k/min with headroom
+    _OUTPUT_TOKEN_LIMIT = 40_000  # generous; retry-after handles real 429s
     _WINDOW_SECONDS = 60
 
     def __init__(self, api_key: str, model: str, max_tokens: int = 16384):
