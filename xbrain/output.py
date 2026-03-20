@@ -18,8 +18,6 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
     lines.append("")
     lines.append(f"**Run ID:** `{result.run_id}`")
     lines.append(f"**Date:** {result.timestamp[:10]}")
-    if result.domains:
-        lines.append(f"**Focus Domains:** {', '.join(result.domains)}")
     if result.constraints:
         lines.append(f"**Constraints:** {', '.join(result.constraints)}")
     lines.append("")

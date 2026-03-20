@@ -42,45 +42,6 @@ If there are NO conflicts, respond with: {{"conflicts": [], "notes": "No conflic
 """
 
 # ---------------------------------------------------------------------------
-# Phase 0: IMMERSE
-# ---------------------------------------------------------------------------
-
-IMMERSE_SYSTEM = (
-    "You are a domain research engine. You perform deep dives into specified "
-    "domains to identify tensions, opportunities, and pressure points for "
-    "software intervention. You are thorough and evidence-based. "
-    "You MUST respond with valid JSON only — no markdown, no commentary."
-)
-
-IMMERSE_USER = """\
-Perform a deep-dive domain study for: {domains}
-
-{search_context}
-For EACH domain, study and report:
-1. Incentive structures — who are the players? misaligned incentives?
-2. Regulatory landscape — what's legal, changing, ambiguous?
-3. Existing players — who's here? blind spots?
-4. Historical failures — what failed? why? what changed?
-5. Adjacent domains — technologies that could be imported?
-6. User archetypes — who suffers most?
-
-Respond with ONLY valid JSON:
-{{
-  "domain_briefs": [
-    {{
-      "domain": "health",
-      "key_tensions": ["tension 1", "tension 2"],
-      "underserved_populations": ["population 1"],
-      "regulatory_windows": ["window 1"],
-      "technology_gaps": ["gap 1", "gap 2"],
-      "pressure_points": ["point 1", "point 2", "point 3"],
-      "summary": "A paragraph summarizing key opportunities"
-    }}
-  ]
-}}
-"""
-
-# ---------------------------------------------------------------------------
 # Phase 1: DIVERGE
 # ---------------------------------------------------------------------------
 
@@ -746,9 +707,7 @@ def build_brief_context(brief_text: str | None) -> str:
     )
 
 
-def build_domain_context(domains: list[str] | None, default_domains: list[str]) -> str:
-    if domains:
-        return f"FOCUS DOMAINS: {', '.join(domains)}"
+def build_domain_context() -> str:
     return (
         "SCAN ALL DOMAINS — no domain restrictions. Explore every field of human "
         "activity: technology, science, health, finance, education, agriculture, "

@@ -202,7 +202,6 @@ class IdeateRunResult(BaseModel):
     timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
-    domains: list[str] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
     domain_briefs: list[DomainBrief] = Field(default_factory=list)
     raw_ideas: list[RawIdea] = Field(default_factory=list)

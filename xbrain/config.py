@@ -22,11 +22,6 @@ class Config:
     score_threshold: float = 8.0
     plateau_delta: float = 0.3
 
-    DEFAULT_DOMAINS: list[str] = [
-        "political", "scientific", "societal", "economic",
-        "environmental", "technological", "creative", "health", "legal",
-    ]
-
     # Scoring weights
     SCORING_WEIGHTS: dict[str, float] = {
         "impact": 0.25,
@@ -57,19 +52,19 @@ class Config:
     # Maps phase name to model tier: "cheap" or "best"
     PHASE_ROUTING: dict[str, dict[str, str]] = {
         "cheapest": {
-            "immerse": "cheap", "diverge": "cheap", "dedup": "cheap",
+            "diverge": "cheap", "dedup": "cheap",
             "gapfill": "cheap", "converge": "cheap", "stress": "cheap",
             "refine": "cheap", "meta": "cheap", "constraints": "cheap",
             "specify": "cheap",
         },
         "balanced": {
-            "immerse": "cheap", "diverge": "cheap", "dedup": "cheap",
+            "diverge": "cheap", "dedup": "cheap",
             "gapfill": "cheap", "converge": "best", "stress": "best",
             "refine": "best", "meta": "cheap", "constraints": "cheap",
             "specify": "best",
         },
         "best": {
-            "immerse": "best", "diverge": "best", "dedup": "best",
+            "diverge": "best", "dedup": "best",
             "gapfill": "best", "converge": "best", "stress": "best",
             "refine": "best", "meta": "best", "constraints": "best",
             "specify": "best",
@@ -81,7 +76,6 @@ class Config:
     PHASE_MAX_TOKENS: dict[str, int] = {
         "meta":              2048,
         "constraints":       1024,
-        "immerse":           4096,
         "diverge":           10240,
         "dedup":             2048,
         "gapfill":           8192,

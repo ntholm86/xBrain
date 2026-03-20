@@ -2,58 +2,6 @@
 
 Generate, score, stress-test, and refine project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then runs adversarial stress testing — a devil's advocate attacks every idea from 9 angles — so only the genuinely strong ones survive.
 
-Now with **adversarial stress testing**, **dynamic brief-adaptive scoring**, **cross-run diversity ratchet**, **failure taxonomy learning**, **mechanism stealing**, **moat archaeology**, **cost forecasting**, **constraint conflict detection**, **project spec generation**, **idea lineage tracking**, **score explainability**, **PMO export** (CSV/Jira/Markdown), and **real-time pipeline observability**.
-
-## What's New in v1.10
-
-**Shared Logging Module** — New `xbrain/log.py` consolidates three separate logging implementations into one encoding-safe, consistently-tagged module. **LLM Call Timing** — Every LLM call now shows `⏳ description...` before and `✓ done in Xs` after, eliminating silent gaps where the pipeline appeared frozen. **Batch & Parallel Progress** — CONVERGE 2C enrichment shows per-batch progress (`1/2`, `2/2` with titles), stress test attacks show per-candidate completion (`[1/8]` → `[8/8]`). **Unified Output Streams** — Retry, throttle, and JSON warning messages from the LLM layer now route through the shared logger on stdout instead of stderr. **Encoding Crash Fix** — specify.py's logger had no Unicode error handler and would crash on Windows.
-
-## What's New in v1.9
-
-**Per-Phase Cost Visibility** — Every run now shows a Cost Breakdown table in the report with per-phase token counts, model used, and dollar cost. The same data is persisted in `idea-log.json` for programmatic analysis. **Configurable Token Budgets** — New `PHASE_MAX_TOKENS` config centralizes output-token limits for all 12 pipeline phases, making cost tuning a single-file change. **Score Clamping** — LLM score values are now clamped to [0, 10] to prevent crashes from malformed responses.
-
-## What's New in v1.8
-
-**Decomposed CONVERGE** — CONVERGE is now three sub-phases: (2A) Cluster + Initial Score, (2B) Comparative Ranking with force-ranked head-to-head judgment, and (2C) Enrich + Assumption Inversion. The old mechanical score-stretching is replaced by LLM-driven comparative analysis. **Assumption Inversion** — Each assumption gets an inverse claim and fragility rating (🔴 fragile / 🟢 solid). If the inverse is easy to defend, the assumption is a critical vulnerability.
-
-## What's New in v1.7
-
-**Web Search Grounding** — xBrain now searches the live internet before generating ideas. The IMMERSE phase queries DuckDuckGo and HackerNews for current trends, competitors, and developer pain points per domain, injecting results as `CURRENT MARKET DATA` so domain briefs reflect 2025/2026 reality instead of stale training data. The STRESS TEST phase searches for prior art per idea before attacking, grounding the "this already exists" angle in real products. The search architecture is pluggable — new providers can be added by subclassing `SearchProvider`. Search is best-effort: if providers are unavailable (no package installed, network down), the pipeline runs exactly as before.
-
-## What's New in v1.6
-
-**Calibration Enforcement** — META-LEARN now produces per-dimension multipliers (0.5–1.5) that are applied mathematically post-CONVERGE. Scores are no longer advisory-only — inflated/deflated dimensions get corrected in code. **Stress Test Fidelity** — API crashes during stress testing are tagged `api_crash` instead of silently becoming INCUBATE verdicts. Reports show crash indicators so you know which verdicts are genuine. **Refinement Failure Blocklist** — Canonical failure types from KILL/MUTATE ideas (prior_art, adoption, technical, timing, defensibility, economics) are injected as hard prohibitions into refinement rounds, not just soft context.
-
-## What's New in v1.5
-
-**Structured Key Assumptions** — Each assumption now includes `validation_cost` (low/medium/high) and `validation_method`, auto-sorted cheapest first. Reports show cost badges and methods inline. **Success Metrics** — Project specs include 3-5 measurable outcomes with numerical targets, measurement methods, timeframes, and abort thresholds. **Validation Plan** — Specs now generate 3-5 pre-build experiments ordered by cost, each testing one key assumption with clear proceed/stop signals.
-
-## What's New in v1.4
-
-**Programmatic Enforcement** — The LLM ignores scoring rules, effort variety, and BUILD thresholds despite explicit instructions. v1.4 enforces them in code. **BUILD Verdict Override** — if attacks_survived ≥ 5 and fatal ≤ 1, verdict is forced to BUILD. **Score Spread Stretching** — if spread < 3.0, scores are linearly stretched to 3.0 while preserving rank. **Effort Diversity** — if all efforts are "medium", hardest/easiest are remapped to large/small based on effort scores. **ICP Grounding** — first customer profile must match the brief's scale context (solo dev ≠ enterprise).
-
-## What's New in v1.3
-
-**Comprehensive Self-Improvement Brief** — The self-improvement brief now describes the full pipeline, all techniques, memory system, and every feature from v1.0–v1.2. When xBrain is used to improve itself, the brief tells the engine exactly what already exists, so it generates genuinely novel ideas instead of redescribing existing features. Feature repulsion is brief-driven — no hardcoded self-awareness in the engine.
-
-## What's New in v1.2
-
-**Idea-Specific Key Assumptions** — Each idea now gets 3-5 unique, falsifiable assumptions instead of generic boilerplate. **Dynamic First Customer Profile** — Per-idea ICP with type, size, readiness, and why_first instead of one-size-fits-all. **Context-Aware Cost Labels** — Costs now show "one-time implementation" vs "monthly infra" vs "monthly labor" as appropriate. **BUILD Verdict Threshold** — Quantitative rule: if attacks_survived ≥ 5/9, verdict must be BUILD. First BUILD verdict achieved. **Stronger Score Spread** — Improved from 1.7 to 2.4 points spread.
-
-## What's New in v1.1
-
-**Dynamic CONVERGE** — The scoring/ranking phase now adapts its output fields to match the brief type. Product briefs get persona/ICP/go-to-market fields. Internal tool briefs get user role/workflow fit. Process briefs get current-state/proposed-change/metrics. No more forcing every idea into a SaaS product template.
-
-**Diversity Ratchet** — Cross-run winner repulsion. Previous high-scoring ideas are injected into DIVERGE as an exclusion list, pushing the engine toward unexplored territory instead of regenerating the same winning patterns.
-
-**Failure Taxonomy** — Structured learning from past attacks. Failed ideas are classified into 6 categories (prior art, adoption, technical, timing, defensibility, economics) and persisted. Future runs receive this taxonomy as context, steering generation away from idea shapes that repeatedly die to the same attack patterns.
-
-**Mechanism Stealing** (Inverse Ideation) — New DIVERGE technique (#6). Extracts working mechanisms from successful products in unrelated fields and transplants them into new contexts. Forces cross-pollination beyond simple domain collision.
-
-**Moat Archaeology** — Defensibility as a first-class constraint. During CONVERGE, any idea scoring below 4 on defensibility triggers a mandatory moat check: the AI must suggest a concrete mutation that would add a defensibility moat (network effects, data flywheel, switching costs, etc.). A defensibility gate also adjusts composite scores.
-
-**Streamlined Stress Test** — Reduced from 3-round adversarial debate (attack → defense → rebuttal) to single-round attack. Verdicts are now rendered immediately after the attack phase. This cut per-run cost from ~$0.30 to ~$0.14 and time from ~5 minutes to ~3 minutes, with no measurable loss in verdict quality.
-
 ## Setup
 
 1. Install dependencies:
@@ -73,7 +21,7 @@ Now with **adversarial stress testing**, **dynamic brief-adaptive scoring**, **c
 python -m xbrain ideate
 ```
 
-That's it. Without `--domains`, the engine scans across ALL domains with no restrictions — technology, science, health, finance, agriculture, entertainment, and everything beyond. Use `--domains` to focus on specific areas. It generates ideas, deduplicates, fills gaps, scores, and stress-tests them through adversarial attack. Results appear in `xbrain-runs/YYYYMMDD-HHMMSS-<brief-slug>/`.
+That's it. The engine scans across all domains with no restrictions — technology, science, health, finance, agriculture, entertainment, and everything beyond. It generates ideas, deduplicates, fills gaps, scores, and stress-tests them through adversarial attack. Results appear in `xbrain-runs/YYYYMMDD-HHMMSS-<brief-slug>/`.
 
 ## The Output
 
@@ -105,22 +53,6 @@ python -m xbrain ideate --brief my-problem.txt
 Auto-detects: if the value is a path to an existing file, it reads the file. Otherwise treats it as text.
 
 Without `--brief`, the engine generates ideas on its own across all domains.
-
-### `--domains` — Focus areas
-
-Narrow ideation to specific topics. Write anything — the AI interprets it.
-
-```
-python -m xbrain ideate --domains health
-
-python -m xbrain ideate --domains fintech "urban planning" agriculture
-
-python -m xbrain ideate --domains "developer tools" gaming education
-
-python -m xbrain ideate --domains "B2B SaaS" "climate tech" logistics
-```
-
-Without `--domains`, the engine scans across all fields with no restrictions.
 
 ### `--constraints` — Add requirements
 
@@ -155,7 +87,7 @@ python -m xbrain ideate --top 5
 See what would happen without spending any credits.
 
 ```
-python -m xbrain ideate --brief problem.txt --domains health --dry-run
+python -m xbrain ideate --brief problem.txt --dry-run
 ```
 
 ### `--lang` — Output language
@@ -200,10 +132,10 @@ Estimate API cost before running, with per-phase breakdown and strategy comparis
 
 ```
 python -m xbrain estimate --ideas 20 --top 8
-python -m xbrain estimate --ideas 30 --top 10 --domains health fintech --strategy balanced
+python -m xbrain estimate --ideas 30 --top 10 --strategy balanced
 ```
 
-Accepts `--ideas`, `--top`, `--domains`, `--constraints`, and `--strategy`.
+Accepts `--ideas`, `--top`, `--constraints`, and `--strategy`.
 
 ## Examples
 
@@ -217,9 +149,9 @@ python -m xbrain ideate
 python -m xbrain ideate --brief "Teachers spend 10+ hours per week grading essays and students get feedback too late to improve"
 ```
 
-**Explore a problem from a file with focused domains:**
+**Explore a problem from a file:**
 ```
-python -m xbrain ideate --brief problem.txt --domains health technology
+python -m xbrain ideate --brief problem.txt
 ```
 
 **Quick cheap run to test an idea:**
@@ -360,7 +292,8 @@ XBRAIN_BEST_MODEL=claude-sonnet-4-20250514     # Model for critical phases (bala
 
 xBrain runs a multi-phase pipeline where each phase builds on the last. The key insight: most ideation tools generate ideas and stop. xBrain generates ideas, then actively tries to destroy them — and the ideas that survive are the ones worth building.
 
-### Pipeline Architecture (Detailed)
+<details>
+<summary><strong>Pipeline Architecture (click to expand)</strong></summary>
 
 ```
                                     xBrain Pipeline: Prompt to Report
@@ -369,21 +302,20 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   USER INPUT                                    PERSISTENT MEMORY
   +---------------------+                       +----------------------------+
   | --brief  (text/file)|                       | xbrain-memory/persistent/  |
-  | --domains           |                       |   idea-archive.json        |
-  | --constraints       |                       |   kill-log.json            |
-  | --ideas N           |                       |   domain-heat-map.json     |
-  | --top N             |                       |   playbook.json            |
-  | --lang              |                       |   score-calibration.json   |
-  | --strategy          |                       |   idea-lineage.json        |
-  +--------+------------+                       |   idea-genes.json          |
-           |                                    |   mutation-archive.json    |
-           v                                    |   attack-patterns.json     |
-  +========================================+    |   meta-metrics.json        |
-  | PHASE -1: META-LEARN                   |    |   refinement-history.json  |
-  | (every 3 runs — runs FIRST)            |    |   failure-taxonomy.json    |
-  |                                        |    +----------+-----------------+
-  |  Reads past run metrics, score history,|<---reads------+
-  |  kill reasons, attack patterns.        |               |
+  | --constraints       |                       |   idea-archive.json        |
+  | --ideas N           |                       |   kill-log.json            |
+  | --top N             |                       |   domain-heat-map.json     |
+  | --lang              |                       |   playbook.json            |
+  | --strategy          |                       |   score-calibration.json   |
+  +--------+------------+                       |   idea-lineage.json        |
+           |                                    |   idea-genes.json          |
+           v                                    |   mutation-archive.json    |
+  +========================================+    |   attack-patterns.json     |
+  | PHASE -1: META-LEARN                   |    |   meta-metrics.json        |
+  | (every 3 runs — runs FIRST)            |    |   refinement-history.json  |
+  |                                        |    |   failure-taxonomy.json    |
+  |  Reads past run metrics, score history,|    +----------+-----------------+
+  |  kill reasons, attack patterns.        |<---reads------+
   |  Distills into compact playbook        |               |
   |  (~200 tokens) + score calibration     |               |
   |  with per-dimension multipliers.       |               |
@@ -403,39 +335,18 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   +==================+=====================+
                      |
                      v
-  +========================================+
-  | PHASE 0: IMMERSE                       |
-  | (optional, when --domains provided)    |
-  |                                        |
-  |  Web search grounding:                 |
-  |    - DuckDuckGo: trends, competitors   |
-  |    - HackerNews: developer sentiment   |
-  |    (pluggable — more sources planned)  |
-  |                                        |
-  |  Per-domain deep dive:                 |
-  |    - Incentive structures              |
-  |    - Regulatory landscape              |
-  |    - Existing players & blind spots    |
-  |    - Historical failures               |
-  |    - Technology gaps                   |
-  |    - Underserved populations           |
-  |                                        |
-  |  Output: DomainBrief[] (JSON)          |
-  +==================+=====================+
-                     |
-                     v
   +========================================+       +==========================+
   | PHASE 1: DIVERGE (Round 1)             |       | Injected Context:        |
   | temp=0.9                               |<------| - Playbook (meta-learn)  |
-  |                                        |       | - Domain briefs          |
-  |  Generate N raw idea seeds using       |       | - Memory (past ideas,    |
-  |  6 simultaneous techniques:            |       |   killed titles, domain  |
-  |                                        |       |   heat map)              |
-  |  1. Domain Scan                        |       | - Brief text             |
-  |  2. Cross-Domain Collision             |       | - Constraints            |
-  |  3. Contrarian Inversion              |       | - Winner repulsion list  |
-  |  4. Contextual Constraints             |       | - Failure taxonomy       |
-  |  5. AI-Augmentable Gap Detection       |       +==========================+
+  |                                        |       | - Memory (past ideas,    |
+  |  Generate N raw idea seeds using       |       |   killed titles, domain  |
+  |  6 simultaneous techniques:            |       |   heat map)              |
+  |                                        |       | - Brief text             |
+  |  1. Domain Scan                        |       | - Constraints            |
+  |  2. Cross-Domain Collision             |       | - Winner repulsion list  |
+  |  3. Contrarian Inversion              |       | - Failure taxonomy       |
+  |  4. Contextual Constraints             |       +==========================+
+  |  5. AI-Augmentable Gap Detection       |
   |  6. Mechanism Stealing                 |
   |                                        |
   |  Output: RawIdea[] (id, concept,       |
@@ -611,111 +522,41 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   +========================================+
 ```
 
-**Phase -1 — META-LEARN** (every 3 runs, runs at pipeline start)
-Cross-session learning. Before any ideation begins, distills accumulated results from previous runs into a compact playbook:
-- **Score calibration**: detects if scores are inflated/deflated, which dimensions need harsher scoring, and produces per-dimension multipliers (0.5–1.5) that are applied mathematically in CONVERGE
-- **Fatal patterns**: top reasons ideas die (injected into DIVERGE to avoid repeating mistakes)
-- **Anti-patterns**: idea shapes to stop generating
-- **Domain gaps**: underexplored areas worth targeting
+</details>
 
-The playbook is injected into future runs as fixed-size context (~200 tokens), replacing the growing raw data that would otherwise bloat prompts over time. The dimension multipliers are applied post-LLM in CONVERGE — scores are corrected in code, not by asking the LLM to follow instructions. Only triggers after 3+ runs have accumulated since the last distillation.
+<details>
+<summary><strong>Phase Details (click to expand)</strong></summary>
+
+**Phase -1 — META-LEARN** (every 3 runs, runs at pipeline start)
+Cross-session learning. Distills accumulated results from previous runs into a compact playbook with score calibration multipliers (0.5–1.5), fatal patterns, anti-patterns, and domain gaps. Applied post-LLM in CONVERGE — scores are corrected in code, not by asking the LLM. Only triggers after 3+ runs.
 
 **Phase -0.5 — CONSTRAINT CHECK** (automatic, when 2+ constraints provided)
-Analyzes constraints for logical contradictions. Warns about conflicts and suggests resolutions. Non-blocking — the pipeline continues regardless.
-
-**Phase 0 — IMMERSE** (optional, when `--domains` is provided)
-Deep-dive domain research. Before the LLM call, xBrain runs live web searches (DuckDuckGo + HackerNews) with queries like `"{domain} startups trends 2025 2026"` and `"{domain} biggest problems pain points"`. The search results are injected as `CURRENT MARKET DATA` context, grounding the LLM's analysis in current reality instead of stale training data. The AI then maps tensions, incentive structures, regulatory landscape, existing players, historical failures, and underserved populations — correcting any outdated assumptions against the search results.
+Analyzes constraints for logical contradictions. Warns about conflicts and suggests resolutions. Non-blocking.
 
 **Phase 1 — DIVERGE** (Round 1)
-Raw idea generation. Uses six techniques simultaneously:
-1. **Domain Scan** — identify unsolved problems per domain
-2. **Cross-Domain Collision** — force novel intersections between unrelated fields
-3. **Contrarian Inversion** — flip conventional assumptions and build on the opposite
-4. **Contextual Constraints** — apply real-world constraints (offline, free, no PII)
-5. **AI-Augmentable Gap Detection** — find ideas where AI bridges the expertise gap, so a developer without domain credentials can still deliver expert-level value
-6. **Mechanism Stealing** (Inverse Ideation) — extract working mechanisms from successful products in unrelated fields and transplant them into new contexts
-
-Additional context injected:
-- **Winner repulsion list** — titles and domains of previous high-scoring ideas, instructing the AI to avoid similar territory (cross-run diversity ratchet)
-- **Failure taxonomy** — categorized attack patterns from past runs (prior art, adoption, technical, timing, defensibility, economics), steering generation away from repeatedly fatal idea shapes
+Raw idea generation using six techniques: Domain Scan, Cross-Domain Collision, Contrarian Inversion, Contextual Constraints, AI-Augmentable Gap Detection, and Mechanism Stealing. The AI determines which domains to explore based on the brief context — scanning broadly when no brief is given.
 
 **Phase 1b — DEDUP** (Semantic Deduplication)
-Analyzes all raw ideas for semantic duplicates — same concept, different words. Collapses near-identical ideas and identifies which themes are over-represented and which areas have gaps. This prevents the scoring phase from wasting cycles on copies.
+Collapses near-identical ideas and identifies over-represented themes and gap areas.
 
 **Phase 1c — DIVERGE GAP-FILL** (Round 2)
-Multi-turn divergence. Takes the gaps identified by dedup and generates new ideas specifically designed to fill those gaps. Uses higher creativity (temperature=0.95) and is explicitly told NOT to repeat over-represented themes. This forces diversity.
+Generates new ideas specifically for gap areas at higher creativity (temperature=0.95), avoiding over-represented themes.
 
 **Phase 2 — CONVERGE**
-Clusters, scores, and ranks. The output format dynamically adapts to the brief type:
-- **Product/startup briefs** → persona, ICP, go-to-market fields
-- **Internal tool briefs** → user role, workflow fit, integration surface
-- **Process/workflow briefs** → current state, proposed change, success metrics
-- **Default** → flexible format matching the brief's nature
+Clusters, scores, and ranks. Output format adapts to brief type (product, internal tool, process). Each idea gets a target persona, ICP, 8-dimension scoring with reasoning, inverse fragility check, and moat check. Scores are calibrated post-LLM using meta-learning multipliers.
 
-Each idea also gets a **moat check** — if defensibility scores below 4, the AI must suggest a concrete mutation that would add a defensibility moat (network effects, data flywheel, switching costs, etc.). This is the **Moat Archaeology** feature.
+Scoring dimensions: Impact (25%), Confidence (20%), Sustainability (10%), Defensibility (10%), Market Timing (5%), Effort (-10%), Cost (-10%), Ethical Risk (-10%). Composite = weighted sum + 3.0, clamped to [0, 10].
 
-Per idea:
-- A specific **target persona** — not generic demographics, but a concrete person: who they are, what pain they feel, what context they work in, and what motivates them
-- A **first customer profile (ICP)** — the ideal early adopter type, organization size, and readiness level
-- **8-dimension scoring** (0-10 each):
-
-| Dimension | Direction | Weight | What it measures |
-|-----------|-----------|--------|------------------|
-| Impact | Higher = better | 25% | How many people affected, how severe the pain |
-| Confidence | Higher = better | 20% | How proven is the approach, how reliable the evidence |
-| Sustainability | Higher = better | 10% | Revenue model strength, retention dynamics |
-| Defensibility | Higher = better | 10% | Moat, switching costs, network effects |
-| Market Timing | Higher = better | 5% | Is the window open now? |
-| Effort | Lower = better | -10% | Implementation complexity (scored assuming developer + AI tools) |
-| Cost | Lower = better | -10% | Infrastructure and operational costs |
-| Ethical Risk | Lower = better | -10% | Potential for misuse or harm |
-
-  Composite score formula: `(0.25 x impact + 0.20 x confidence + 0.10 x sustainability + 0.10 x defensibility + 0.05 x market_timing - 0.10 x effort - 0.10 x cost - 0.10 x ethical_risk) + 3.0`, clamped to 0-10.
-
-- **Score reasoning**: for each dimension, a human-readable explanation of WHY that score was given — makes scoring auditable by non-technical stakeholders
-- **Inverse scoring** ("what would need to be TRUE for this to be TERRIBLE?") — breaks the tendency to score everything 7-8 by forcing the AI to articulate failure conditions. If the idea is fragile (inverse_confidence > 6), positive scores get reduced
-- **Score calibration** from the meta-learning playbook (if available). On first runs, scores are UNCALIBRATED. After the meta-learning phase has run (every 3 runs), per-dimension multipliers are applied mathematically post-LLM: inflated dimensions get deflated, underscored dimensions get boosted. This is code-enforced — the LLM's scores are corrected after the fact, not by asking it to follow calibration instructions. Calibrated candidates are tagged accordingly in the report
-
-**Phase 3 — STRESS TEST (Adversarial Attack)**
-Single-round adversarial attack by a Devil's Advocate. Each idea is tested **in parallel** — all ideas run their attack concurrently using async API calls, significantly reducing wall-clock time:
-
-Before attacks begin, xBrain searches the web for each idea's title + "existing product competitor" to find real prior art. These search results are injected as `PRIOR ART SEARCH RESULTS` context into the attack prompt, grounding the prior art attack angle in real competitors instead of hallucinated ones.
-
-- **Attack:** The Devil's Advocate attacks each idea from 9 angles: prior art, adoption failure, technical blockers, problem reframe, negative externalities, obsolescence, timing, defensibility, and expertise gaps. A verdict is rendered immediately based on attack severity.
-
-For expertise gap attacks, the AI evaluates whether AI tools can bridge the gap — only truly unbridgeable gaps (licensure, physical skills) count as fatal.
-
-Additional outputs per idea:
-- **Feasibility matrix** (9 dimensions, scored 1-5): technical risk, data availability, regulatory risk, infrastructure cost, time to prototype, maintenance burden, LLM capability fit, defensibility, and market timing
-- **Kill criteria** — specific conditions under which to abort building
-- **Verdict**: BUILD, MUTATE, KILL, or INCUBATE
-
-If the API call crashes (timeout, JSON error, rate limit), the fallback INCUBATE verdict is tagged with `error_source: api_crash`. The report shows `(⚠ api_crash)` next to the verdict so crash-based INCUBATEs are never mistaken for genuine assessments.
+**Phase 3 — STRESS TEST**
+Single-round adversarial attack. Each idea tested in parallel via async API calls. Web search finds real prior art per idea before attacking. 9 structured attack angles + 1 freeform. Produces feasibility matrix (9 dims, 1-5), kill criteria, and verdict (BUILD/MUTATE/KILL/INCUBATE).
 
 **Phase 4 — REFINE** (automatic, if no BUILD verdicts)
-Iterative refinement loop — up to 3 rounds. Triggered when the stress test produces zero BUILD verdicts. Each round:
-1. **Extract mutations** — collects suggested improvements from every MUTATE verdict
-2. **Extract attack patterns** — identifies the most frequent fatal arguments (top 5 in round 1, top 10 in later rounds)
-3. **Extract failure blocklist** — classifies KILL/MUTATE attacks into 6 canonical failure types (prior_art, adoption, technical, timing, defensibility, economics) and injects them as hard prohibitions ("DO NOT generate ideas that...") before any soft context
-4. **Ban previous concepts** — all prior candidate titles and rationales are explicitly banned from re-generation
-5. **Extract problem reframes** — finds "Reframe:" attacks and "real problem" sentences from stress tests, injects them as alternative starting points for ideation
-6. **Re-generate** — runs a fresh DIVERGE with the blocklist, banned concepts, reframes, mutations, patterns, winner repulsion list, and failure taxonomy injected as context, using progressively lower creativity (temperature drops from 0.75 → 0.60 → 0.50) and fewer ideas (50% → 33% → 25% of original count)
-7. **Re-score and re-stress** — runs CONVERGE (with calibration enforcement) and STRESS TEST on the new batch
-8. **Merge survivors** — new BUILD ideas are merged with previous rounds. Title-based deduplication ensures the same concept (from different rounds) only appears once — the highest-scored version is kept
-
-The loop stops as soon as a BUILD verdict is found or 3 rounds are exhausted. This is how xBrain iterates toward quality — each round learns from the specific failure modes of the previous round.
+Up to 3 refinement rounds. Extracts mutations, attack patterns, failure blocklist, and problem reframes from previous round. Re-generates with progressively lower creativity and fewer ideas. Stops when BUILD found or 3 rounds exhausted.
 
 **Phase 5 — MEMORY UPDATE** (automatic, end of every run)
-Persists all run data to cross-session memory:
-- **Idea archive**: all survivors (ID, title, score, verdict, domains) appended to the archive
-- **Kill log**: KILL ideas and their strongest fatal argument recorded for future avoidance
-- **Mutations**: MUTATE ideas with suggested improvements saved for refinement learning
-- **Attack patterns**: recurring fatal arguments extracted and stored
-- **Failure taxonomy**: attacks classified into 6 categories (prior art, adoption, technical, timing, defensibility, economics) for cross-run learning
-- **Domain heat map**: domains used in this run tallied for exploration tracking
-- **Lineage**: idea→run relationships recorded for cross-run lineage browsing
-- **Idea genes**: high-scoring ideas (score ≥ 6.5) decomposed into reusable solution patterns (capped at 100 genes)
-- **Run metrics**: token usage, build rate, and timestamps logged
+Persists idea archive, kill log, mutations, attack patterns, failure taxonomy, domain heat map, lineage, idea genes (score ≥ 6.5), and run metrics.
+
+</details>
 
 ### Persistent Memory
 
@@ -733,7 +574,7 @@ xBrain remembers across runs. Files in `xbrain-memory/persistent/`:
 | `idea-genes.json` | Reusable idea patterns extracted from high-scoring ideas |
 | `mutation-archive.json` | MUTATE ideas with their suggested mutations |
 | `attack-patterns.json` | Recurring attack patterns from stress tests |
-| `failure-taxonomy.json` | Categorized failure patterns (prior art, adoption, technical, timing, defensibility, economics) |
+| `failure-taxonomy.json` | Categorized failure patterns |
 | `refinement-history.json` | History of refinement rounds |
 
 ### The Report
@@ -741,38 +582,13 @@ xBrain remembers across runs. Files in `xbrain-memory/persistent/`:
 Each run generates `idea-report.md` with:
 - **Summary** — ideas generated, scored, token usage, cost
 - **Comparative Summary** — highest impact idea, highest confidence idea
-- **Effort-Impact Quadrant** — categorizes ideas into Quick Wins (high impact, lower effort), Strategic (high impact, high effort), and Blue Sky (interesting but lower priority)
-- **Domain Briefs** — if IMMERSE ran, the full domain research (tensions, pressure points, regulatory windows)
-- **Ideas at a Glance** — quick comparison table with score, effort, and verdict
-- **Per-idea detail**:
-  - Target persona (who, pain, context, motivation) — dynamically adapted to brief type
-  - First customer profile (ICP type, org size, readiness) — for product briefs only
-  - 8-dimension score table with reasoning per dimension
-  - Inverse fragility check (what would make this terrible?)
-  - Key assumptions (critical unknowns that must be validated)
-  - Stress test results: attacks made/survived/fatal, strongest attack, suggested mutation
-  - Feasibility matrix (9 dimensions, 1-5 scale)
-  - Moat check — if defensibility < 4, a moat-strengthening mutation is suggested
-  - Kill criteria (abort conditions for the build phase)
-  - Competitive landscape and timeline alignment
-
-### Console Output
-
-Each pipeline phase prints a visual header, and at the end of a run, xBrain prints a structured completion summary:
-- Verdict breakdown (BUILD / MUTATE / KILL / INCUBATE counts)
-- Refinement rounds used (if any)
-- Top 5 ideas by score
-- Output file locations
-- Total tokens and cost
-- Suggested next command (e.g. `specify` for the top BUILD idea)
+- **Effort-Impact Quadrant** — Quick Wins, Strategic, Blue Sky
+- **Ideas at a Glance** — comparison table with score, effort, and verdict
+- **Per-idea detail** — persona, ICP, 8-dimension scores with reasoning, inverse fragility check, assumptions, stress test results, feasibility matrix, moat check, kill criteria
 
 ## Cost
 
-The stress test runs **per-idea parallel API calls** — with 8 ideas, each fires 8 concurrent requests instead of one batched request. This multiplies the number of API calls but dramatically reduces wall-clock time since all calls execute simultaneously. Combined with the sequential phases (constraint check, immerse, diverge, dedup, gap-fill, converge), a typical run makes ~15 API calls and completes in under 3 minutes.
-
-If the refinement loop triggers (no BUILD verdicts), each refinement round adds diverge + converge + parallel stress test calls, up to 3 rounds.
-
-The actual cost (tokens in/out and dollar amount) is tracked and shown in the terminal output and in the report header.
+The stress test runs **per-idea parallel API calls** — with 8 ideas, each fires 8 concurrent requests. Combined with sequential phases (constraint check, diverge, dedup, gap-fill, converge), a typical run makes ~12 API calls and completes in under 3 minutes.
 
 Approximate cost per run with Sonnet: **$0.10–$0.15** (simple run), **$0.20–$0.40** (with refinement rounds).
 
@@ -781,7 +597,7 @@ API calls include automatic **retry with exponential backoff** for rate limits, 
 Use `python -m xbrain estimate` to preview costs before running (no API calls made):
 
 ```
-python -m xbrain estimate --ideas 20 --top 8 --domains health fintech
+python -m xbrain estimate --ideas 20 --top 8
 ```
 
 The `--dry-run` flag on `ideate` also shows estimated cost.

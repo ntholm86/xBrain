@@ -34,15 +34,6 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     ideate.add_argument(
-        "--domains",
-        nargs="*",
-        metavar="DOMAIN",
-        help=(
-            "Focus on specific domains — any topic works "
-            '(e.g. health fintech "urban planning" gaming agriculture).'
-        ),
-    )
-    ideate.add_argument(
         "--constraints",
         nargs="*",
         metavar="CONSTRAINT",
@@ -112,7 +103,6 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     estimate.add_argument("--ideas", type=int, default=20, metavar="N", help="Ideas to generate")
     estimate.add_argument("--top", type=int, default=8, metavar="N", help="Ideas to score")
-    estimate.add_argument("--domains", nargs="*", metavar="DOMAIN", help="Focus domains")
     estimate.add_argument("--constraints", nargs="*", metavar="CONSTRAINT", help="Constraints")
     estimate.add_argument(
         "--strategy",
@@ -193,7 +183,6 @@ def _resolve_brief(value: str | None) -> str | None:
 def _cmd_ideate(args: argparse.Namespace) -> None:
     cfg = Config()
 
-    domains = args.domains if args.domains else None
     constraints = args.constraints if args.constraints else None
     brief_text = _resolve_brief(args.brief)
     language = args.lang or None
@@ -213,7 +202,6 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
             model=cfg.model,
             ideas_per_round=cfg.ideas_per_round,
             converge_top_n=cfg.converge_top_n,
-            has_domains=bool(domains),
             has_constraints=bool(constraints),
             pricing=cfg.MODEL_PRICING,
             strategy=cfg.model_strategy,
@@ -223,7 +211,6 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
         print(f"  Model:       {cfg.model}")
         print(f"  Strategy:    {cfg.model_strategy}")
         print(f"  Max tokens:  {cfg.max_tokens}")
-        print(f"  Domains:     {domains or '(broad scan)'}")
         print(f"  Constraints: {constraints or '(none)'}")
         print(f"  Ideas:       {cfg.ideas_per_round}")
         print(f"  Top N:       {cfg.converge_top_n}")
@@ -258,7 +245,7 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
     from xbrain.ideate import IdeatePipeline  # noqa: E402
 
     pipeline = IdeatePipeline(config=cfg)
-    pipeline.run(domains=domains, constraints=constraints, brief_text=brief_text, language=language)
+    pipeline.run(constraints=constraints, brief_text=brief_text, language=language)
 
 
 def _cmd_specify(args: argparse.Namespace) -> None:
@@ -297,7 +284,6 @@ def _cmd_estimate(args: argparse.Namespace) -> None:
         model=cfg.model,
         ideas_per_round=args.ideas,
         converge_top_n=args.top,
-        has_domains=bool(args.domains),
         has_constraints=bool(args.constraints),
         pricing=cfg.MODEL_PRICING,
         strategy=args.strategy,
@@ -324,7 +310,6 @@ def _cmd_estimate(args: argparse.Namespace) -> None:
             model=cfg.model,
             ideas_per_round=args.ideas,
             converge_top_n=args.top,
-            has_domains=bool(args.domains),
             has_constraints=bool(args.constraints),
             pricing=cfg.MODEL_PRICING,
             strategy=strat,

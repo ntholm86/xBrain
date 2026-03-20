@@ -17,7 +17,6 @@ from xbrain.memory import MemoryStore
 from xbrain.models import (
     AttackResponse,
     DebateExchange,
-    DomainBrief,
     FeasibilityMatrix,
     IdeaCard,
     IdeateRunResult,
@@ -44,8 +43,6 @@ from xbrain.prompts import (
     DIVERGE_GAPFILL_USER,
     DIVERGE_SYSTEM,
     DIVERGE_USER,
-    IMMERSE_SYSTEM,
-    IMMERSE_USER,
     META_LEARN_SYSTEM,
     META_LEARN_USER,
     STRESS_TEST_SYSTEM,
@@ -142,7 +139,6 @@ class IdeatePipeline:
 
     def run(
         self,
-        domains: list[str] | None = None,
         constraints: list[str] | None = None,
         brief_text: str | None = None,
         language: str | None = None,
@@ -159,8 +155,6 @@ class IdeatePipeline:
         if brief_text:
             preview = brief_text[:120] + ("..." if len(brief_text) > 120 else "")
             _log("IDEATE", f"Brief: {preview}")
-        if domains:
-            _log("IDEATE", f"Focus domains: {', '.join(domains)}")
         if constraints:
             _log("IDEATE", f"Constraints: {', '.join(constraints)}")
         if language:
@@ -173,7 +167,6 @@ class IdeatePipeline:
             model=self.cfg.model,
             ideas_per_round=self.cfg.ideas_per_round,
             converge_top_n=self.cfg.converge_top_n,
-            has_domains=bool(domains),
             has_constraints=bool(constraints),
             pricing=self.cfg.MODEL_PRICING,
             strategy=self.cfg.model_strategy,
@@ -183,7 +176,6 @@ class IdeatePipeline:
 
         result = IdeateRunResult(
             run_id=run_id,
-            domains=domains or [],
             constraints=constraints or [],
         )
 
@@ -194,19 +186,10 @@ class IdeatePipeline:
         if constraints and len(constraints) >= 2:
             self._phase_check_constraints(constraints)
 
-        # Phase 0 — Immerse (optional)
-        domain_briefs: list[DomainBrief] = []
-        if domains:
-            _log_phase_header("IMMERSE", f"Deep-diving into {', '.join(domains)}")
-            tp = time.monotonic()
-            domain_briefs = self._phase_immerse(domains)
-            _log("IMMERSE", f"done in {time.monotonic() - tp:.0f}s")
-            result.domain_briefs = domain_briefs
-
         # Phase 1 — Diverge
         _log_phase_header("DIVERGE", "Generating raw idea seeds")
         tp = time.monotonic()
-        raw_ideas = self._phase_diverge(domains, constraints, domain_briefs, brief_text)
+        raw_ideas = self._phase_diverge(constraints, brief_text)
         result.raw_ideas = raw_ideas
 
         # Phase 1b — Dedup + Gap Analysis
@@ -215,7 +198,7 @@ class IdeatePipeline:
         # Phase 1c — Gap-Fill Divergence (multi-turn)
         if gaps:
             gap_ideas = self._phase_diverge_gapfill(
-                gaps, overrepresented, raw_ideas, domains, brief_text
+                gaps, overrepresented, raw_ideas, brief_text
             )
             if gap_ideas:
                 raw_ideas.extend(gap_ideas)
@@ -257,22 +240,20 @@ class IdeatePipeline:
 
                 if _cached_ctx is None:
                     _cached_ctx = {
-                        "domain": build_domain_context(domains, self.cfg.DEFAULT_DOMAINS),
+                        "domain": build_domain_context(),
                         "constraint": build_constraint_context(constraints),
                         "memory": build_memory_context(
                             self.memory.past_idea_count(),
                             self.memory.get_domain_heat_map(),
                             self.memory.killed_idea_titles(),
                         ),
-                        "immersion": build_immersion_context(
-                            [b.model_dump() for b in domain_briefs] if domain_briefs else None
-                        ),
+                        "immersion": "",
                         "brief": build_brief_context(brief_text),
                     }
 
                 # Run refinement phase
                 refinement_survivors = self._phase_refine(
-                    raw_ideas, survivors, stress_results, domains, constraints, domain_briefs, brief_text,
+                    raw_ideas, survivors, stress_results, constraints, brief_text,
                     iteration=refinement_round,
                     cached_context=_cached_ctx,
                 )
@@ -504,64 +485,21 @@ class IdeatePipeline:
         except Exception as e:
             _log("CONSTCHK", f"  Skipped (error: {e})")
 
-    def _phase_immerse(self, domains: list[str]) -> list[DomainBrief]:
-        _log("IMMERSE", f"Deep-diving into: {', '.join(domains)}")
-
-        # ── Web search grounding ──────────────────────────────────
-        search_text = ""
-        if self.search.enabled:
-            queries: list[str] = []
-            for d in domains:
-                queries.append(f"{d} startups trends 2025 2026")
-                queries.append(f"{d} biggest problems pain points")
-            _log("IMMERSE", f"  Searching web for {len(queries)} queries...")
-            results = self.search.search_many(queries, max_results_per_query=3)
-            search_text = format_search_results(results, max_chars=3000)
-            _log("IMMERSE", f"  Got {len(results)} search results ({len(search_text)} chars)")
-
-        search_ctx = build_search_context(search_text)
-        prompt = IMMERSE_USER.format(domains=", ".join(domains), search_context=search_ctx)
-        timer = log_llm_call("IMMERSE", "Generating domain briefs")
-        data = self.llm.generate_json(
-            self._sys(IMMERSE_SYSTEM), prompt, temperature=0.6,
-            model_override=self._model_for_phase("immerse"), phase="immerse",
-            max_tokens=self._max_tokens_for_phase("immerse"),
-        )
-        timer.done()
-        briefs_raw = data.get("domain_briefs", [])
-
-        briefs = []
-        for b in briefs_raw:
-            # Normalize list-of-str fields: LLM sometimes returns dicts instead of strings
-            for key in ("pressure_points", "key_tensions", "underserved_populations",
-                        "regulatory_windows", "technology_gaps"):
-                if key in b:
-                    b[key] = [_coerce_str(item) for item in b[key]]
-            briefs.append(DomainBrief(**b))
-            _log("IMMERSE", f"  {b.get('domain','?').upper()}: {len(b.get('pressure_points',[]))} pressure points")
-
-        _log("IMMERSE", f"Domain briefs generated for {len(briefs)} domains.")
-        return briefs
-
     def _phase_diverge(
         self,
-        domains: list[str] | None,
         constraints: list[str] | None,
-        domain_briefs: list[DomainBrief],
         brief_text: str | None = None,
     ) -> list[RawIdea]:
         _log("DIVERGE", f"Round 1/{self.cfg.diverge_rounds} — generating raw idea seeds...")
 
-        domain_ctx = build_domain_context(domains, self.cfg.DEFAULT_DOMAINS)
+        domain_ctx = build_domain_context()
         constraint_ctx = build_constraint_context(constraints)
         memory_ctx = build_memory_context(
             self.memory.past_idea_count(),
             self.memory.get_domain_heat_map(),
             self.memory.killed_idea_titles(),
         )
-        immersion_ctx = build_immersion_context(
-            [b.model_dump() for b in domain_briefs] if domain_briefs else None
-        )
+        immersion_ctx = ""
         brief_ctx = build_brief_context(brief_text)
 
         winner_ctx = build_winner_repulsion_context(self.memory.get_previous_winners())
@@ -656,7 +594,6 @@ class IdeatePipeline:
         gaps: list[str],
         overrepresented: list[str],
         existing_ideas: list[RawIdea],
-        domains: list[str] | None,
         brief_text: str | None,
     ) -> list[RawIdea]:
         """Multi-turn divergence: generate new ideas to fill gaps from round 1."""
@@ -667,7 +604,7 @@ class IdeatePipeline:
         prompt = DIVERGE_GAPFILL_USER.format(
             idea_count=gap_count,
             brief_context=build_brief_context(brief_text),
-            domain_context=build_domain_context(domains, self.cfg.DEFAULT_DOMAINS),
+            domain_context=build_domain_context(),
             playbook_context=build_playbook_context(self.memory.get_playbook()),
             overrepresented="; ".join(overrepresented),
             gaps="; ".join(gaps),
@@ -1061,9 +998,7 @@ class IdeatePipeline:
         raw_ideas: list[RawIdea],
         candidates: list[IdeaCard],
         stress_results: list[StressTestResult],
-        domains: list[str] | None,
         constraints: list[str] | None,
-        domain_briefs: list[DomainBrief],
         brief_text: str | None,
         iteration: int = 1,
         cached_context: dict[str, str] | None = None,
@@ -1175,16 +1110,14 @@ class IdeatePipeline:
             immersion_ctx = cached_context["immersion"]
             brief_ctx = cached_context["brief"]
         else:
-            domain_ctx = build_domain_context(domains, self.cfg.DEFAULT_DOMAINS)
+            domain_ctx = build_domain_context()
             constraint_ctx = build_constraint_context(constraints)
             memory_ctx = build_memory_context(
                 self.memory.past_idea_count(),
                 self.memory.get_domain_heat_map(),
                 self.memory.killed_idea_titles(),
             )
-            immersion_ctx = build_immersion_context(
-                [b.model_dump() for b in domain_briefs] if domain_briefs else None
-            )
+            immersion_ctx = ""
             brief_ctx = build_brief_context(brief_text)
 
         # Adjust idea count by iteration: 1st=50%, 2nd=33%, 3rd=25%
@@ -1641,7 +1574,6 @@ class IdeatePipeline:
         model: str,
         ideas_per_round: int,
         converge_top_n: int,
-        has_domains: bool,
         has_constraints: bool,
         pricing: dict[str, tuple[float, float]],
         strategy: str = "single",
@@ -1663,8 +1595,6 @@ class IdeatePipeline:
 
         if has_constraints:
             _add("constraints", 800, 600)
-        if has_domains:
-            _add("immerse", 600, 3000)
         _add("diverge", 2000, 4000 + ideas_per_round * 120)
         _add("dedup", 1500 + ideas_per_round * 80, 1500)
         _add("gapfill", 1500, 2000)

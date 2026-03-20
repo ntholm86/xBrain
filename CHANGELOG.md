@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.11.0 — 2026-03-20
+
+### Removed
+
+#### `--domains` Parameter
+The `--domains` CLI parameter has been removed from both `ideate` and `estimate` subcommands. The AI now determines which domains to explore based entirely on the brief context — no predefined domain list needed.
+
+#### IMMERSE Phase
+The IMMERSE pipeline phase (domain-specific research) has been removed. It only ran when `--domains` was provided. Domain context is now inferred during DIVERGE via broad exploration. This reduces the pipeline from ~15 API calls to ~12.
+
+#### `DEFAULT_DOMAINS` Config
+The hardcoded `DEFAULT_DOMAINS` list in `config.py` has been removed along with the `"immerse"` entry in `PHASE_ROUTING` and `PHASE_MAX_TOKENS`.
+
+### Changed
+
+#### `build_domain_context()` Simplified
+No longer accepts parameters — always returns broad "scan all domains" exploration text, letting the AI determine relevant domains from the brief.
+
+#### README Cleaned Up
+- Removed 10 "What's New" sections (content lives in CHANGELOG.md)
+- Removed feature-spam intro paragraph
+- Moved Setup to top, before architecture details
+- Wrapped pipeline diagram and phase descriptions in collapsible `<details>` sections
+- Removed all `--domains` documentation and examples
+- Condensed phase descriptions from ~200 lines to ~40 lines
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.11.0
+- `xbrain/cli.py` — removed `--domains` from ideate/estimate parsers, removed `has_domains` from estimate calls
+- `xbrain/config.py` — removed `DEFAULT_DOMAINS`, removed `"immerse"` from `PHASE_ROUTING` and `PHASE_MAX_TOKENS`
+- `xbrain/ideate.py` — removed `domains` parameter from `run()`, deleted `_phase_immerse()`, removed `domains`/`domain_briefs` from diverge/gapfill/refine, removed `has_domains` from `estimate_cost()`
+- `xbrain/prompts.py` — deleted `IMMERSE_SYSTEM`/`IMMERSE_USER` constants, simplified `build_domain_context()`
+- `xbrain/models.py` — removed `domains` field from `IdeateRunResult`
+- `xbrain/output.py` — removed "Focus Domains" line from report header
+- `README.md` — major cleanup (see Changed above)
+
+---
+
 ## v1.10.0 — 2026-03-20
 
 ### New Features
