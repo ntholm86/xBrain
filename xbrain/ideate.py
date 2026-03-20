@@ -707,6 +707,34 @@ class IdeatePipeline:
         # Sort by composite score descending
         candidates.sort(key=lambda c: c.composite_score, reverse=True)
 
+        # ── Enforce score spread ≥ 3.0 ───────────────────────────
+        if len(candidates) >= 2:
+            top = candidates[0].composite_score
+            bot = candidates[-1].composite_score
+            spread = top - bot
+            if spread < 3.0 and spread > 0:
+                target_spread = 3.0
+                mid = (top + bot) / 2
+                scale = target_spread / spread
+                for c in candidates:
+                    stretched = mid + (c.composite_score - mid) * scale
+                    c.composite_score = round(max(0.0, min(10.0, stretched)), 1)
+                new_spread = candidates[0].composite_score - candidates[-1].composite_score
+                _log("CONVERGE", f"  Score spread stretched: {spread:.1f} → {new_spread:.1f}")
+
+        # ── Enforce effort diversity ──────────────────────────────
+        if len(candidates) >= 3:
+            efforts = [c.estimated_effort for c in candidates]
+            if len(set(efforts)) == 1:
+                # All same effort — remap using the effort dimension score
+                # Higher effort score = harder = "large"; lower = "small"
+                by_effort_score = sorted(candidates, key=lambda c: c.score_breakdown.effort)
+                by_effort_score[0].estimated_effort = "small"
+                by_effort_score[-1].estimated_effort = "large"
+                _log("CONVERGE", f"  Effort diversity enforced: "
+                     f"{by_effort_score[0].title[:30]}→small, "
+                     f"{by_effort_score[-1].title[:30]}→large")
+
         _log("CONVERGE", f"  {len(candidates)} candidates scored.  (UNCALIBRATED)")
         for i, c in enumerate(candidates[:5]):
             _log("CONVERGE", f"  #{i+1} [{c.composite_score:.1f}] \"{c.title}\"")
@@ -821,11 +849,28 @@ class IdeatePipeline:
             fatal = st.attacks_fatal
             _log("STRESS", f"    → {survived} survived, {fatal} fatal → {st.verdict}")
 
+        # ── Programmatic verdict enforcement ────────────────────
+        # The LLM tends to hedge with MUTATE even when its own numbers
+        # say BUILD.  Enforce the quantitative rule from the prompt:
+        # attacks_survived >= 5  AND  attacks_fatal <= 1  →  BUILD
+        overrides = 0
+        for r in results:
+            if (r.verdict == "MUTATE"
+                    and r.attacks_survived >= 5
+                    and r.attacks_fatal <= 1):
+                _log("STRESS", f"  ⚑ Override {r.idea_id}: MUTATE→BUILD "
+                     f"(survived={r.attacks_survived}, fatal={r.attacks_fatal})")
+                r.verdict = "BUILD"
+                overrides += 1
+
         _log("STRESS", "")
         verdicts: dict[str, int] = {}
         for r in results:
             verdicts[r.verdict] = verdicts.get(r.verdict, 0) + 1
-        _log("STRESS", f"  Verdicts: {verdicts}")
+        if overrides:
+            _log("STRESS", f"  Verdicts (after {overrides} override(s)): {verdicts}")
+        else:
+            _log("STRESS", f"  Verdicts: {verdicts}")
 
         return results
 

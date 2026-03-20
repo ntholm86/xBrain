@@ -1,5 +1,50 @@
 # Changelog
 
+## v1.4.0 — 2026-03-20
+
+### Fixes — Programmatic Enforcement
+
+The LLM consistently ignores scoring rules, effort differentiation, ICP grounding, and BUILD thresholds despite explicit prompt instructions. v1.4.0 enforces these rules programmatically after the LLM responds, rather than hoping it obeys.
+
+#### BUILD Verdict Enforcement (Programmatic)
+The stress test prompt says "≥5 survived → BUILD" but the LLM still hedges with MUTATE. Now `_phase_stress_test` applies a post-hoc override: if `attacks_survived >= 5` and `attacks_fatal <= 1`, verdict is forced to BUILD regardless of what the LLM said.
+
+#### Score Spread Enforcement (Programmatic)
+The prompt says "spread ≥ 3.0" but the LLM clusters scores within 2 points. After CONVERGE, if spread < 3.0, scores are linearly stretched around the midpoint to achieve the 3.0 minimum while preserving rank order.
+
+#### Effort Diversity Enforcement (Programmatic + Prompt)
+All ideas were getting "medium" effort despite the prompt requiring variety. After CONVERGE, if all efforts are identical, the easiest idea (lowest effort score) is remapped to "small" and the hardest (highest) to "large". Prompt also strengthened: effort score ≥ 7 → "large", ≤ 3 → "small".
+
+#### ICP Grounding (Prompt)
+Added explicit ICP grounding rule to CONVERGE: first_customer_profile must match the brief's scale and context. Solo-dev tool → solo developer ICP, not "Series B startup". Internal tool → tool operator ICP, not enterprise customer.
+
+### Files Changed
+
+- `xbrain/__init__.py` — version bump to 1.4.0
+- `xbrain/ideate.py` — added programmatic BUILD override, score spread stretching, effort diversity enforcement
+- `xbrain/prompts.py` — strengthened effort differentiation language, added ICP grounding rule
+
+---
+
+## v1.3.0 — 2026-03-20
+
+### New Features
+
+#### Feature-Aware Diversity Ratchet → Removed (Brief-Driven Instead)
+Initially added a hardcoded `XBRAIN_EXISTING_FEATURES` list and `FEATURE REPULSION` block injected into DIVERGE. **Removed** — xBrain is a general-purpose ideation engine, not a self-improvement tool. Feature repulsion should come from the brief content, which already describes existing capabilities when relevant. The brief is the right place for this — it's user-controlled and context-specific.
+
+#### Comprehensive Self-Improvement Brief
+Rewrote `improve-xbrain-ideation.txt` with full feature awareness — pipeline phases, all 6 DIVERGE techniques, memory system, meta-learning, stress testing, dynamic CONVERGE, and every v1.1–v1.2 feature. The brief now tells xBrain exactly what it already does, so it can focus on genuine gaps.
+
+### Files Changed
+
+- `xbrain/__init__.py` — version bump to 1.3.0
+- `xbrain/prompts.py` — removed hardcoded `XBRAIN_EXISTING_FEATURES` and `build_feature_repulsion_context()` (feature repulsion is brief-driven)
+- `xbrain/ideate.py` — removed `build_feature_repulsion_context()` calls
+- `improve-xbrain-ideation.txt` — complete rewrite with full feature description
+
+---
+
 ## v1.2.0 — 2026-03-20
 
 ### Fixes

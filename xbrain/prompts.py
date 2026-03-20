@@ -310,11 +310,19 @@ Do NOT use generic assumptions like "target persona exists" or "market timing is
 THIS idea succeed or fail. Example: "Hospitals will share de-identified data for under \
 $10k/year" or "Claude can parse regulatory filings with >90% accuracy."
 - DIFFERENTIATE EFFORT: Not every idea is "medium" effort. At least one must be \
-"small" and at least one must be "large" (if {top_n} >= 3).
+"small" and at least one must be "large" (if {top_n} >= 3). \
+Use the effort SCORE to decide: effort >= 7 → "large", effort <= 3 → "small". \
+DO NOT mark all ideas as medium — that means you failed to differentiate.
 - BE HARSH on ideas that are generic, vague, or that any competent developer \
 could build in a weekend. These should score below 5 on impact and defensibility.
 - DEFENSIBILITY GATE: Ideas with defensibility < 3 should be penalized heavily \
 in the composite score unless the brief explicitly doesn't care about moats.
+- ICP GROUNDING: The first_customer_profile MUST match the scale and context \
+described in the brief. If the brief describes a solo developer tool, the first \
+customer is a solo developer — NOT an enterprise. If the brief describes an \
+internal improvement, the customer is the tool's operator. Read the brief and \
+match the ICP to what the brief actually describes. Do NOT default to \
+"Series B startup" or "enterprise team" unless the brief specifically targets them.
 
 Respond with ONLY this JSON structure:
 {{

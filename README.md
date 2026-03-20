@@ -4,6 +4,18 @@ Generate, score, stress-test, and refine project ideas using Claude. xBrain runs
 
 Now with **adversarial stress testing**, **dynamic brief-adaptive scoring**, **cross-run diversity ratchet**, **failure taxonomy learning**, **mechanism stealing**, **moat archaeology**, **cost forecasting**, **constraint conflict detection**, **project spec generation**, **idea lineage tracking**, **score explainability**, and **PMO export** (CSV/Jira/Markdown).
 
+## What's New in v1.4
+
+**Programmatic Enforcement** — The LLM ignores scoring rules, effort variety, and BUILD thresholds despite explicit instructions. v1.4 enforces them in code. **BUILD Verdict Override** — if attacks_survived ≥ 5 and fatal ≤ 1, verdict is forced to BUILD. **Score Spread Stretching** — if spread < 3.0, scores are linearly stretched to 3.0 while preserving rank. **Effort Diversity** — if all efforts are "medium", hardest/easiest are remapped to large/small based on effort scores. **ICP Grounding** — first customer profile must match the brief's scale context (solo dev ≠ enterprise).
+
+## What's New in v1.3
+
+**Comprehensive Self-Improvement Brief** — The self-improvement brief now describes the full pipeline, all techniques, memory system, and every feature from v1.0–v1.2. When xBrain is used to improve itself, the brief tells the engine exactly what already exists, so it generates genuinely novel ideas instead of redescribing existing features. Feature repulsion is brief-driven — no hardcoded self-awareness in the engine.
+
+## What's New in v1.2
+
+**Idea-Specific Key Assumptions** — Each idea now gets 3-5 unique, falsifiable assumptions instead of generic boilerplate. **Dynamic First Customer Profile** — Per-idea ICP with type, size, readiness, and why_first instead of one-size-fits-all. **Context-Aware Cost Labels** — Costs now show "one-time implementation" vs "monthly infra" vs "monthly labor" as appropriate. **BUILD Verdict Threshold** — Quantitative rule: if attacks_survived ≥ 5/9, verdict must be BUILD. First BUILD verdict achieved. **Stronger Score Spread** — Improved from 1.7 to 2.4 points spread.
+
 ## What's New in v1.1
 
 **Dynamic CONVERGE** — The scoring/ranking phase now adapts its output fields to match the brief type. Product briefs get persona/ICP/go-to-market fields. Internal tool briefs get user role/workflow fit. Process briefs get current-state/proposed-change/metrics. No more forcing every idea into a SaaS product template.

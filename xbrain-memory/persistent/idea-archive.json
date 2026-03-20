@@ -3108,5 +3108,181 @@
       "regulation",
       "developer_tools"
     ]
+  },
+  {
+    "id": "idea-013",
+    "title": "Assumption Dependency Graph & Failure Propagation Engine",
+    "score": 8.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "risk_analysis",
+      "systems_thinking",
+      "epistemology"
+    ]
+  },
+  {
+    "id": "idea-006",
+    "title": "Regulatory Cliff Mapper: Pre-Enforcement Ideation Engine",
+    "score": 7.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "regulation",
+      "compliance",
+      "strategic_timing"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "Rapid Validation Gauntlet: 3-Day Sprint Compression Protocol",
+    "score": 7.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "agile_methodology",
+      "product_development",
+      "lean_startup"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Anti-Moat Idea Spotter: Competitive Fork Simulator",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "strategy",
+      "competitive_analysis",
+      "defensibility"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Idea Genealogy Forensics: Failure Pattern Detector",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "organizational_learning",
+      "knowledge_management",
+      "failure_analysis"
+    ]
+  },
+  {
+    "id": "idea-024",
+    "title": "Idea-Portfolio Synergy Mapper: Cross-Idea Value Optimizer",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "portfolio_management",
+      "strategy",
+      "systems_thinking"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Narrative Tension Mapper: Multi-Stakeholder Framing Engine",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "communication",
+      "stakeholder_management",
+      "narrative_design"
+    ]
+  },
+  {
+    "id": "gap-007",
+    "title": "Customer Co-Ideation Loop: Async User-Driven Validation",
+    "score": 6.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "user_research",
+      "product_development",
+      "participatory_design"
+    ]
+  },
+  {
+    "id": "idea-017",
+    "title": "Assumption Dependency Mapper for Ideas",
+    "score": 8.4,
+    "verdict": "BUILD",
+    "domains": [
+      "systems_thinking",
+      "risk_analysis",
+      "epistemology"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Idea Genealogy Tracer",
+    "score": 8.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "organizational_learning",
+      "product_management",
+      "behavioral_science"
+    ]
+  },
+  {
+    "id": "idea-009",
+    "title": "Idea-to-Metric Binding Engine",
+    "score": 8.0,
+    "verdict": "BUILD",
+    "domains": [
+      "product_operations",
+      "metrics",
+      "accountability"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Adversarial Idea Pressure Test",
+    "score": 7.3,
+    "verdict": "BUILD",
+    "domains": [
+      "technology",
+      "critical_thinking",
+      "risk_analysis"
+    ]
+  },
+  {
+    "id": "idea-007",
+    "title": "Blind Spot Ideation Mode",
+    "score": 6.7,
+    "verdict": "BUILD",
+    "domains": [
+      "product_analytics",
+      "customer_insights",
+      "data_mining"
+    ]
+  },
+  {
+    "id": "gap-007",
+    "title": "Portfolio Rebalancing Dashboard",
+    "score": 6.7,
+    "verdict": "BUILD",
+    "domains": [
+      "strategy",
+      "finance",
+      "portfolio_management"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "Underrepresented Voice Ideation",
+    "score": 6.2,
+    "verdict": "BUILD",
+    "domains": [
+      "labor",
+      "civic_participation",
+      "organizational_culture"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Idea Synthesis Engine",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "systems_thinking",
+      "innovation",
+      "combinatorics"
+    ]
   }
 ]
