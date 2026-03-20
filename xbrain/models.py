@@ -213,15 +213,17 @@ class IdeateRunResult(BaseModel):
 
 def compute_composite_score(sb: ScoreBreakdown) -> float:
     """Compute the normalized composite score (0-10) from raw dimension scores."""
+    from .config import Config
+    w = Config.SCORING_WEIGHTS
     raw = (
-        0.25 * sb.impact
-        + 0.20 * sb.confidence
-        + 0.10 * sb.sustainability
-        + 0.10 * sb.defensibility
-        + 0.05 * sb.market_timing
-        - 0.10 * sb.effort
-        - 0.10 * sb.cost
-        - 0.10 * sb.ethical_risk
+        w["impact"] * sb.impact
+        + w["confidence"] * sb.confidence
+        + w["sustainability"] * sb.sustainability
+        + w["defensibility"] * sb.defensibility
+        + w["market_timing"] * sb.market_timing
+        + w["effort"] * sb.effort
+        + w["cost"] * sb.cost
+        + w["ethical_risk"] * sb.ethical_risk
     )
     # Raw range: -3.0 to 7.0 → normalize to 0-10
     normalized = raw + 3.0

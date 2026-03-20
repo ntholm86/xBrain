@@ -78,4 +78,4 @@ class Config:
 
     # Cheap model (used for routing)
     cheap_model: str = os.getenv("XBRAIN_CHEAP_MODEL", "claude-haiku-4-5-20251001")
-    best_model: str = os.getenv("XBRAIN_BEST_MODEL", "")
+    best_model: str = os.getenv("XBRAIN_BEST_MODEL", "") or os.getenv("XBRAIN_MODEL", "claude-sonnet-4-20250514")

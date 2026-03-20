@@ -28,6 +28,7 @@ class LLMClient:
         self.total_output_tokens = 0
         self._phase_token_log: list[dict] = []
         self._token_lock = threading.Lock()
+        self._async_token_lock = asyncio.Lock()
         # Token-aware throttling: list of (timestamp, output_tokens)
         self._token_window: list[tuple[float, int]] = []
 

@@ -73,10 +73,10 @@ class MemoryStore:
         metrics: dict,
     ) -> None:
         """Persist everything from a completed run."""
-        # Append to idea archive
+        # Append to idea archive (keep last 500 entries)
         archive = self.get_idea_archive()
         archive.extend(ideas)
-        self._write("idea-archive.json", archive)
+        self._write("idea-archive.json", archive[-500:])
 
         # Update domain heat map
         hm = self.get_domain_heat_map()
@@ -84,16 +84,16 @@ class MemoryStore:
             hm[d] = hm.get(d, 0) + 1
         self._write("domain-heat-map.json", hm)
 
-        # Append killed ideas
+        # Append killed ideas (keep last 200 entries)
         if killed:
             kl = self.get_kill_log()
             kl.extend(killed)
-            self._write("kill-log.json", kl)
+            self._write("kill-log.json", kl[-200:])
 
-        # Append meta-metrics
+        # Append meta-metrics (keep last 100 runs)
         mm = self.get_meta_metrics()
         mm.append(metrics)
-        self._write("meta-metrics.json", mm)
+        self._write("meta-metrics.json", mm[-100:])
 
     def save_mutations(self, mutations: list[dict]) -> None:
         """Persist MUTATE ideas with their suggested mutations."""
@@ -136,10 +136,10 @@ class MemoryStore:
         self._write("score-calibration.json", calibration)
 
     def save_lineage(self, entries: list[dict]) -> None:
-        """Append lineage entries (idea relationships)."""
+        """Append lineage entries (idea relationships), keep last 500."""
         lineage = self.get_lineage()
         lineage.extend(entries)
-        self._write("idea-lineage.json", lineage)
+        self._write("idea-lineage.json", lineage[-500:])
 
     def save_idea_genes(self, genes: list[dict]) -> None:
         """Save extracted reusable idea genes (problem patterns, solution patterns)."""
@@ -195,8 +195,11 @@ class MemoryStore:
     def _read(self, filename: str, default):
         p = self.path / filename
         if p.exists():
-            with open(p, encoding="utf-8") as f:
-                return json.load(f)
+            try:
+                with open(p, encoding="utf-8") as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, ValueError):
+                return default
         return default
 
     def _write(self, filename: str, data) -> None:

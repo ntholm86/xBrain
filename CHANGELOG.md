@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.5.1 — 2026-03-20
+
+### Fixes — Pipeline Audit
+
+Full codebase audit identified 6 issues across 5 files. All fixed.
+
+#### Null Safety: `inverse_score` Parsing
+If the LLM returns `"inverse_score": null` (key present, value null), `c.get("inverse_score", {})` returns `null` instead of the default `{}`, crashing with `AttributeError`. Changed to `(c.get("inverse_score") or {})` to coerce null to empty dict.
+
+#### Corrupt Memory File Recovery
+`MemoryStore._read()` had no error handling on `json.load()`. A corrupted JSON file (partial write, disk error) would crash the entire pipeline. Now catches `JSONDecodeError` and returns the default value instead.
+
+#### Scoring Weights Single Source of Truth
+`compute_composite_score()` hardcoded weight values that duplicated `Config.SCORING_WEIGHTS`. If weights were changed in config, scores wouldn't reflect them. Now reads from `Config.SCORING_WEIGHTS` directly — one truth source.
+
+#### Memory File Pruning
+Four memory files grew without bound: `idea-archive.json`, `kill-log.json`, `meta-metrics.json`, and `idea-lineage.json`. After hundreds of runs these would become multi-MB. Added retention caps: archive (500), kill log (200), metrics (100), lineage (500). `idea-genes.json` already capped at 100.
+
+#### Async Lock Availability
+Added `asyncio.Lock` to `LLMClient` alongside the existing `threading.Lock` for use in async code paths. The threading lock is still used for shared data since `_record_usage` is called from both sync and async contexts.
+
+#### Model Routing Fallback
+`Config.best_model` defaulted to empty string when `XBRAIN_BEST_MODEL` wasn't set. The `balanced` strategy would silently fall back to the default model with no indication routing was bypassed. Now falls back to `XBRAIN_MODEL` (the main configured model).
+
+### Files Changed
+
+- `xbrain/__init__.py` — version bump to 1.5.1
+- `xbrain/ideate.py` — null-safe `inverse_score` parsing
+- `xbrain/memory.py` — corrupt JSON recovery, memory file pruning caps
+- `xbrain/models.py` — `compute_composite_score()` uses `Config.SCORING_WEIGHTS`
+- `xbrain/llm.py` — added `asyncio.Lock` for async code paths
+- `xbrain/config.py` — `best_model` falls back to main model
+
+---
+
 ## v1.5.0 — 2026-03-20
 
 ### New Features
