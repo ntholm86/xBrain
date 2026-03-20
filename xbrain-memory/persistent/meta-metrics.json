@@ -345,5 +345,15 @@
     "pass_count": 8,
     "tokens_in": 24441,
     "tokens_out": 24667
+  },
+  {
+    "run_id": "20260320-053812-xbrain-is-a-python-cli-pipeline-v151",
+    "timestamp": "2026-03-20T05:38:12.914085+00:00",
+    "ideas_generated": 23,
+    "candidates": 8,
+    "build_count": 4,
+    "pass_count": 8,
+    "tokens_in": 32523,
+    "tokens_out": 26957
   }
 ]

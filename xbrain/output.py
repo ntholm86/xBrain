@@ -36,7 +36,10 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
     lines.append(f"- **After Scoring:** {len(result.candidates)}")
     verdict_str = ", ".join(f"{v} {k}" for k, v in sorted(verdicts.items()))
     lines.append(f"- **Verdicts:** {verdict_str}")
-    lines.append("- **Scoring Status:** UNCALIBRATED")
+    # Determine calibration status from candidates
+    cal_statuses = {c.scoring_calibration_status for c in result.survivors if c.scoring_calibration_status}
+    cal_status = "CALIBRATED" if "calibrated" in cal_statuses else "UNCALIBRATED"
+    lines.append(f"- **Scoring Status:** {cal_status}")
     lines.append(
         f"- **Tokens Used:** {result.total_input_tokens:,} in / "
         f"{result.total_output_tokens:,} out"
@@ -110,7 +113,10 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
     lines.append("| # | Title | Score | Effort | Verdict |")
     lines.append("|---|-------|-------|--------|---------|")
     for i, card in enumerate(sorted_survivors):
-        verdict = card.stress_test_verdict or (stress_map.get(card.id).verdict if stress_map.get(card.id) else "?")
+        stress_entry = stress_map.get(card.id)
+        verdict = card.stress_test_verdict or (stress_entry.verdict if stress_entry else "?")
+        if stress_entry and stress_entry.error_source:
+            verdict = f"{verdict} (⚠ {stress_entry.error_source})"
         lines.append(f"| {i+1} | {card.title[:50]}{'...' if len(card.title) > 50 else ''} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict} |")
     lines.append("")
     lines.append("---")
@@ -123,6 +129,8 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
     for i, card in enumerate(sorted_survivors):
         stress = stress_map.get(card.id)
         verdict = card.stress_test_verdict or (stress.verdict if stress else "?")
+        if stress and stress.error_source:
+            verdict = f"{verdict} (⚠ {stress.error_source})"
         emoji = _verdict_emoji(verdict)
 
         lines.append(f"### {emoji} #{i+1}: {card.title}  (Score: {card.composite_score:.1f})")

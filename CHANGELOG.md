@@ -1,5 +1,31 @@
 # Changelog
 
+## v1.6.0 — 2026-03-20
+
+### New Features
+
+#### Calibration Enforcement Layer
+META-LEARN now outputs per-dimension calibration multipliers (0.5–1.5) alongside the existing text-based calibration. After CONVERGE scores ideas, xBrain applies these multipliers mathematically to each dimension score and recomputes the composite — removing reliance on the LLM voluntarily following calibration instructions. Candidates are tagged `calibrated` or `uncalibrated` in the report. Calibration is also applied during refinement rounds.
+
+#### Stress Test Fidelity Monitor
+When the stress test API call crashes (timeout, JSON error, rate limit), the fallback INCUBATE verdict is now tagged with `error_source: api_crash`. The pipeline log shows `⚠ CRASH-INCUBATE` instead of a normal verdict, and the report shows `(⚠ api_crash)` next to the verdict — so crash-based INCUBATEs are never mistaken for genuine assessments.
+
+#### Report Calibration Status
+The report summary previously hardcoded "Scoring Status: UNCALIBRATED" regardless of whether calibration was actually applied. Now reads the `scoring_calibration_status` from candidates and shows CALIBRATED or UNCALIBRATED accurately.
+
+#### Refinement Failure Blocklist
+Refinement rounds now extract canonical failure types (prior_art, adoption, technical, timing, defensibility, economics) from KILL/MUTATE stress results and inject them as hard prohibitions before the soft refinement context. The blocklist uses imperative language ("DO NOT generate ideas that...") and requires each new idea to explain why it avoids the blocked failure types — stronger than the existing soft attack-pattern context.
+
+### Files Changed
+
+- `xbrain/__init__.py` — version bump to 1.6.0
+- `xbrain/prompts.py` — META-LEARN outputs `dimension_multipliers`; added `CANONICAL_FAILURE_TYPES` map and `build_failure_blocklist_context()` function
+- `xbrain/models.py` — `error_source` field on `AttackResponse` and `StressTestResult`
+- `xbrain/ideate.py` — calibration enforcement in `_phase_converge()` and `_phase_refine()`, crash-INCUBATE tagging in `_phase_stress_test()`, failure blocklist extraction and injection in `_phase_refine()`
+- `xbrain/output.py` — report shows `error_source` flag on verdicts in both summary table and detail cards; scoring status reads from candidates instead of hardcoded
+
+---
+
 ## v1.5.1 — 2026-03-20
 
 ### Fixes — Pipeline Audit

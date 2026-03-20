@@ -695,6 +695,42 @@ def build_failure_taxonomy_context(taxonomy: dict) -> str:
     return "\n".join(lines)
 
 
+# Canonical failure categories for blocklist extraction
+CANONICAL_FAILURE_TYPES = {
+    "prior_art": ["prior art", "already exists", "existing solution", "competitor", "been done"],
+    "adoption": ["adoption", "switching cost", "user acquisition", "won't use", "no demand"],
+    "technical": ["technical", "infeasible", "can't build", "complexity", "scalability"],
+    "timing": ["timing", "too early", "too late", "market window", "premature"],
+    "defensibility": ["defensib", "moat", "easily copied", "no barrier", "commodit"],
+    "economics": ["economic", "unit economics", "revenue", "pricing", "margin", "cost"],
+}
+
+
+def build_failure_blocklist_context(failure_types: dict[str, list[str]]) -> str:
+    """Build HARD constraint blocklist from canonical failure types found in stress tests.
+
+    Unlike soft context, this uses imperative prohibitions to prevent the LLM
+    from regenerating ideas that fall into the same failure categories.
+    """
+    if not failure_types:
+        return ""
+    lines = [
+        "🚫 HARD FAILURE BLOCKLIST — DO NOT generate ideas that fall into these "
+        "failure categories. These specific weaknesses killed or damaged ideas "
+        "in the previous round. Any new idea exhibiting these patterns will be "
+        "immediately rejected:",
+    ]
+    for category, examples in failure_types.items():
+        label = category.replace("_", " ").title()
+        example_text = examples[0][:120] if examples else ""
+        lines.append(f"- BLOCKED: {label} — \"{example_text}\"")
+    lines.append(
+        "\nEvery new idea MUST include a one-sentence explanation of why it "
+        "does NOT suffer from any of the blocked failure types above."
+    )
+    return "\n".join(lines)
+
+
 def build_memory_context(
     past_idea_count: int,
     domain_heat_map: dict[str, int],
@@ -812,11 +848,26 @@ Respond with ONLY valid JSON:
   "score_calibration": {{
     "bias_direction": "inflated|deflated|balanced",
     "adjustment": "Brief instruction for scoring LLM (1 sentence)",
-    "weak_dimensions": ["dimension names that need harsher scoring"]
+    "weak_dimensions": ["dimension names that need harsher scoring"],
+    "dimension_multipliers": {{
+      "impact": 1.0,
+      "confidence": 1.0,
+      "effort": 1.0,
+      "cost": 1.0,
+      "ethical_risk": 1.0,
+      "sustainability": 1.0,
+      "defensibility": 1.0,
+      "market_timing": 1.0
+    }}
   }},
   "domain_recommendations": ["domain1", "domain2"],
   "anti_patterns": ["pattern1", "pattern2", "pattern3"]
 }}
+
+dimension_multipliers: Set each to a value between 0.5 and 1.5.
+- <1.0 means the LLM historically OVER-scores that dimension → deflate it.
+- >1.0 means the LLM historically UNDER-scores that dimension → inflate it.
+- 1.0 means no correction needed.
 """
 
 

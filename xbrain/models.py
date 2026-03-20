@@ -76,6 +76,7 @@ class AttackResponse(BaseModel):
     llm_capability_fit: str = ""
     kill_criteria: list[str] = Field(default_factory=list)
     verdict: str = ""
+    error_source: str = ""         # "" = genuine, "api_crash" = exception fallback
 
 
 class DefenseExchangeItem(BaseModel):
@@ -138,6 +139,7 @@ class StressTestResult(BaseModel):
     llm_capability_fit: str = ""   # strong / moderate / weak
     kill_criteria: list[str] = Field(default_factory=list)
     verdict: str = ""              # BUILD / KILL / MUTATE / INCUBATE
+    error_source: str = ""         # "" = genuine verdict, "api_crash" = exception fallback
 
 
 class RawIdea(BaseModel):

@@ -55,6 +55,8 @@ from xbrain.prompts import (
     build_refinement_context,
     build_winner_repulsion_context,
     build_failure_taxonomy_context,
+    build_failure_blocklist_context,
+    CANONICAL_FAILURE_TYPES,
 )
 
 
@@ -735,7 +737,28 @@ class IdeatePipeline:
                      f"{by_effort_score[0].title[:30]}→small, "
                      f"{by_effort_score[-1].title[:30]}→large")
 
-        _log("CONVERGE", f"  {len(candidates)} candidates scored.  (UNCALIBRATED)")
+        # ── Apply mathematical calibration from META-LEARN ────────
+        calibration_data = self.memory.get_score_stats()
+        multipliers = (calibration_data.get("dimension_multipliers") or {}) if calibration_data else {}
+        if multipliers:
+            for c in candidates:
+                sb = c.score_breakdown
+                for dim in ("impact", "confidence", "effort", "cost", "ethical_risk",
+                            "sustainability", "defensibility", "market_timing"):
+                    m = multipliers.get(dim)
+                    if m is not None and m != 1.0:
+                        orig = getattr(sb, dim)
+                        setattr(sb, dim, round(max(0.0, min(10.0, orig * m)), 2))
+                c.composite_score = compute_composite_score(sb)
+            candidates.sort(key=lambda c: c.composite_score, reverse=True)
+            for c in candidates:
+                c.scoring_calibration_status = "calibrated"
+            _log("CONVERGE", f"  Calibration applied: {multipliers}")
+            cal_status = "CALIBRATED"
+        else:
+            cal_status = "UNCALIBRATED"
+
+        _log("CONVERGE", f"  {len(candidates)} candidates scored.  ({cal_status})")
         for i, c in enumerate(candidates[:5]):
             _log("CONVERGE", f"  #{i+1} [{c.composite_score:.1f}] \"{c.title}\"")
             _log("CONVERGE", f"       Domains: {', '.join(c.domain_tags)}")
@@ -781,8 +804,8 @@ class IdeatePipeline:
                 raw = _unwrap_single(data, "results", c.id, "attack")
                 return AttackResponse.model_validate(raw)
             except (ValueError, Exception) as e:
-                _log("STRESS", f"  [WARN] Attack failed for {c.id}: {e}")
-                return AttackResponse(idea_id=c.id, freeform_attack="(attack failed)", structured_attacks=[], verdict="INCUBATE")
+                _log("STRESS", f"  [WARN] Attack failed for {c.id} (API crash → INCUBATE): {e}")
+                return AttackResponse(idea_id=c.id, freeform_attack="(attack failed — API crash, not a genuine verdict)", structured_attacks=[], verdict="INCUBATE", error_source="api_crash")
 
         attack_results = self._run_parallel([_attack_one(c) for c in candidates])
 
@@ -842,12 +865,16 @@ class IdeatePipeline:
                 llm_capability_fit=ar.llm_capability_fit,
                 kill_criteria=ar.kill_criteria,
                 verdict=ar.verdict,
+                error_source=getattr(ar, "error_source", ""),
             )
             results.append(st)
 
             survived = st.attacks_survived
             fatal = st.attacks_fatal
-            _log("STRESS", f"    → {survived} survived, {fatal} fatal → {st.verdict}")
+            if st.error_source:
+                _log("STRESS", f"    → ⚠ CRASH-INCUBATE (API error, not a genuine verdict)")
+            else:
+                _log("STRESS", f"    → {survived} survived, {fatal} fatal → {st.verdict}")
 
         # ── Programmatic verdict enforcement ────────────────────
         # The LLM tends to hedge with MUTATE even when its own numbers
@@ -969,6 +996,22 @@ class IdeatePipeline:
         refinement_ctx = build_refinement_context(mutations, attack_patterns, banned_concepts, reframe_attacks)
         _log("REFINE", f"  Learning context prepared: {len(mutations[:5])} mutations + {len(attack_patterns[:5])} patterns")
 
+        # ── Extract canonical failure types for hard blocklist ────
+        failure_types: dict[str, list[str]] = {}
+        for s in stress_results:
+            if s.verdict in ("KILL", "MUTATE"):
+                all_attack_text = " ".join(s.structured_attacks + [s.freeform_attack, s.strongest_argument]).lower()
+                for category, keywords in CANONICAL_FAILURE_TYPES.items():
+                    if any(kw in all_attack_text for kw in keywords):
+                        if category not in failure_types:
+                            failure_types[category] = []
+                        example = s.strongest_argument or (s.structured_attacks[0] if s.structured_attacks else "")
+                        if example and example not in failure_types[category]:
+                            failure_types[category].append(example)
+        blocklist_ctx = build_failure_blocklist_context(failure_types)
+        if failure_types:
+            _log("REFINE", f"  Failure blocklist: {', '.join(failure_types.keys())}")
+
         # Use cached context if available, otherwise build fresh
         if cached_context:
             domain_ctx = cached_context["domain"]
@@ -1005,8 +1048,11 @@ class IdeatePipeline:
             failure_taxonomy_context=build_failure_taxonomy_context(self.memory.get_failure_taxonomy()),
         )
 
-        # Append refinement context to the prompt
-        refined_prompt = prompt + "\n\n" + refinement_ctx
+        # Append failure blocklist (hard constraints) BEFORE soft refinement context
+        refined_prompt = prompt
+        if blocklist_ctx:
+            refined_prompt = refined_prompt + "\n\n" + blocklist_ctx
+        refined_prompt = refined_prompt + "\n\n" + refinement_ctx
 
         # Adjust temperature: less creative on later iterations (more focused on solving problems)
         temperature = max(0.5, 0.9 - (iteration * 0.15))
@@ -1055,6 +1101,22 @@ class IdeatePipeline:
         for c in candidates_raw:
             card = self._parse_candidate(c)
             refined_candidates.append(card)
+
+        # Apply calibration to refinement candidates too
+        cal_data = self.memory.get_score_stats()
+        cal_multipliers = (cal_data.get("dimension_multipliers") or {}) if cal_data else {}
+        if cal_multipliers:
+            for c in refined_candidates:
+                sb = c.score_breakdown
+                for dim in ("impact", "confidence", "effort", "cost", "ethical_risk",
+                            "sustainability", "defensibility", "market_timing"):
+                    m = cal_multipliers.get(dim)
+                    if m is not None and m != 1.0:
+                        orig = getattr(sb, dim)
+                        setattr(sb, dim, round(max(0.0, min(10.0, orig * m)), 2))
+                c.composite_score = compute_composite_score(sb)
+                c.scoring_calibration_status = "calibrated"
+            refined_candidates.sort(key=lambda c: c.composite_score, reverse=True)
 
         _log("REFINE", f"  CONVERGE result: {len(refined_candidates)} candidates ready for stress test")
         for i, c in enumerate(refined_candidates[:3]):

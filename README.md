@@ -4,6 +4,10 @@ Generate, score, stress-test, and refine project ideas using Claude. xBrain runs
 
 Now with **adversarial stress testing**, **dynamic brief-adaptive scoring**, **cross-run diversity ratchet**, **failure taxonomy learning**, **mechanism stealing**, **moat archaeology**, **cost forecasting**, **constraint conflict detection**, **project spec generation**, **idea lineage tracking**, **score explainability**, and **PMO export** (CSV/Jira/Markdown).
 
+## What's New in v1.6
+
+**Calibration Enforcement** — META-LEARN now produces per-dimension multipliers (0.5–1.5) that are applied mathematically post-CONVERGE. Scores are no longer advisory-only — inflated/deflated dimensions get corrected in code. **Stress Test Fidelity** — API crashes during stress testing are tagged `api_crash` instead of silently becoming INCUBATE verdicts. Reports show crash indicators so you know which verdicts are genuine. **Refinement Failure Blocklist** — Canonical failure types from KILL/MUTATE ideas (prior_art, adoption, technical, timing, defensibility, economics) are injected as hard prohibitions into refinement rounds, not just soft context.
+
 ## What's New in v1.5
 
 **Structured Key Assumptions** — Each assumption now includes `validation_cost` (low/medium/high) and `validation_method`, auto-sorted cheapest first. Reports show cost badges and methods inline. **Success Metrics** — Project specs include 3-5 measurable outcomes with numerical targets, measurement methods, timeframes, and abort thresholds. **Validation Plan** — Specs now generate 3-5 pre-build experiments ordered by cost, each testing one key assumption with clear proceed/stop signals.
@@ -365,7 +369,8 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   |  Reads past run metrics, score history,|<---reads------+
   |  kill reasons, attack patterns.        |               |
   |  Distills into compact playbook        |               |
-  |  (~200 tokens) + score calibration.    |               |
+  |  (~200 tokens) + score calibration     |               |
+  |  with per-dimension multipliers.       |               |
   |                                        |               |
   |  Output: playbook.json,               |               |
   |          score-calibration.json        |---writes----->+
@@ -462,7 +467,9 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   |    - Inverse scoring (fragility check) |
   |    - Composite = weighted sum + 3.0    |
   |      clamped to [0, 10]               |
-  |    - Calibration from meta-learn       |
+  |    - Post-LLM: score spread stretch,  |
+  |      effort diversity enforcement,     |
+  |      calibration multipliers applied   |
   |                                        |
   |  Output: IdeaCard[] (top N, ranked)    |
   +==================+=====================+
@@ -485,6 +492,7 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   |  |    - Feasibility matrix (9 dims, 1-5 scale)               | |
   |  |    - Kill criteria (abort conditions)                      | |
   |  |    - Verdict: BUILD / MUTATE / KILL / INCUBATE             | |
+  |  |  On API crash: INCUBATE + error_source="api_crash"         | |
   |  +-----------------------------------------------------------+ |
   +=========================+=======================================+
                             |
@@ -503,12 +511,17 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
                        |  |  1. Extract mutations from MUTATE      |
                        |  |  2. Extract fatal attack patterns      |
                        |  |     (top 5 round 1, top 10 later)      |
-                       |  |  3. Re-DIVERGE with learnings injected |
-                       |  |     + winner repulsion + failure       |
-                       |  |     taxonomy context                   |
+                       |  |  3. Extract canonical failure types    |
+                       |  |     → hard blocklist (prohibitions)    |
+                       |  |  4. Ban all previous idea concepts     |
+                       |  |  5. Extract problem reframes from      |
+                       |  |     stress test attacks                |
+                       |  |  6. Re-DIVERGE with blocklist +        |
+                       |  |     learnings + winner repulsion +     |
+                       |  |     failure taxonomy context           |
                        |  |     (50%->33%->25% of idea count)      |
-                       |  |  4. Re-CONVERGE + Re-STRESS TEST       |
-                       |  |  5. Merge survivors (title dedup)      |
+                       |  |  7. Re-CONVERGE + Re-STRESS TEST       |
+                       |  |  8. Merge survivors (title dedup)      |
                        |  |                                        |
                        |  |  Stop when BUILD found or 3 rounds hit |
                        |  +==================+=====================+
@@ -528,6 +541,8 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   |    - Domain heat map                   |  |     future runs
   |    - Idea lineage (idea->run graph)    |  |     via META-LEARN
   |    - Idea genes (score >= 6.5)         |  |
+  |    - Failure taxonomy                  |  |
+  |    - Refinement history                |  |
   |    - Run metrics                       +--+
   +==================+=====================+
                      |
@@ -574,12 +589,12 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
 
 **Phase -1 — META-LEARN** (every 3 runs, runs at pipeline start)
 Cross-session learning. Before any ideation begins, distills accumulated results from previous runs into a compact playbook:
-- **Score calibration**: detects if scores are inflated/deflated and which dimensions need harsher scoring
+- **Score calibration**: detects if scores are inflated/deflated, which dimensions need harsher scoring, and produces per-dimension multipliers (0.5–1.5) that are applied mathematically in CONVERGE
 - **Fatal patterns**: top reasons ideas die (injected into DIVERGE to avoid repeating mistakes)
 - **Anti-patterns**: idea shapes to stop generating
 - **Domain gaps**: underexplored areas worth targeting
 
-The playbook is injected into future runs as fixed-size context (~200 tokens), replacing the growing raw data that would otherwise bloat prompts over time. Only triggers after 3+ runs have accumulated since the last distillation.
+The playbook is injected into future runs as fixed-size context (~200 tokens), replacing the growing raw data that would otherwise bloat prompts over time. The dimension multipliers are applied post-LLM in CONVERGE — scores are corrected in code, not by asking the LLM to follow instructions. Only triggers after 3+ runs have accumulated since the last distillation.
 
 **Phase -0.5 — CONSTRAINT CHECK** (automatic, when 2+ constraints provided)
 Analyzes constraints for logical contradictions. Warns about conflicts and suggests resolutions. Non-blocking — the pipeline continues regardless.
@@ -635,7 +650,7 @@ Per idea:
 
 - **Score reasoning**: for each dimension, a human-readable explanation of WHY that score was given — makes scoring auditable by non-technical stakeholders
 - **Inverse scoring** ("what would need to be TRUE for this to be TERRIBLE?") — breaks the tendency to score everything 7-8 by forcing the AI to articulate failure conditions. If the idea is fragile (inverse_confidence > 6), positive scores get reduced
-- **Score calibration** from the meta-learning playbook (if available). Scores are marked UNCALIBRATED until the meta-learning phase has run (every 3 runs). After calibration, weak dimensions are scored more harshly and inflated/deflated scores are adjusted
+- **Score calibration** from the meta-learning playbook (if available). On first runs, scores are UNCALIBRATED. After the meta-learning phase has run (every 3 runs), per-dimension multipliers are applied mathematically post-LLM: inflated dimensions get deflated, underscored dimensions get boosted. This is code-enforced — the LLM's scores are corrected after the fact, not by asking it to follow calibration instructions. Calibrated candidates are tagged accordingly in the report
 
 **Phase 3 — STRESS TEST (Adversarial Attack)**
 Single-round adversarial attack by a Devil's Advocate. Each idea is tested **in parallel** — all ideas run their attack concurrently using async API calls, significantly reducing wall-clock time:
@@ -649,13 +664,18 @@ Additional outputs per idea:
 - **Kill criteria** — specific conditions under which to abort building
 - **Verdict**: BUILD, MUTATE, KILL, or INCUBATE
 
+If the API call crashes (timeout, JSON error, rate limit), the fallback INCUBATE verdict is tagged with `error_source: api_crash`. The report shows `(⚠ api_crash)` next to the verdict so crash-based INCUBATEs are never mistaken for genuine assessments.
+
 **Phase 4 — REFINE** (automatic, if no BUILD verdicts)
 Iterative refinement loop — up to 3 rounds. Triggered when the stress test produces zero BUILD verdicts. Each round:
 1. **Extract mutations** — collects suggested improvements from every MUTATE verdict
 2. **Extract attack patterns** — identifies the most frequent fatal arguments (top 5 in round 1, top 10 in later rounds)
-3. **Re-generate** — runs a fresh DIVERGE with the mutations, patterns, winner repulsion list, and failure taxonomy injected as context, using progressively lower creativity (temperature drops from 0.75 → 0.60 → 0.50) and fewer ideas (50% → 33% → 25% of original count)
-4. **Re-score and re-stress** — runs CONVERGE and STRESS TEST on the new batch
-5. **Merge survivors** — new BUILD ideas are merged with previous rounds. Title-based deduplication ensures the same concept (from different rounds) only appears once — the highest-scored version is kept
+3. **Extract failure blocklist** — classifies KILL/MUTATE attacks into 6 canonical failure types (prior_art, adoption, technical, timing, defensibility, economics) and injects them as hard prohibitions ("DO NOT generate ideas that...") before any soft context
+4. **Ban previous concepts** — all prior candidate titles and rationales are explicitly banned from re-generation
+5. **Extract problem reframes** — finds "Reframe:" attacks and "real problem" sentences from stress tests, injects them as alternative starting points for ideation
+6. **Re-generate** — runs a fresh DIVERGE with the blocklist, banned concepts, reframes, mutations, patterns, winner repulsion list, and failure taxonomy injected as context, using progressively lower creativity (temperature drops from 0.75 → 0.60 → 0.50) and fewer ideas (50% → 33% → 25% of original count)
+7. **Re-score and re-stress** — runs CONVERGE (with calibration enforcement) and STRESS TEST on the new batch
+8. **Merge survivors** — new BUILD ideas are merged with previous rounds. Title-based deduplication ensures the same concept (from different rounds) only appears once — the highest-scored version is kept
 
 The loop stops as soon as a BUILD verdict is found or 3 rounds are exhausted. This is how xBrain iterates toward quality — each round learns from the specific failure modes of the previous round.
 

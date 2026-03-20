@@ -3284,5 +3284,97 @@
       "innovation",
       "combinatorics"
     ]
+  },
+  {
+    "id": "idea-001-enhanced",
+    "title": "Technique Enforcement Engine: Parallel Diverge with Distribution Weighting",
+    "score": 8.5,
+    "verdict": "BUILD",
+    "domains": [
+      "software_engineering",
+      "prompt_engineering",
+      "parallelism",
+      "quality_control"
+    ]
+  },
+  {
+    "id": "idea-003-enhanced",
+    "title": "Calibration Enforcement Layer: Post-Converge Score Adjustment",
+    "score": 7.8,
+    "verdict": "BUILD",
+    "domains": [
+      "software_engineering",
+      "statistical_calibration",
+      "machine_learning"
+    ]
+  },
+  {
+    "id": "idea-005-enhanced",
+    "title": "Stress Test Fidelity Monitor: Crash vs. Genuine Verdict Classification",
+    "score": 7.8,
+    "verdict": "BUILD",
+    "domains": [
+      "software_engineering",
+      "reliability",
+      "observability"
+    ]
+  },
+  {
+    "id": "gap-007-enhanced",
+    "title": "Structural Clone Detection via Mechanism Abstraction",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "deduplication",
+      "abstraction",
+      "pattern_recognition",
+      "software_engineering"
+    ]
+  },
+  {
+    "id": "idea-004-enhanced",
+    "title": "Refinement Learning Loop: Mutation Directives from Stress Test Failures",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "software_engineering",
+      "optimization",
+      "reinforcement_learning"
+    ]
+  },
+  {
+    "id": "idea-007-enhanced",
+    "title": "Memory Compression via Mechanistic Abstraction: Idea Templates",
+    "score": 6.6,
+    "verdict": "BUILD",
+    "domains": [
+      "software_engineering",
+      "knowledge_management",
+      "meta_learning"
+    ]
+  },
+  {
+    "id": "gap-002-enhanced",
+    "title": "Live Feedback Socket: Real-World Outcome Integration",
+    "score": 6.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "feedback_loops",
+      "machine_learning",
+      "product_validation",
+      "observability"
+    ]
+  },
+  {
+    "id": "gap-004-enhanced",
+    "title": "Regulatory Constraint Injector: Compliance-First Ideation",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "compliance",
+      "regulation",
+      "legal_automation",
+      "software_engineering"
+    ]
   }
 ]
