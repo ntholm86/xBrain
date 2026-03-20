@@ -134,7 +134,8 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         # Quick Reference Card
         sb = card.score_breakdown
         lines.append("**Quick Reference:**")
-        lines.append(f"- **Composite Score:** {card.composite_score:.1f} | **Effort:** {card.estimated_effort} | **Cost:** ${card.estimated_cost_usd_month:.0f}/mo")
+        cost_label = card.cost_context if card.cost_context else "monthly"
+        lines.append(f"- **Composite Score:** {card.composite_score:.1f} | **Effort:** {card.estimated_effort} | **Cost:** ${card.estimated_cost_usd_month:.0f} ({cost_label})")
         market_snippet = (card.market_timing_notes[:60] + "...") if card.market_timing_notes and len(card.market_timing_notes) > 60 else (card.market_timing_notes or "TBD")
         lines.append(f"- **Novelty:** {card.novelty_score:.2f} | **Confidence:** {sb.confidence:.1f}/10 | **Timing:** {market_snippet}")
         lines.append("")
@@ -151,10 +152,19 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         lines.append("")
 
         # First Customer Profile (ICP)
-        lines.append("**First Customer Profile (ICP):**")
-        lines.append("- **Type:** Early adopter with acute pain point in domain")
-        lines.append(f"- **Size:** 5-50 person team / $5-50M ARR")
-        lines.append(f"- **Readiness:** High technical literacy, willing to pilot new tools")
+        icp = card.first_customer_profile
+        if icp:
+            lines.append("**First Customer Profile (ICP):**")
+            lines.append(f"- **Type:** {icp.get('type', 'Early adopter with acute pain point')}")
+            lines.append(f"- **Size:** {icp.get('size', 'Varies')}")
+            lines.append(f"- **Readiness:** {icp.get('readiness', 'High technical literacy')}")
+            if icp.get("why_first"):
+                lines.append(f"- **Why First:** {icp['why_first']}")
+        else:
+            lines.append("**First Customer Profile (ICP):**")
+            lines.append("- **Type:** Early adopter with acute pain point in domain")
+            lines.append("- **Size:** Varies")
+            lines.append("- **Readiness:** High technical literacy, willing to pilot new tools")
         lines.append("")
 
         # Score table
@@ -163,11 +173,13 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
 
         # Key Assumptions
         lines.append("**Key Assumptions (Critical Unknowns):**")
-        lines.append("1. Target persona exists and has sufficient budget/authority to buy")
-        lines.append("2. The stated pain point ranks in top 3 for the persona")
-        lines.append("3. LLM can reliably generate/validate core value proposition")
-        lines.append("4. Integration with existing tools is feasible within timeline")
-        lines.append("5. Market timing window remains open (not commoditized by competitors)")
+        if card.key_assumptions:
+            for j, assumption in enumerate(card.key_assumptions, 1):
+                lines.append(f"{j}. {assumption}")
+        else:
+            lines.append("1. Core value proposition resonates with target persona")
+            lines.append("2. Technical approach is feasible within stated effort")
+            lines.append("3. No blocking regulatory or legal constraints")
         lines.append("")
 
         # Stress test details
@@ -200,7 +212,8 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         lines.append(f"**Source:** {card.source_technique}")
         lines.append(f"**Novelty:** {card.novelty_score:.2f}")
         lines.append(f"**Estimated Effort:** {card.estimated_effort}")
-        lines.append(f"**Estimated Cost:** ${card.estimated_cost_usd_month:.0f}/month")
+        cost_label = card.cost_context if card.cost_context else "monthly"
+        lines.append(f"**Estimated Cost:** ${card.estimated_cost_usd_month:.0f} ({cost_label})")
         if card.sustainability_model:
             lines.append(f"**Sustainability:** {card.sustainability_model}")
         lines.append("")

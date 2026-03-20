@@ -1054,6 +1054,9 @@ class IdeatePipeline:
             score_reasoning=c.get("score_reasoning", {}),
             inverse_terrible_conditions=c.get("inverse_score", {}).get("terrible_conditions", []),
             inverse_confidence=c.get("inverse_score", {}).get("inverse_confidence", 0.0),
+            key_assumptions=c.get("key_assumptions", []),
+            first_customer_profile=c.get("first_customer_profile", {}),
+            cost_context=c.get("cost_context", ""),
         )
 
     def _parse_stress_result(self, r: dict) -> StressTestResult:

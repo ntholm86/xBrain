@@ -1,5 +1,52 @@
 # Changelog
 
+## v1.2.0 — 2026-03-20
+
+### Fixes
+
+#### Idea-Specific Key Assumptions
+Key Assumptions were hardcoded in `output.py` — every idea got the same 5 generic assumptions ("Target persona exists and has sufficient budget"). Now the CONVERGE prompt generates 3-5 **unique, falsifiable assumptions per idea**, and `output.py` renders them from model data. Example: "Semantic similarity (embeddings) can reliably cluster idea variants with <5% false positive rate."
+
+#### Dynamic First Customer Profile (ICP)
+ICP was hardcoded as "5-50 person team / $5-50M ARR" for every idea. Now the CONVERGE prompt generates a `first_customer_profile` object per idea with type, size, readiness, and why_first fields. Internal tool briefs now correctly show "internal: xBrain validation & product ops, 3-5 people" instead of SaaS customer profiles.
+
+#### Context-Aware Cost Labels
+`estimated_cost_usd_month` was always rendered as "$X/mo" even for one-time implementations. Added `cost_context` field to `IdeaCard` — the LLM now specifies "one-time implementation", "monthly labor", "transition cost", etc. Report renders the actual context instead of assuming monthly SaaS costs.
+
+#### BUILD Verdict Threshold
+All ideas were getting MUTATE because the LLM was hedging. Added a quantitative rule to the stress test prompt: "if attacks_survived >= 5 out of 9, the verdict MUST be BUILD unless there is exactly one irreparable fatal flaw." Run 9 produced the first BUILD verdict (Assumption Invalidation Speedrun, 6/9 survived, 0 fatal).
+
+#### Stronger Score Spread Enforcement
+Score spread was 1.7 points (target: 3.0). Added explicit instructions: "Assign scores AFTER force-ranking. The #1 idea gets the highest composite; the last gets at least 3.0 points lower." Run 9 achieved 2.4 points (8.1→5.7) — improved but still under target.
+
+### Model Changes
+
+- `IdeaCard` — added `key_assumptions: list[str]`, `first_customer_profile: dict`, `cost_context: str`
+- `_parse_candidate()` in `ideate.py` — reads new fields from LLM response
+
+### Performance
+
+| Metric | v1.1.0 (Run 8) | v1.2.0 (Run 9) |
+|--------|----------------|-----------------|
+| Time | 2m 50s | 3m 4s |
+| Cost | $0.14 | $0.14 |
+| Tokens (in/out) | 24K/23K | 21K/23K |
+| BUILD verdicts | 0 | **1** |
+| Key assumptions unique | 0/8 | **8/8** |
+| ICP unique | 0/8 | **8/8** |
+| Cost context | all "/mo" | **all contextual** |
+| Score spread | 1.7 | **2.4** |
+| Mechanism stealing | 4/22 (18%) | **10/25 (40%)** |
+
+### Files Changed
+
+- `xbrain/models.py` — added `key_assumptions`, `first_customer_profile`, `cost_context` to `IdeaCard`
+- `xbrain/ideate.py` — `_parse_candidate()` reads new fields
+- `xbrain/prompts.py` — CONVERGE: key_assumptions instruction + JSON schema, score spread hardening; STRESS_TEST: BUILD quantitative threshold
+- `xbrain/output.py` — ICP, Key Assumptions, cost labels now render from model data instead of hardcoded text
+
+---
+
 ## v1.1.0 — 2025-03-19
 
 ### New Features

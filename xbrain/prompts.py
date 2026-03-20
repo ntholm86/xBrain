@@ -300,7 +300,15 @@ The #1 ranked idea MUST have the highest composite score. The last MUST have the
 - USE THE FULL RANGE: The best idea should score 8-10 on its strongest dimension. \
 The weakest should have at least one dimension scoring 3 or below.
 - SPREAD SCORES: The gap between the highest and lowest composite score MUST be \
-at least 3.0 points. If all ideas look similar, you're not being critical enough.
+at least 3.0 points. If all ideas look similar, you're not being critical enough. \
+HARD RULE: Assign scores AFTER force-ranking. The #1 idea gets the highest \
+composite; the last gets at least 3.0 points lower. If you're tempted to cluster \
+scores within 2 points of each other, you haven't differentiated enough.
+- KEY ASSUMPTIONS: For each idea, list 3-5 assumptions that are UNIQUE TO THAT IDEA. \
+Do NOT use generic assumptions like "target persona exists" or "market timing is right" \
+— those apply to everything. Instead name the specific, falsifiable claim that makes \
+THIS idea succeed or fail. Example: "Hospitals will share de-identified data for under \
+$10k/year" or "Claude can parse regulatory filings with >90% accuracy."
 - DIFFERENTIATE EFFORT: Not every idea is "medium" effort. At least one must be \
 "small" and at least one must be "large" (if {top_n} >= 3).
 - BE HARSH on ideas that are generic, vague, or that any competent developer \
@@ -320,10 +328,13 @@ Respond with ONLY this JSON structure:
 "ethical_risk": 2, "sustainability": 6, "defensibility": 7, "market_timing": 8}},
     "estimated_effort": "small|medium|large",
     "estimated_cost_usd_month": 45,
+    "cost_context": "monthly infra|one-time implementation|monthly labor|transition cost",
     "ethical_risk_level": "low|medium|high",
     "sustainability_model": "...",
     "defensibility_notes": "...",
     "market_timing_notes": "...",
+    "key_assumptions": ["Specific falsifiable claim 1", "Specific claim 2", "Specific claim 3"],
+    "first_customer_profile": {{"type": "...", "size": "...", "readiness": "...", "why_first": "..."}},
     "inverse_score": {{"terrible_conditions": ["..."], "inverse_confidence": 4.5}}
   }}]
 }}
@@ -391,10 +402,12 @@ idea has a genuine strength that neutralizes the attack, say so.
 6. VERDICT (be decisive — MUTATE is not a safe default):
    - BUILD: more attacks survived than failed, no single fatal flaw \
 that invalidates the core concept. Most ideas should get BUILD if they \
-have a strong core.
+have a strong core. QUANTITATIVE RULE: if attacks_survived >= 5 out of 9, \
+the verdict MUST be BUILD unless there is exactly one irreparable fatal flaw.
    - MUTATE: the core concept is valid BUT a specific, named flaw \
 requires a concrete change (you MUST describe the exact mutation). \
-Do NOT use MUTATE as a hedge — if the idea works, say BUILD.
+Do NOT use MUTATE as a hedge — if the idea works, say BUILD. \
+MUTATE is ONLY for ideas where you can name the exact thing to change.
    - KILL: a fatal flaw that cannot be fixed by any mutation. The \
 fundamental premise is wrong. Use this for ideas with broken economics, \
 impossible technical requirements, or saturated markets with no gap.

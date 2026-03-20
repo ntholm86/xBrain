@@ -3019,5 +3019,94 @@
       "project_management",
       "portfolio_strategy"
     ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Idea Parentage & Genealogy Tracker",
+    "score": 8.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "knowledge_management",
+      "organizational_learning",
+      "graph_theory"
+    ]
+  },
+  {
+    "id": "gap-008",
+    "title": "Assumption Invalidation Speedrun",
+    "score": 7.6,
+    "verdict": "BUILD",
+    "domains": [
+      "validation",
+      "experimentation",
+      "lean_methodology"
+    ]
+  },
+  {
+    "id": "gap-009",
+    "title": "Failure Attribution Indexer",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "organizational_learning",
+      "failure_analysis",
+      "knowledge_management"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Adversarial Ideation Sparring Partner",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "adversarial_thinking",
+      "product_strategy"
+    ]
+  },
+  {
+    "id": "gap-006",
+    "title": "Cross-Domain Collision Engine",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "innovation",
+      "analogical_reasoning",
+      "knowledge_transfer"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Idea Sequencing Optimizer",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "project_management",
+      "operations",
+      "optimization"
+    ]
+  },
+  {
+    "id": "gap-007",
+    "title": "Idea ROI Stochastic Modeler",
+    "score": 6.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "finance",
+      "economics",
+      "portfolio_management"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "Regulatory Prebuild Library",
+    "score": 5.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "compliance",
+      "legal",
+      "regulation",
+      "developer_tools"
+    ]
   }
 ]
