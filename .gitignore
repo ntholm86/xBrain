@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 xbrain-runs/
 xbrain-memory/
+xbrain/__pycache__
