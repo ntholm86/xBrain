@@ -3,18 +3,13 @@
 from __future__ import annotations
 
 import json
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from xbrain.config import Config
 from xbrain.llm import LLMClient
+from xbrain.log import log as _log, log_llm_call
 from xbrain.prompts import SPECIFY_SYSTEM, SPECIFY_USER
-
-
-def _log(tag: str, msg: str) -> None:
-    print(f"[{tag:<9s}] {msg}")
-    sys.stdout.flush()
 
 
 class SpecifyPipeline:
@@ -76,10 +71,12 @@ class SpecifyPipeline:
             else:
                 model_override = self.cfg.best_model or None
 
+        timer = log_llm_call("SPECIFY", "Generating project specification")
         data = self.llm.generate_json(
             sys_prompt, prompt, temperature=0.4,
             model_override=model_override, phase="specify",
         )
+        timer.done()
 
         # Write output
         run_dir = idea_cards_path.parent

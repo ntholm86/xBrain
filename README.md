@@ -2,7 +2,11 @@
 
 Generate, score, stress-test, and refine project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then runs adversarial stress testing — a devil's advocate attacks every idea from 9 angles — so only the genuinely strong ones survive.
 
-Now with **adversarial stress testing**, **dynamic brief-adaptive scoring**, **cross-run diversity ratchet**, **failure taxonomy learning**, **mechanism stealing**, **moat archaeology**, **cost forecasting**, **constraint conflict detection**, **project spec generation**, **idea lineage tracking**, **score explainability**, and **PMO export** (CSV/Jira/Markdown).
+Now with **adversarial stress testing**, **dynamic brief-adaptive scoring**, **cross-run diversity ratchet**, **failure taxonomy learning**, **mechanism stealing**, **moat archaeology**, **cost forecasting**, **constraint conflict detection**, **project spec generation**, **idea lineage tracking**, **score explainability**, **PMO export** (CSV/Jira/Markdown), and **real-time pipeline observability**.
+
+## What's New in v1.10
+
+**Shared Logging Module** — New `xbrain/log.py` consolidates three separate logging implementations into one encoding-safe, consistently-tagged module. **LLM Call Timing** — Every LLM call now shows `⏳ description...` before and `✓ done in Xs` after, eliminating silent gaps where the pipeline appeared frozen. **Batch & Parallel Progress** — CONVERGE 2C enrichment shows per-batch progress (`1/2`, `2/2` with titles), stress test attacks show per-candidate completion (`[1/8]` → `[8/8]`). **Unified Output Streams** — Retry, throttle, and JSON warning messages from the LLM layer now route through the shared logger on stdout instead of stderr. **Encoding Crash Fix** — specify.py's logger had no Unicode error handler and would crash on Windows.
 
 ## What's New in v1.9
 

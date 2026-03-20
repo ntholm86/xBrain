@@ -12,9 +12,10 @@ Adding a new provider:
 
 from __future__ import annotations
 
-import sys
 import time
 from dataclasses import dataclass, field
+
+from xbrain.log import log as _log
 
 
 # ── Result type ──────────────────────────────────────────────────────
@@ -104,14 +105,6 @@ class HackerNewsProvider(SearchProvider):
 
 
 # ── Aggregator ───────────────────────────────────────────────────────
-
-def _log(tag: str, msg: str) -> None:
-    line = f"[{tag:<9s}] {msg}"
-    try:
-        print(line)
-    except UnicodeEncodeError:
-        print(line.encode("utf-8", errors="replace").decode("utf-8", errors="replace"))
-    sys.stdout.flush()
 
 
 class SearchAggregator:

@@ -1,5 +1,42 @@
 # Changelog
 
+## v1.10.0 — 2026-03-20
+
+### New Features
+
+#### Shared Logging Module (`xbrain/log.py`)
+New centralized logging module replaces three separate `_log()` definitions across ideate.py, search.py, and specify.py. Provides encoding-safe output on Windows (handles `UnicodeEncodeError`), consistent `[TAG      ]` formatting, and flush-after-write across the entire pipeline.
+
+#### LLM Call Timing
+Every LLM call now shows a `⏳ description...` line before the call and `✓ done in Xs` after it returns, eliminating silent gaps where the pipeline appeared frozen. All 12 LLM calls in the ideation pipeline and the SPECIFY call are timed.
+
+#### Batch & Parallel Progress Indicators
+- **CONVERGE 2C enrichment**: Shows `Enriching batch 1/2 (Title1, Title2, ...)` with per-batch timing
+- **Stress test attacks**: Shows `[0/8] Attacking: Idea Title...` → `[1/8] Idea Title — attack received` with a completion summary (`All 8 attacks completed in 84.0s`)
+
+### Changed
+
+#### Unified Output Streams
+All 10 `print(..., file=sys.stderr)` calls in `llm.py` (retry, throttle, JSON warnings, errors) now route through the shared `_log()` function on stdout, keeping all pipeline output on a single stream with consistent tagging (`[RETRY]`, `[THROTTLE]`, `[WARN]`, `[ERROR]`).
+
+#### Encoding-Safe Summary Output
+The final completion summary (previously 21 raw `print()` calls) now uses `log_summary_block()` with encoding error handling, preventing crashes on terminals with limited Unicode support.
+
+### Fixes
+
+#### specify.py Encoding Crash
+The `_log()` function in specify.py had no `UnicodeEncodeError` handler — it would crash on Windows when LLM output contained Unicode characters. Now uses the shared encoding-safe implementation.
+
+### Files Changed
+- `xbrain/log.py` — **new** shared logging module (log, log_phase, log_llm_call, log_progress, log_summary_block)
+- `xbrain/__init__.py` — version bump to 1.10.0
+- `xbrain/ideate.py` — removed local `_log`/`_log_phase_header`, imports from `xbrain.log`, all 12 LLM calls timed, batch/parallel progress, summary via `log_summary_block`
+- `xbrain/llm.py` — imports `_log` from `xbrain.log`, replaced 10 stderr prints with unified logging
+- `xbrain/search.py` — removed local `_log`, imports from `xbrain.log`
+- `xbrain/specify.py` — removed weak `_log` (no encoding handler), imports from `xbrain.log`, SPECIFY LLM call timed
+
+---
+
 ## v1.9.0 — 2026-03-20
 
 ### New Features

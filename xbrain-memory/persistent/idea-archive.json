@@ -3771,5 +3771,94 @@
       "human_ai_teaming",
       "conflict_resolution"
     ]
+  },
+  {
+    "id": "gap-008",
+    "title": "Sync Licensing Discovery & Pitch Automation",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "monetization",
+      "licensing",
+      "automation",
+      "content_discovery"
+    ]
+  },
+  {
+    "id": "gap-006",
+    "title": "Cross-Platform Audio Codec Validator",
+    "score": 6.6,
+    "verdict": "BUILD",
+    "domains": [
+      "quality_assurance",
+      "audio_engineering",
+      "platform_interoperability"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Adaptive Music Theory Curriculum Engine",
+    "score": 6.4,
+    "verdict": "BUILD",
+    "domains": [
+      "education",
+      "music_theory",
+      "personalization"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Royalty Split Sheet Validator & Smart Contract Generator",
+    "score": 6.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "legal_tech",
+      "blockchain",
+      "rights_management"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Comparative Listening Panel Simulator",
+    "score": 6.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "music_production",
+      "machine_learning",
+      "audio_engineering"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Latency-Optimized Neural Vocoder (On-Device)",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "audio_engineering",
+      "edge_computing",
+      "music_production"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "Dynamic Pricing Engine for DIY Releases",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "fintech",
+      "behavioral_economics",
+      "monetization"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Peer Review & Blind A/B Feedback Loop",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "community",
+      "audio_production",
+      "psychology"
+    ]
   }
 ]

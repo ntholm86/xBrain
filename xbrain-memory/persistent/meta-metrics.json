@@ -405,5 +405,15 @@
     "pass_count": 5,
     "tokens_in": 20553,
     "tokens_out": 20139
+  },
+  {
+    "run_id": "20260320-111612-ai-tools-for-indie-musicians",
+    "timestamp": "2026-03-20T11:16:12.278032+00:00",
+    "ideas_generated": 21,
+    "candidates": 8,
+    "build_count": 2,
+    "pass_count": 8,
+    "tokens_in": 26948,
+    "tokens_out": 31573
   }
 ]
