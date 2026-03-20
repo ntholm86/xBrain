@@ -183,7 +183,7 @@ class IdeaCard(BaseModel):
     inverse_terrible_conditions: list[str] = Field(default_factory=list)
     inverse_confidence: float = 0.0
     llm_capability_fit: str = ""
-    key_assumptions: list[str] = Field(default_factory=list)
+    key_assumptions: list = Field(default_factory=list)  # list of dicts: {claim, validation_cost, validation_method}
     first_customer_profile: dict = Field(default_factory=dict)
     cost_context: str = ""  # e.g. "monthly infra" or "one-time implementation"
     backlog_state: str = "active"

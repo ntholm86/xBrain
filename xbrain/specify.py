@@ -267,6 +267,33 @@ class SpecifyPipeline:
                 lines.append(f"| {r.get('risk', '')} | {r.get('likelihood', '')} | {r.get('mitigation', '')} |")
             lines.append("")
 
+        # Success Metrics
+        metrics = data.get("success_metrics", [])
+        if metrics:
+            lines.append("## Success Metrics")
+            lines.append("")
+            lines.append("| Metric | Target | Method | Timeframe | Abort If |")
+            lines.append("|--------|--------|--------|-----------|----------|")
+            for m in metrics:
+                abort = m.get("abort_threshold", "—") or "—"
+                lines.append(f"| {m.get('metric', '')} | {m.get('target', '')} | {m.get('measurement_method', '')} | {m.get('timeframe', '')} | {abort} |")
+            lines.append("")
+
+        # Validation Plan
+        experiments = data.get("validation_plan", [])
+        if experiments:
+            lines.append("## Validation Plan (Pre-Build Experiments)")
+            lines.append("")
+            for i, exp in enumerate(experiments, 1):
+                lines.append(f"### Experiment {i}: {exp.get('experiment', '')}")
+                lines.append("")
+                lines.append(f"**Tests assumption:** {exp.get('assumption_tested', '')}")
+                lines.append(f"**Method:** {exp.get('method', '')}")
+                lines.append(f"**Duration:** {exp.get('duration', '')} | **Cost:** {exp.get('cost', '')}")
+                lines.append(f"- ✅ **Proceed if:** {exp.get('success_signal', '')}")
+                lines.append(f"- 🛑 **Stop if:** {exp.get('failure_signal', '')}")
+                lines.append("")
+
         # MVP
         mvp = data.get("mvp_scope", {})
         if mvp:

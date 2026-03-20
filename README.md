@@ -4,6 +4,10 @@ Generate, score, stress-test, and refine project ideas using Claude. xBrain runs
 
 Now with **adversarial stress testing**, **dynamic brief-adaptive scoring**, **cross-run diversity ratchet**, **failure taxonomy learning**, **mechanism stealing**, **moat archaeology**, **cost forecasting**, **constraint conflict detection**, **project spec generation**, **idea lineage tracking**, **score explainability**, and **PMO export** (CSV/Jira/Markdown).
 
+## What's New in v1.5
+
+**Structured Key Assumptions** — Each assumption now includes `validation_cost` (low/medium/high) and `validation_method`, auto-sorted cheapest first. Reports show cost badges and methods inline. **Success Metrics** — Project specs include 3-5 measurable outcomes with numerical targets, measurement methods, timeframes, and abort thresholds. **Validation Plan** — Specs now generate 3-5 pre-build experiments ordered by cost, each testing one key assumption with clear proceed/stop signals.
+
 ## What's New in v1.4
 
 **Programmatic Enforcement** — The LLM ignores scoring rules, effort variety, and BUILD thresholds despite explicit instructions. v1.4 enforces them in code. **BUILD Verdict Override** — if attacks_survived ≥ 5 and fatal ≤ 1, verdict is forced to BUILD. **Score Spread Stretching** — if spread < 3.0, scores are linearly stretched to 3.0 while preserving rank. **Effort Diversity** — if all efforts are "medium", hardest/easiest are remapped to large/small based on effort scores. **ICP Grounding** — first customer profile must match the brief's scale context (solo dev ≠ enterprise).
@@ -228,6 +232,8 @@ The spec includes:
 - Data model with relationships
 - 10-15 development tasks ordered by dependency
 - Technical risks and mitigations from the stress test
+- Success metrics with numerical targets and abort thresholds
+- Validation plan — cheapest pre-build experiments to test assumptions
 - MVP scope (what to build in a 2-week sprint)
 - Kill criteria (when to abort)
 

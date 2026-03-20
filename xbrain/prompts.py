@@ -307,8 +307,12 @@ scores within 2 points of each other, you haven't differentiated enough.
 - KEY ASSUMPTIONS: For each idea, list 3-5 assumptions that are UNIQUE TO THAT IDEA. \
 Do NOT use generic assumptions like "target persona exists" or "market timing is right" \
 — those apply to everything. Instead name the specific, falsifiable claim that makes \
-THIS idea succeed or fail. Example: "Hospitals will share de-identified data for under \
-$10k/year" or "Claude can parse regulatory filings with >90% accuracy."
+THIS idea succeed or fail. Each assumption MUST include a validation_cost (low = can \
+test in a day for free, medium = needs a week or small budget, high = needs months or \
+significant resources) and a validation_method (one sentence: how to test this cheaply). \
+Order assumptions cheapest-to-validate FIRST. Example: {{"claim": "Claude can parse \
+regulatory filings with >90% accuracy", "validation_cost": "low", \
+"validation_method": "Run 50 sample filings through the API and measure accuracy"}}
 - DIFFERENTIATE EFFORT: Not every idea is "medium" effort. At least one must be \
 "small" and at least one must be "large" (if {top_n} >= 3). \
 Use the effort SCORE to decide: effort >= 7 → "large", effort <= 3 → "small". \
@@ -341,7 +345,9 @@ Respond with ONLY this JSON structure:
     "sustainability_model": "...",
     "defensibility_notes": "...",
     "market_timing_notes": "...",
-    "key_assumptions": ["Specific falsifiable claim 1", "Specific claim 2", "Specific claim 3"],
+    "key_assumptions": [
+      {{"claim": "Specific falsifiable claim", "validation_cost": "low|medium|high", "validation_method": "How to test this cheaply"}}
+    ],
     "first_customer_profile": {{"type": "...", "size": "...", "readiness": "...", "why_first": "..."}},
     "inverse_score": {{"terrible_conditions": ["..."], "inverse_confidence": 4.5}}
   }}]
@@ -874,8 +880,14 @@ Use RESTful conventions.
 6. TASK BREAKDOWN: Break into 10-15 development tasks, ordered by dependency. \
 Each task should be completable in 1-3 days. Include acceptance criteria.
 7. RISKS & MITIGATIONS: Top 3 technical risks from the stress test and how to handle them.
-8. MVP SCOPE: What to build first (2-week sprint). What to defer.
-9. KILL CRITERIA: Conditions that should abort the project (from stress test).
+8. SUCCESS METRICS: 3-5 measurable outcomes with numerical thresholds that define \
+success vs failure. Each metric needs a target value, measurement method, and \
+timeframe. Include at least one "abort threshold" — a number that means stop building.
+9. VALIDATION PLAN: Ordered list of 3-5 cheapest experiments to run BEFORE building \
+the full product. Each experiment should test one key assumption and take at most \
+1-2 weeks. Include expected outcome, cost, and what you learn if it fails.
+10. MVP SCOPE: What to build first (2-week sprint). What to defer.
+11. KILL CRITERIA: Conditions that should abort the project (from stress test).
 
 Respond with ONLY valid JSON:
 {{
@@ -926,6 +938,26 @@ Respond with ONLY valid JSON:
       "risk": "What could go wrong",
       "likelihood": "high|medium|low",
       "mitigation": "How to handle it"
+    }}
+  ],
+  "success_metrics": [
+    {{
+      "metric": "What to measure",
+      "target": "Numerical threshold for success",
+      "measurement_method": "How to measure it",
+      "timeframe": "When to measure",
+      "abort_threshold": "Number that means stop (optional)"
+    }}
+  ],
+  "validation_plan": [
+    {{
+      "experiment": "What to test",
+      "assumption_tested": "Which key assumption this validates",
+      "method": "How to run the experiment",
+      "duration": "1-2 weeks",
+      "cost": "$0-500",
+      "success_signal": "What result means proceed",
+      "failure_signal": "What result means pivot or stop"
     }}
   ],
   "mvp_scope": {{

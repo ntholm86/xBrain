@@ -175,7 +175,15 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         lines.append("**Key Assumptions (Critical Unknowns):**")
         if card.key_assumptions:
             for j, assumption in enumerate(card.key_assumptions, 1):
-                lines.append(f"{j}. {assumption}")
+                if isinstance(assumption, dict):
+                    claim = assumption.get("claim", str(assumption))
+                    cost = assumption.get("validation_cost", "")
+                    method = assumption.get("validation_method", "")
+                    cost_badge = f" `[{cost}]`" if cost else ""
+                    method_suffix = f" — *{method}*" if method else ""
+                    lines.append(f"{j}. {claim}{cost_badge}{method_suffix}")
+                else:
+                    lines.append(f"{j}. {assumption}")
         else:
             lines.append("1. Core value proposition resonates with target persona")
             lines.append("2. Technical approach is feasible within stated effort")

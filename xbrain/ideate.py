@@ -1099,7 +1099,7 @@ class IdeatePipeline:
             score_reasoning=c.get("score_reasoning", {}),
             inverse_terrible_conditions=c.get("inverse_score", {}).get("terrible_conditions", []),
             inverse_confidence=c.get("inverse_score", {}).get("inverse_confidence", 0.0),
-            key_assumptions=c.get("key_assumptions", []),
+            key_assumptions=self._normalize_assumptions(c.get("key_assumptions", [])),
             first_customer_profile=c.get("first_customer_profile", {}),
             cost_context=c.get("cost_context", ""),
         )
@@ -1310,6 +1310,30 @@ class IdeatePipeline:
                 f"MUST be written in {self._language}. Keep JSON keys in English."
             )
         return base_prompt
+
+    @staticmethod
+    def _normalize_assumptions(raw: list) -> list:
+        """Normalize key_assumptions to structured dicts.
+
+        The LLM may return plain strings (old format) or dicts with
+        claim/validation_cost/validation_method (new format).  Always
+        return a list of dicts sorted by validation cost.
+        """
+        COST_ORDER = {"low": 0, "medium": 1, "high": 2}
+        result = []
+        for item in raw:
+            if isinstance(item, str):
+                result.append({"claim": item, "validation_cost": "medium", "validation_method": ""})
+            elif isinstance(item, dict):
+                result.append({
+                    "claim": item.get("claim", str(item)),
+                    "validation_cost": item.get("validation_cost", "medium"),
+                    "validation_method": item.get("validation_method", ""),
+                })
+            else:
+                result.append({"claim": str(item), "validation_cost": "medium", "validation_method": ""})
+        result.sort(key=lambda a: COST_ORDER.get(a.get("validation_cost", "medium"), 1))
+        return result
 
     @staticmethod
     def _make_run_id(brief_text: str | None = None) -> str:

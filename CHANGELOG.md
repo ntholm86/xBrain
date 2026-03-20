@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.5.0 — 2026-03-20
+
+### New Features
+
+#### Structured Key Assumptions with Validation Cost Ranking
+Key assumptions are no longer flat strings. Each assumption is now a structured object with `claim`, `validation_cost` (low/medium/high), and `validation_method`. Assumptions are auto-sorted cheapest-to-validate first, so founders know which bets to test immediately. The CONVERGE prompt instructs the LLM to produce this format, and `_normalize_assumptions()` in `ideate.py` enforces it programmatically — plain strings from the LLM are auto-converted to dicts with sensible defaults. Reports render cost badges (`[low]`, `[medium]`, `[high]`) and validation methods inline.
+
+#### Success Metrics in Project Specs
+The Specify pipeline now generates 3-5 measurable success metrics per project spec, each with a numerical target, measurement method, timeframe, and abort threshold. This replaces vague "we'll know it's working" statements with concrete numbers.
+
+#### Validation Plan in Project Specs
+Project specs now include a pre-build validation plan: 3-5 ordered experiments to run before writing code. Each experiment tests one key assumption and includes method, duration, cost estimate, success signal, and failure signal. Cheapest experiments come first.
+
+### Files Changed
+
+- `xbrain/__init__.py` — version bump to 1.5.0
+- `xbrain/prompts.py` — structured key_assumptions format in CONVERGE, success_metrics and validation_plan in SPECIFY
+- `xbrain/ideate.py` — added `_normalize_assumptions()` for format enforcement and cost sorting
+- `xbrain/models.py` — `key_assumptions` type changed from `list[str]` to `list` (accepts dicts)
+- `xbrain/output.py` — renders structured assumptions with cost badges and validation methods
+- `xbrain/specify.py` — renders Success Metrics table and Validation Plan section
+
+---
+
 ## v1.4.0 — 2026-03-20
 
 ### Fixes — Programmatic Enforcement
