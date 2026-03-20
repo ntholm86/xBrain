@@ -17,24 +17,18 @@ from xbrain.memory import MemoryStore
 from xbrain.models import (
     AttackResponse,
     DebateExchange,
-    DefenseResponse,
     DomainBrief,
     FeasibilityMatrix,
     IdeaCard,
     IdeateRunResult,
     Persona,
     RawIdea,
-    RebuttalResponse,
     ScoreBreakdown,
     StressTestResult,
     compute_composite_score,
 )
 from xbrain.output import generate_idea_report
 from xbrain.prompts import (
-    ADVERSARIAL_DEFENSE_SYSTEM,
-    ADVERSARIAL_DEFENSE_USER,
-    ADVERSARIAL_REBUTTAL_SYSTEM,
-    ADVERSARIAL_REBUTTAL_USER,
     CONSTRAINT_CHECK_SYSTEM,
     CONSTRAINT_CHECK_USER,
     CONVERGE_SYSTEM,
@@ -59,6 +53,8 @@ from xbrain.prompts import (
     build_memory_context,
     build_playbook_context,
     build_refinement_context,
+    build_winner_repulsion_context,
+    build_failure_taxonomy_context,
 )
 
 
@@ -109,11 +105,6 @@ def _unwrap_single(data: dict | list, wrapper_key: str, idea_id: str, phase: str
     return item
 
 
-_ANGLE_KEYWORDS = [
-    "prior", "adoption", "technical", "reframe",
-    "externali", "obsolesc", "timing", "defensib", "expertise",
-]
-
 
 def _coerce_str(item) -> str:
     """Coerce an LLM value to a plain string.
@@ -127,38 +118,6 @@ def _coerce_str(item) -> str:
         return "; ".join(str(v) for v in item.values() if v)
     return str(item)
 
-
-def _match_exchange(exchanges: list, idx: int):
-    """Match a defense/rebuttal exchange to an attack by position.
-
-    Accepts either a list of Pydantic models (with .angle) or dicts.
-    Uses index-based matching (prompts list attacks in order), with a
-    keyword fallback for robustness when the LLM reorders items.
-    Returns the matched item or None.
-    """
-    if not exchanges:
-        return None
-
-    def _get_angle(ex) -> str:
-        return (getattr(ex, "angle", None) or (ex.get("angle", "") if isinstance(ex, dict) else "")).lower()
-
-    # Skip any leading freeform-defense entry
-    offset = 0
-    if "freeform" in _get_angle(exchanges[0]):
-        offset = 1
-
-    adj = idx + offset
-    if adj < len(exchanges):
-        return exchanges[adj]
-
-    # Keyword fallback
-    kw = _ANGLE_KEYWORDS[idx] if idx < len(_ANGLE_KEYWORDS) else ""
-    if kw:
-        for ex in exchanges:
-            if kw in _get_angle(ex):
-                return ex
-
-    return None
 
 
 class IdeatePipeline:
@@ -194,6 +153,7 @@ class IdeatePipeline:
     ) -> Path:
         """Execute the full ideation pipeline and return the run directory."""
         self._language = language
+        self._brief_text = brief_text
         run_id = self._make_run_id(brief_text)
         run_dir = self.cfg.runs_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -284,8 +244,8 @@ class IdeatePipeline:
         survivors = self._merge_survivors(candidates, stress_results)
         result.survivors = survivors
 
-        # Check if any ideas survived with BUILD verdict — if not, trigger iterative refinement loop
-        build_count = sum(1 for s in stress_results if s.verdict == "BUILD")
+        # Check if any ideas passed (BUILD or MUTATE) — only refine if everything is KILL
+        pass_count = sum(1 for s in stress_results if s.verdict in ("BUILD", "MUTATE"))
         refinement_round = 0
         max_refinement_rounds = 3
         refinement_error = None
@@ -294,10 +254,10 @@ class IdeatePipeline:
         _cached_ctx: dict[str, str] | None = None
         
         try:
-            while build_count == 0 and refinement_round < max_refinement_rounds:
+            while pass_count == 0 and refinement_round < max_refinement_rounds:
                 refinement_round += 1
                 _log("IDEATE", f"")
-                _log("IDEATE", f"Refinement Round {refinement_round}/{max_refinement_rounds}: No BUILD verdicts found. Extracting learnings...")
+                _log("IDEATE", f"Refinement Round {refinement_round}/{max_refinement_rounds}: No passing verdicts found. Extracting learnings...")
 
                 if _cached_ctx is None:
                     _cached_ctx = {
@@ -336,20 +296,19 @@ class IdeatePipeline:
                 survivors = self._merge_survivors(survivors + refinement_survivors, result.stress_test_results)
                 result.survivors = survivors
                 
-                # Check for BUILD verdicts in this refinement round
-                build_count = sum(1 for s in refinement_stress if s.verdict == "BUILD")
-                mutate_count = sum(1 for s in refinement_stress if s.verdict == "MUTATE")
+                # Check for passing verdicts (BUILD or MUTATE) in this refinement round
+                pass_count = sum(1 for s in refinement_stress if s.verdict in ("BUILD", "MUTATE"))
                 kill_count = sum(1 for s in refinement_stress if s.verdict == "KILL")
                 
-                _log("IDEATE", f"  Refinement round {refinement_round} results: {build_count} BUILD, {mutate_count} MUTATE, {kill_count} KILL")
+                _log("IDEATE", f"  Refinement round {refinement_round} results: {pass_count} passed, {kill_count} KILL")
                 
-                if build_count > 0:
-                    _log("IDEATE", f"  ✓ SUCCESS: {build_count} idea(s) passed all quality gates!")
+                if pass_count > 0:
+                    _log("IDEATE", f"  ✓ SUCCESS: {pass_count} idea(s) passed stress test!")
                     break
                 elif refinement_round < max_refinement_rounds:
                     _log("IDEATE", f"  → Will continue refining ({refinement_round}/{max_refinement_rounds})")
             
-            if build_count == 0 and refinement_round >= max_refinement_rounds:
+            if pass_count == 0 and refinement_round >= max_refinement_rounds:
                 _log("IDEATE", f"")
                 _log("IDEATE", f"Reached maximum refinement rounds ({max_refinement_rounds}). Proceeding with {len(survivors)} candidates.")
         
@@ -408,6 +367,7 @@ class IdeatePipeline:
             print(f"  Refinement:       {refinement_round} round(s)")
         print()
 
+        final_pass = final_build + final_mutate
         if sorted_survivors:
             print("  Top ideas:")
             for i, c in enumerate(sorted_survivors[:5]):
@@ -429,12 +389,15 @@ class IdeatePipeline:
         print(f"  Cost:    ${cost_info['total_cost_usd']:.4f}")
         print()
 
-        if final_build > 0:
-            best = next((c for c in sorted_survivors if c.stress_test_verdict == "BUILD"), sorted_survivors[0])
+        if final_pass > 0:
+            best = next((c for c in sorted_survivors if c.stress_test_verdict in ("BUILD", "MUTATE")), sorted_survivors[0])
             print(f"  Next step:")
             print(f"    python -m xbrain specify --idea {run_dir}/idea-cards.json --select {best.id}")
         else:
-            print(f"  No BUILD verdicts. Review MUTATE ideas or re-run with different constraints.")
+            if final_pass > 0:
+                print(f"  {final_pass} idea(s) passed stress testing. Review report for details.")
+            else:
+                print(f"  No passing verdicts. Review ideas or re-run with different constraints.")
 
         print()
         sys.stdout.flush()
@@ -582,6 +545,9 @@ class IdeatePipeline:
         )
         brief_ctx = build_brief_context(brief_text)
 
+        winner_ctx = build_winner_repulsion_context(self.memory.get_previous_winners())
+        failure_ctx = build_failure_taxonomy_context(self.memory.get_failure_taxonomy())
+
         prompt = DIVERGE_USER.format(
             idea_count=self.cfg.ideas_per_round,
             domain_context=domain_ctx,
@@ -590,6 +556,8 @@ class IdeatePipeline:
             immersion_context=immersion_ctx,
             brief_context=brief_ctx,
             playbook_context=build_playbook_context(self.memory.get_playbook()),
+            winner_repulsion_context=winner_ctx,
+            failure_taxonomy_context=failure_ctx,
         )
 
         data = self.llm.generate_json(
@@ -719,11 +687,12 @@ class IdeatePipeline:
             top_n=self.cfg.converge_top_n,
             ideas_json=ideas_json,
             calibration_context=calibration_ctx,
+            brief_context=build_brief_context(self._brief_text),
         )
 
         data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5,
                                        model_override=self._model_for_phase("converge"), phase="converge",
-                                       max_tokens=12288)
+                                       max_tokens=8192)
 
         clustering = data.get("clustering_summary", "")
         if clustering:
@@ -750,7 +719,7 @@ class IdeatePipeline:
         return candidates
 
     def _phase_stress_test(self, candidates: list[IdeaCard]) -> list[StressTestResult]:
-        _log("STRESS", f"Adversarial debate for {len(candidates)} candidates (parallel)...")
+        _log("STRESS", f"Adversarial stress test for {len(candidates)} candidates (parallel)...")
         _log("STRESS", "")
 
         # Build per-idea compact dicts once (slim: no persona/score_breakdown to save tokens)
@@ -763,27 +732,18 @@ class IdeatePipeline:
                 "domain_tags": c.domain_tags,
             }
 
-        # Slim version for defense/rebuttal (no full persona/score breakdown)
-        slim_by_id: dict[str, dict] = {}
-        for c in candidates:
-            slim_by_id[c.id] = {
-                "id": c.id,
-                "title": c.title,
-                "composite_score": c.composite_score,
-                "domain_tags": c.domain_tags,
-            }
-
         stress_model = self._model_for_phase("stress")
         sys_attack = self._sys(STRESS_TEST_SYSTEM)
-        sys_defense = self._sys(ADVERSARIAL_DEFENSE_SYSTEM)
-        sys_rebuttal = self._sys(ADVERSARIAL_REBUTTAL_SYSTEM)
+        brief_ctx = build_brief_context(self._brief_text)
 
-        # ── Round 1: Devil's Advocate attacks (parallel across ideas) ──
-        _log("STRESS", f"Round 1/3 — Devil's Advocate attacking ({len(candidates)} parallel calls)...")
+        # ── Single round: Attack + Feasibility + Verdict (parallel across ideas) ──
+        _log("STRESS", f"Attacking {len(candidates)} candidates ({len(candidates)} parallel calls)...")
 
         async def _attack_one(c: IdeaCard) -> AttackResponse:
             cj = json.dumps([compact_by_id[c.id]], ensure_ascii=False)
-            prompt = STRESS_TEST_USER.format(candidate_count=1, candidates_json=cj)
+            prompt = STRESS_TEST_USER.format(
+                candidate_count=1, candidates_json=cj, brief_context=brief_ctx,
+            )
             try:
                 data = await self.llm.generate_json_async(
                     sys_attack, prompt, temperature=0.4,
@@ -798,8 +758,19 @@ class IdeatePipeline:
 
         attack_results = self._run_parallel([_attack_one(c) for c in candidates])
 
+        # ── Assemble final StressTestResults directly from attack ────
+
+        results: list[StressTestResult] = []
+        angles = [
+            "Prior art", "Adoption failure", "Technical blocker",
+            "Problem reframe", "Negative externalities", "Obsolescence",
+            "Timing", "Defensibility", "Expertise gap",
+        ]
+
         for ar in attack_results:
-            title = next((c.title for c in candidates if c.id == ar.idea_id), ar.idea_id)
+            idea_id = ar.idea_id
+            title = next((c.title for c in candidates if c.id == idea_id), idea_id)
+
             _log("STRESS", f"  {title}")
             _log("STRESS", f"    Freeform: {ar.freeform_attack[:100]}")
             for atk in ar.structured_attacks[:3]:
@@ -807,128 +778,24 @@ class IdeatePipeline:
             if len(ar.structured_attacks) > 3:
                 _log("STRESS", f"    ... and {len(ar.structured_attacks) - 3} more attacks")
 
-        # ── Round 2: Idea Champion defends (parallel, slim context) ────
-        _log("STRESS", "")
-        _log("STRESS", f"Round 2/3 — Idea Champion defending ({len(candidates)} parallel calls)...")
-
-        async def _defend_one(ar: AttackResponse) -> DefenseResponse:
-            slim_json = json.dumps([slim_by_id.get(ar.idea_id, {"id": ar.idea_id})], ensure_ascii=False)
-            atk_json = json.dumps([{
-                "idea_id": ar.idea_id,
-                "freeform_attack": ar.freeform_attack,
-                "structured_attacks": ar.structured_attacks,
-            }], ensure_ascii=False)
-            prompt = ADVERSARIAL_DEFENSE_USER.format(
-                candidate_count=1, candidates_json=slim_json, attacks_json=atk_json,
-            )
-            try:
-                data = await self.llm.generate_json_async(
-                    sys_defense, prompt, temperature=0.4,
-                    model_override=stress_model, phase="stress-defense",
-                    max_tokens=6144,
-                )
-                raw = _unwrap_single(data, "defenses", ar.idea_id, "defense")
-                return DefenseResponse.model_validate(raw)
-            except (ValueError, Exception) as e:
-                _log("STRESS", f"  [WARN] Defense failed for {ar.idea_id}: {e}")
-                return DefenseResponse(idea_id=ar.idea_id, exchanges=[])
-
-        defenses_list = self._run_parallel([_defend_one(ar) for ar in attack_results])
-
-        defense_map: dict[str, DefenseResponse] = {}
-        for d in defenses_list:
-            defense_map[d.idea_id] = d
-            title = next((c.title for c in candidates if c.id == d.idea_id), d.idea_id)
-            _log("STRESS", f"  {title}")
-            for ex in d.exchanges[:3]:
-                _log("STRESS", f"    [{ex.outcome:>8s}] {ex.angle}: {ex.defense[:80]}")
-            if len(d.exchanges) > 3:
-                _log("STRESS", f"    ... and {len(d.exchanges) - 3} more defenses")
-
-        # ── Round 3: Judge runs rebuttal round + verdict (parallel, slim context) ──
-        _log("STRESS", "")
-        _log("STRESS", f"Round 3/3 — Final rebuttals and verdict ({len(candidates)} parallel calls)...")
-
-        async def _rebuttal_one(ar: AttackResponse) -> RebuttalResponse:
-            slim_json = json.dumps([slim_by_id.get(ar.idea_id, {"id": ar.idea_id})], ensure_ascii=False)
-            def_resp = defense_map.get(ar.idea_id)
-            def_exchanges = [ex.model_dump() for ex in def_resp.exchanges] if def_resp else []
-            debate = json.dumps([{
-                "idea_id": ar.idea_id,
-                "attacks": ar.structured_attacks,
-                "freeform_attack": ar.freeform_attack,
-                "defenses": def_exchanges,
-            }], ensure_ascii=False)
-            prompt = ADVERSARIAL_REBUTTAL_USER.format(
-                candidate_count=1, candidates_json=slim_json, debate_json=debate,
-            )
-            try:
-                data = await self.llm.generate_json_async(
-                    sys_rebuttal, prompt, temperature=0.3,
-                    model_override=stress_model, phase="stress-rebuttal",
-                    max_tokens=8192,
-                )
-                raw = _unwrap_single(data, "results", ar.idea_id, "rebuttal")
-                return RebuttalResponse.model_validate(raw)
-            except (ValueError, Exception) as e:
-                _log("STRESS", f"  [WARN] Rebuttal failed for {ar.idea_id}: {e}")
-                return RebuttalResponse(idea_id=ar.idea_id, exchanges=[], verdict="INCUBATE")
-
-        rebuttal_list = self._run_parallel([_rebuttal_one(ar) for ar in attack_results])
-        rebuttal_map: dict[str, RebuttalResponse] = {r.idea_id: r for r in rebuttal_list}
-
-        # ── Assemble final StressTestResults ───────────────────────────
-
-        results: list[StressTestResult] = []
-        for ar in attack_results:
-            idea_id = ar.idea_id
-            defense_info = defense_map.get(idea_id)
-            rebuttal_info = rebuttal_map.get(idea_id)
-
-            # Build debate rounds from all three phases
+            # Build debate rounds from attack + defense pairs
             debate_rounds: list[DebateExchange] = []
-            defense_exchanges = defense_info.exchanges if defense_info else []
-            rebuttal_exchanges = rebuttal_info.exchanges if rebuttal_info else []
-
-            # Standard attack angles
-            angles = [
-                "Prior art", "Adoption failure", "Technical blocker",
-                "Problem reframe", "Negative externalities", "Obsolescence",
-                "Timing", "Defensibility", "Expertise gap",
-            ]
-
+            defenses = ar.defenses or []
             for i, attack_text in enumerate(ar.structured_attacks):
                 angle = angles[i] if i < len(angles) else f"Attack {i+1}"
+                defense_text = defenses[i] if i < len(defenses) else ""
 
-                dex = _match_exchange(defense_exchanges, i)
-                rex = _match_exchange(rebuttal_exchanges, i)
-
+                # Determine outcome based on whether this attack is fatal
+                # Use survived/fatal counts from the LLM's own assessment
                 debate_rounds.append(DebateExchange(
                     angle=angle,
                     attack=attack_text,
-                    defense=dex.defense if dex else "",
-                    attacker_rebuttal=rex.attacker_rebuttal if rex else "",
-                    defender_rebuttal=rex.defender_rebuttal if rex else "",
-                    outcome=(
-                        (rex.final_outcome if rex and rex.final_outcome else "")
-                        or (dex.outcome if dex else "")
-                    ),
+                    defense=defense_text,
+                    outcome="",  # No separate outcome per angle in single-round mode
                 ))
 
-            # Use rebuttal verdict as source of truth, fall back to attack data
-            fm_raw = (
-                rebuttal_info.feasibility_matrix if rebuttal_info and rebuttal_info.feasibility_matrix
-                else ar.feasibility_matrix
-            ) or {}
+            fm_raw = ar.feasibility_matrix or {}
             fm = FeasibilityMatrix(**fm_raw)
-
-            def _pick(attr: str) -> str | int | list:
-                """Pick first non-empty value: rebuttal > attack."""
-                if rebuttal_info:
-                    val = getattr(rebuttal_info, attr, None)
-                    if val:  # non-empty string, non-zero int, non-empty list
-                        return val
-                return getattr(ar, attr)
 
             st = StressTestResult(
                 idea_id=idea_id,
@@ -936,28 +803,23 @@ class IdeatePipeline:
                 structured_attacks=ar.structured_attacks,
                 defenses=ar.defenses,
                 debate_rounds=debate_rounds,
-                attacks_made=_pick("attacks_made") or len(ar.structured_attacks),
-                attacks_survived=_pick("attacks_survived"),
-                attacks_fatal=_pick("attacks_fatal"),
-                strongest_argument=_pick("strongest_argument"),
-                strongest_defense=(
-                    (rebuttal_info.strongest_defense if rebuttal_info else "")
-                    or (defense_info.strongest_defense if defense_info else "")
-                    or ar.strongest_defense
-                ),
-                suggested_mutation=_pick("suggested_mutation"),
+                attacks_made=ar.attacks_made or len(ar.structured_attacks),
+                attacks_survived=ar.attacks_survived,
+                attacks_fatal=ar.attacks_fatal,
+                strongest_argument=ar.strongest_argument,
+                strongest_defense=ar.strongest_defense,
+                suggested_mutation=ar.suggested_mutation,
                 feasibility_matrix=fm,
-                feasibility_verdict=_pick("feasibility_verdict"),
-                llm_capability_fit=_pick("llm_capability_fit"),
-                kill_criteria=_pick("kill_criteria"),
-                verdict=_pick("verdict"),
+                feasibility_verdict=ar.feasibility_verdict,
+                llm_capability_fit=ar.llm_capability_fit,
+                kill_criteria=ar.kill_criteria,
+                verdict=ar.verdict,
             )
             results.append(st)
 
-            title = next((c.title for c in candidates if c.id == idea_id), idea_id)
             survived = st.attacks_survived
             fatal = st.attacks_fatal
-            _log("STRESS", f"  {title}: {survived} survived, {fatal} fatal → {st.verdict}")
+            _log("STRESS", f"    → {survived} survived, {fatal} fatal → {st.verdict}")
 
         _log("STRESS", "")
         verdicts: dict[str, int] = {}
@@ -1025,8 +887,41 @@ class IdeatePipeline:
 
         _log("REFINE", f"  Extracted {len(mutations)} mutations and {len(attack_patterns)} attack patterns")
 
+        # Extract banned concepts: titles + one-line concepts of ALL prior candidates
+        banned_concepts = []
+        for c in candidates:
+            banned_concepts.append(f"{c.title}: {c.rationale[:100] if c.rationale else c.title}")
+        _log("REFINE", f"  Banned concepts: {len(banned_concepts)} previous ideas will be excluded")
+
+        # Extract problem reframes from stress test structured attacks
+        reframe_attacks = []
+        for s in stress_results:
+            # Check structured_attacks for "Reframe:" or "Problem reframe:" entries
+            if s.structured_attacks:
+                for attack in s.structured_attacks:
+                    attack_lower = attack.lower()
+                    if attack_lower.startswith("reframe:") or attack_lower.startswith("problem reframe:"):
+                        # Strip the prefix and keep the reframe content
+                        reframe_text = attack.split(":", 1)[1].strip() if ":" in attack else attack
+                        if reframe_text and len(reframe_text) > 20:
+                            reframe_attacks.append(reframe_text)
+            # Also check freeform_attack for reframe insights
+            if s.freeform_attack and "real problem" in s.freeform_attack.lower():
+                # Extract sentences containing the reframe
+                for sentence in s.freeform_attack.split("."):
+                    if "real problem" in sentence.lower() or "actually about" in sentence.lower():
+                        sentence = sentence.strip()
+                        if len(sentence) > 20:
+                            reframe_attacks.append(sentence)
+        # Deduplicate and limit
+        reframe_attacks = list(dict.fromkeys(reframe_attacks))[:5]
+        _log("REFINE", f"  Problem reframes extracted: {len(reframe_attacks)} alternative framings from stress tests")
+        if reframe_attacks[:2]:
+            for r in reframe_attacks[:2]:
+                _log("REFINE", f"    - {r[:80]}")
+
         # Build refinement context for diverge phase
-        refinement_ctx = build_refinement_context(mutations, attack_patterns)
+        refinement_ctx = build_refinement_context(mutations, attack_patterns, banned_concepts, reframe_attacks)
         _log("REFINE", f"  Learning context prepared: {len(mutations[:5])} mutations + {len(attack_patterns[:5])} patterns")
 
         # Use cached context if available, otherwise build fresh
@@ -1061,6 +956,8 @@ class IdeatePipeline:
             immersion_context=immersion_ctx,
             brief_context=brief_ctx,
             playbook_context=build_playbook_context(self.memory.get_playbook()),
+            winner_repulsion_context=build_winner_repulsion_context(self.memory.get_previous_winners()),
+            failure_taxonomy_context=build_failure_taxonomy_context(self.memory.get_failure_taxonomy()),
         )
 
         # Append refinement context to the prompt
@@ -1096,6 +993,7 @@ class IdeatePipeline:
             top_n=converge_top_n,
             ideas_json=ideas_json,
             calibration_context=build_calibration_context(self.memory.get_score_stats()),
+            brief_context=build_brief_context(self._brief_text),
         )
 
         _log("REFINE", f"  CONVERGE: Scoring {len(refined_raw_ideas)} ideas, selecting top {converge_top_n}...")
@@ -1278,12 +1176,14 @@ class IdeatePipeline:
             domains_used.update(c.domain_tags)
 
         build_count = sum(1 for c in result.survivors if c.stress_test_verdict == "BUILD")
+        pass_count = sum(1 for c in result.survivors if c.stress_test_verdict in ("BUILD", "MUTATE"))
         metrics = {
             "run_id": result.run_id,
             "timestamp": result.timestamp,
             "ideas_generated": len(result.raw_ideas),
             "candidates": len(result.candidates),
             "build_count": build_count,
+            "pass_count": pass_count,
             "tokens_in": result.total_input_tokens,
             "tokens_out": result.total_output_tokens,
         }
@@ -1295,6 +1195,28 @@ class IdeatePipeline:
             self.memory.save_mutations(mutations)
         if attack_patterns:
             self.memory.save_attack_patterns(attack_patterns)
+
+        # Classify attacks into failure taxonomy categories
+        _FAILURE_CATEGORIES = {
+            "prior_art": ["already exists", "prior art", "been done", "existing", "commodity"],
+            "adoption": ["nobody will", "won't use", "won't adopt", "adoption", "no demand"],
+            "technical": ["impossible", "impractical", "technical", "can't build", "infeasible"],
+            "timing": ["too early", "too late", "timing", "window", "obsolete"],
+            "defensibility": ["clone", "no moat", "defensib", "competitor", "replicate"],
+            "economics": ["cost", "expensive", "revenue", "pricing", "economics", "margin"],
+        }
+        taxonomy_updates: dict[str, list[str]] = {}
+        for s in result.stress_test_results:
+            for attack in s.structured_attacks:
+                attack_lower = attack.lower()
+                for category, keywords in _FAILURE_CATEGORIES.items():
+                    if any(kw in attack_lower for kw in keywords):
+                        taxonomy_updates.setdefault(category, []).append(
+                            attack[:150]
+                        )
+                        break  # only classify into first matching category
+        if taxonomy_updates:
+            self.memory.save_failure_taxonomy(taxonomy_updates)
 
         # Save lineage: track which ideas came from which run + source technique
         lineage_entries = []
@@ -1375,14 +1297,14 @@ class IdeatePipeline:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _run_parallel(coros: list, max_concurrent: int = 8) -> list:
+    def _run_parallel(coros: list, max_concurrent: int = 2) -> list:
         """Run coroutines concurrently with a concurrency limit to avoid rate limits."""
         async def _gather():
             sem = asyncio.Semaphore(max_concurrent)
             async def _limited(idx: int, coro):
                 async with sem:
                     if idx > 0:
-                        await asyncio.sleep(0.1)  # brief stagger to avoid burst
+                        await asyncio.sleep(1.5)  # stagger to avoid burst
                     return await coro
             tasks = [_limited(i, c) for i, c in enumerate(coros)]
             return await asyncio.gather(*tasks)

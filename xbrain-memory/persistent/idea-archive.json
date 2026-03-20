@@ -1896,5 +1896,1128 @@
       "community",
       "mental_health"
     ]
+  },
+  {
+    "id": "idea-002",
+    "title": "LeadingEdgeDetector: Forward-Looking Signal Engine for Emerging Opportunities",
+    "score": 7.9,
+    "verdict": "BUILD_AS_FEATURE_EXPERIMENT",
+    "domains": [
+      "ai_infrastructure",
+      "data_engineering",
+      "developer_tools"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "LiveSignal Intake Engine: Task-Aware, Learned Signal Filtering for xBrain IMMERSE Phase",
+    "score": 7.9,
+    "verdict": "DO_NOT_BUILD_AS_PROPOSED",
+    "domains": [
+      "developer_tools",
+      "data_engineering",
+      "ai_infrastructure"
+    ]
+  },
+  {
+    "id": "idea-001-merged",
+    "title": "LiveSignal Ingester + SignalRank",
+    "score": 7.6,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "developer_tools",
+      "data_engineering",
+      "ai_infrastructure"
+    ]
+  },
+  {
+    "id": "gap-006-standalone",
+    "title": "DecayDetector: Declining Infrastructure & Replacement Opportunity Engine",
+    "score": 7.5,
+    "verdict": "BUILD_WITH_REPOSITIONING",
+    "domains": [
+      "negative_signals",
+      "declining_trends",
+      "infrastructure_replacement",
+      "developer_tools"
+    ]
+  },
+  {
+    "id": "gap-007-merged",
+    "title": "IncentiveStructureValidator + StakeholderAlignment Engine",
+    "score": 7.3,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "incentive_design",
+      "stakeholder_analysis",
+      "fatal_flaw_early_detection",
+      "ai_infrastructure"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Signal Decay Detector: Time-Series Signal Trajectory Tracking for Leading Indicators",
+    "score": 7.3,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "ai_infrastructure",
+      "data_engineering",
+      "developer_tools"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "SignalRouter: Task-Aware Data Source Prioritization Engine",
+    "score": 7.2,
+    "verdict": "DO_NOT_BUILD_AS_PROPOSED",
+    "domains": [
+      "developer_tools",
+      "data_engineering",
+      "ai_infrastructure"
+    ]
+  },
+  {
+    "id": "idea-002-standalone",
+    "title": "HistoryMirror: Pattern-Matched Crisis & Opportunity Engine",
+    "score": 7.1,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "ai_infrastructure",
+      "data_engineering",
+      "historical_analysis"
+    ]
+  },
+  {
+    "id": "gap-002-merged",
+    "title": "CapitalFlowRadar + TalentFlowMapper",
+    "score": 7.0,
+    "verdict": "INCUBATE",
+    "domains": [
+      "financial_signals",
+      "venture_capital",
+      "talent_signals",
+      "market_prediction"
+    ]
+  },
+  {
+    "id": "idea-001-merged-005",
+    "title": "TaskGrinder + SignalDecayAnalyzer: Domain-Aware, Temporally-Calibrated Signal Relevance Engine",
+    "score": 6.8,
+    "verdict": "BUILD_WITH_PHASED_ROLLOUT",
+    "domains": [
+      "ai_infrastructure",
+      "data_engineering",
+      "developer_tools"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "IncentiveMapper: Automated Stakeholder Incentive Extraction & Misalignment Detection",
+    "score": 6.2,
+    "verdict": "INCUBATE",
+    "domains": [
+      "developer_tools",
+      "data_engineering",
+      "ai_infrastructure"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Reverse-Engineer Failed Pivots (Graveyard→Opportunity Mapper)",
+    "score": 7.7,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "product_strategy",
+      "failure_analysis",
+      "market_gaps"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Competitor Move Monitor (500-Startup Vertical Intelligence)",
+    "score": 7.5,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "business_intelligence",
+      "technology",
+      "competitive_strategy"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Technology Sunrise Detector (Academic→Venture→Patent Inflection Mapping)",
+    "score": 7.5,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "technology",
+      "research",
+      "forecasting",
+      "ai_infrastructure"
+    ]
+  },
+  {
+    "id": "idea-014",
+    "title": "Stakeholder Incentive Alignment Mapper (Game-Theoretic Risk Screening)",
+    "score": 7.2,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "product",
+      "game_theory",
+      "risk_assessment"
+    ]
+  },
+  {
+    "id": "gap-006",
+    "title": "Outcome-Based Pricing Idea Generator (Success-Contingent Revenue Models)",
+    "score": 7.0,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "revenue_models",
+      "pricing_strategy",
+      "b2b"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Real-Time Regulatory Change Detector (50-State + Federal Compliance Monitor)",
+    "score": 6.7,
+    "verdict": "BUILD",
+    "domains": [
+      "legal",
+      "technology",
+      "compliance"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "Hardware-Software Arbitrage Detector (IoT/Edge/Legacy Equipment Modernization)",
+    "score": 6.6,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "hardware",
+      "iot",
+      "manufacturing",
+      "edge_computing"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Social Media Trend-to-Software Pipeline (TikTok/Reddit/Discord Complaint Clustering)",
+    "score": 6.0,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "social",
+      "technology",
+      "market_research"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "TAM Validator via Signal Proportionality",
+    "score": 8.3,
+    "verdict": "BUILD_MVP_WITH_HYPOTHESIS_TESTING",
+    "domains": [
+      "data_engineering",
+      "market_sizing",
+      "validation"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Signal Relevance Engine with Momentum Tracking",
+    "score": 8.1,
+    "verdict": "CONDITIONAL BUILD - MAJOR MUTATIONS REQUIRED",
+    "domains": [
+      "ai_infrastructure",
+      "developer_tools",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Idea Decay Predictor: Time-Series Obsolescence Forecasting",
+    "score": 8.1,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "ai_infrastructure",
+      "developer_tools"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "SignalRelevance: Domain-Specific Signal Filtering Engine",
+    "score": 8.0,
+    "verdict": "CONDITIONAL BUILD - MAJOR MUTATIONS REQUIRED",
+    "domains": [
+      "developer_tools",
+      "data_engineering",
+      "ai_infrastructure"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "Cross-Signal Confluence Detector",
+    "score": 7.8,
+    "verdict": "CONDITIONAL_BUILD",
+    "domains": [
+      "data_engineering",
+      "signal_analysis",
+      "opportunity_detection"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Regulatory Velocity Monitor",
+    "score": 7.7,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "developer_tools",
+      "ai_infrastructure",
+      "legal"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Signal Relevance Engine: Causal-Distance Filtering for Domain-Specific Ideation",
+    "score": 7.6,
+    "verdict": "CONDITIONAL BUILD - MAJOR MUTATIONS REQUIRED",
+    "domains": [
+      "developer_tools",
+      "ai_infrastructure",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "StakeholderIncentiveMapper: Decision-Tree Constraint Satisfaction for Regulated Domains",
+    "score": 7.6,
+    "verdict": "PIVOT_OR_ABANDON",
+    "domains": [
+      "ai_infrastructure",
+      "data_engineering",
+      "developer_tools"
+    ]
+  },
+  {
+    "id": "idea-012",
+    "title": "Regulatory Anticipation Engine",
+    "score": 7.4,
+    "verdict": "BUILD WITH MUTATIONS",
+    "domains": [
+      "ai_infrastructure",
+      "developer_tools",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Negative Signal Detector & Market Saturation Firewall",
+    "score": 7.2,
+    "verdict": "PIVOT_THEN_BUILD",
+    "domains": [
+      "developer_tools",
+      "market_intelligence",
+      "risk_detection"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Real-time World Signal Ingestion Layer for xBrain",
+    "score": 6.9,
+    "verdict": "CONDITIONAL BUILD - MAJOR MUTATIONS REQUIRED",
+    "domains": [
+      "developer_tools",
+      "ai_infrastructure",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Failure Mode Inversion Engine",
+    "score": 8.2,
+    "verdict": "BUILD",
+    "domains": [
+      "ai_architecture",
+      "failure_analysis",
+      "constraint_design"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Validation Runtime: Micro-Experiments Engine",
+    "score": 7.9,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "technology",
+      "research_methods",
+      "product_validation"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Network Effect Arbitrage Detector",
+    "score": 7.7,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "platform_economics",
+      "network_effects",
+      "market_design"
+    ]
+  },
+  {
+    "id": "gap-006",
+    "title": "Privacy-First Business Model Generator",
+    "score": 7.7,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "privacy",
+      "data_ownership",
+      "business_model_innovation"
+    ]
+  },
+  {
+    "id": "idea-012",
+    "title": "Idea-to-Metric Bridge",
+    "score": 7.6,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "entrepreneurship",
+      "metrics",
+      "validation",
+      "risk_reduction"
+    ]
+  },
+  {
+    "id": "idea-024",
+    "title": "Supply-Side Constraint Detector",
+    "score": 7.4,
+    "verdict": "BUILD_WITH_PIVOT_TO_MARKETPLACE",
+    "domains": [
+      "economics",
+      "logistics",
+      "product_strategy"
+    ]
+  },
+  {
+    "id": "gap-008",
+    "title": "Pricing Mechanism Ideation Engine",
+    "score": 7.4,
+    "verdict": "BUILD_WITH_MUTATION",
+    "domains": [
+      "monetization",
+      "pricing_strategy",
+      "business_model"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Failure Archaeology: Anti-Pattern Learning System",
+    "score": 7.2,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "technology",
+      "machine_learning",
+      "product_development"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Stakeholder Veto Simulator",
+    "score": 7.1,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "political_economy",
+      "regulatory",
+      "game_theory"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Stakeholder Simulation Layer: Incentive Alignment Mapper",
+    "score": 6.6,
+    "verdict": "BUILD_WITH_PIVOTS",
+    "domains": [
+      "technology",
+      "economics",
+      "psychology"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Idea Decay Detector",
+    "score": 6.5,
+    "verdict": "BUILD_MVP_ONLY",
+    "domains": [
+      "ai_architecture",
+      "meta_learning",
+      "quality_assurance"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Real-Time Substrate Monitor: Opportunity Window Detector",
+    "score": 6.2,
+    "verdict": "BUILD_MVP_ONLY",
+    "domains": [
+      "technology",
+      "information_systems",
+      "market_intelligence"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "WorldSignal Ingestion Layer: Domain-Aware Signal Router",
+    "score": 8.0,
+    "verdict": "DO NOT BUILD",
+    "domains": [
+      "ai_infrastructure",
+      "developer_tools",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "idea-001-merged",
+    "title": "RealTime Signal Ingestion Layer (SIGIL) + Trajectory Memory (WSM)",
+    "score": 7.9,
+    "verdict": "BUILD with mandatory mutations: (1) Reposition from generalist to domain-specific (biotech); (2) Treat SIGIL as a component of xBrain, not a standalone product; (3) Use only official APIs, no scraping; (4) Hire biotech domain expert; (5) Prove downstream ROI within 3 months. The original idea (generalist signal aggregation) is a commodity and will fail. The mutated idea (domain-specific signal layer for biotech idea generation) is viable if executed with domain expertise and speed-to-market focus.",
+    "domains": [
+      "data_engineering",
+      "AI_infrastructure",
+      "developer_tools"
+    ]
+  },
+  {
+    "id": "gap-002-merged",
+    "title": "PainPointExtractionPipeline + IdeaValidationAutomation",
+    "score": 7.9,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "developer_tools",
+      "AI_infrastructure",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "LiveSignal Router: Domain-Specialized Signal Ingestion Layer",
+    "score": 7.9,
+    "verdict": "DO NOT BUILD",
+    "domains": [
+      "ai_infrastructure",
+      "developer_tools",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "idea-001-004-merged",
+    "title": "Precision Signal Router with Velocity Tracking",
+    "score": 7.8,
+    "verdict": "CONDITIONAL_BUILD",
+    "domains": [
+      "ai_infrastructure",
+      "data_engineering",
+      "developer_tools"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Competitive Obsolescence Detector: Real-Time Competitive Landscape Snapshot",
+    "score": 7.7,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "developer_tools",
+      "ai_infrastructure"
+    ]
+  },
+  {
+    "id": "idea-007-merged",
+    "title": "RegulatoryWindowDetector (RWD) + CrossBorderRegulatoryArbitrage (CBRA)",
+    "score": 7.5,
+    "verdict": "DO_NOT_BUILD",
+    "domains": [
+      "AI_infrastructure",
+      "developer_tools",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "idea-009-merged",
+    "title": "FailurePatternAnalyzer (FPA) + IncentiveAlignmentValidator (IAV)",
+    "score": 7.4,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "AI_infrastructure",
+      "developer_tools",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "gap-001-merged",
+    "title": "AdoptionCurvePredictor + MacroEconomicContextualizer",
+    "score": 6.9,
+    "verdict": "DO NOT BUILD",
+    "domains": [
+      "AI_infrastructure",
+      "developer_tools",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "HistoryMirror: Historical Pattern Matching for Predictive Insight",
+    "score": 6.8,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "ai_infrastructure",
+      "data_engineering"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "HistoricalEcho: Pattern-Matching Engine for Historical Precedent",
+    "score": 6.7,
+    "verdict": "BUILD_WITH_MUTATIONS",
+    "domains": [
+      "ai_infrastructure",
+      "data_engineering",
+      "developer_tools"
+    ]
+  },
+  {
+    "id": "gap-009",
+    "title": "Founder Demand Validator (Real-World Pain Grounding)",
+    "score": 8.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "market_validation",
+      "founder_research",
+      "signal_detection"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Idea Decay Tracker: Real-World Outcome Feedback Loop",
+    "score": 8.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "AI_infrastructure",
+      "product_validation",
+      "metrics"
+    ]
+  },
+  {
+    "id": "idea-001-merged",
+    "title": "Idea Autopsy Lab + Anti-Pattern Mutation Engine",
+    "score": 8.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "software_engineering",
+      "product_management",
+      "failure_analysis",
+      "risk_assessment"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Diversity Ratchet (Semantic Divergence Constraint)",
+    "score": 7.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "AI_infrastructure",
+      "algorithm_design"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "Moat Archaeology (Defensibility-First Ideation)",
+    "score": 7.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "competitive_strategy",
+      "business_sustainability",
+      "economics"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Real-Time Event Stream Ingestion Layer",
+    "score": 7.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "data_infrastructure"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Regulatory Cliff Calendar + Constraint-Driven Ideation",
+    "score": 7.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "regulatory",
+      "legal",
+      "technology",
+      "finance",
+      "compliance"
+    ]
+  },
+  {
+    "id": "idea-010",
+    "title": "Idea Autopsy Feedback Loop",
+    "score": 7.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "meta-learning",
+      "feedback_loops",
+      "failure_analysis",
+      "real_world_validation"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Network Effect Optimizer (Topology-Aware Ideation)",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "platform_dynamics",
+      "network_effects",
+      "marketplace_design"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Failure Archaeology System (Real-World Stress Testing)",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "AI_infrastructure",
+      "learning_systems"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Monetization Laboratory (Unit Economics Stress Testing)",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "business_model_innovation",
+      "fintech",
+      "saas"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Capability Shift Detector: Unlock Idea Spaces via Real-Time Tech Monitoring",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "AI_infrastructure",
+      "technology",
+      "research"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Inverse Ideation Layer: Mechanism Stealing from Recent Successes",
+    "score": 6.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "product_validation",
+      "architecture"
+    ]
+  },
+  {
+    "id": "gap-006",
+    "title": "Analogical Bridge System (Cross-Domain Mechanism Stealing)",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "innovation_methodology",
+      "cross_domain_synthesis",
+      "design_thinking"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Capability-Window Opportunist",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology_monitoring",
+      "capability_shifts",
+      "market_timing",
+      "real_time_signal"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Regulatory Window Calendar: Deterministic Opportunity Forcing Function",
+    "score": 6.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "legal",
+      "economic",
+      "regulatory"
+    ]
+  },
+  {
+    "id": "idea-005-merged",
+    "title": "Real-World Validation Engine: Multi-Source Pain Signal Mapper",
+    "score": 8.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "product_strategy",
+      "user_research",
+      "data_analysis",
+      "real_time_signals"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Adversarial Idea Validator: Expert Crowdsourced Ground-Truth Testing",
+    "score": 7.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "validation",
+      "crowdsourcing",
+      "meta_learning"
+    ]
+  },
+  {
+    "id": "idea-002-005-merged",
+    "title": "Real-World Signal Aggregator: Market Timing + Regulatory Window Detector",
+    "score": 7.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "market_intelligence",
+      "signal_processing",
+      "regulatory_intelligence",
+      "timing"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Idea-to-Prototype Compiler: 48-Hour Validation via Workflow + Landing Page + Fake-Door Test",
+    "score": 7.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "product_development",
+      "automation",
+      "validation"
+    ]
+  },
+  {
+    "id": "idea-001-merged-with-006",
+    "title": "Idea Genealogy + Real-World Validation Marketplace",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "meta-learning",
+      "validation",
+      "product_development",
+      "marketplace"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Real-Time Signal Aggregator: Live Market, Regulatory, Patent, Social Sentiment Feed",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "market_intelligence",
+      "regulatory",
+      "real_time_data"
+    ]
+  },
+  {
+    "id": "idea-006",
+    "title": "Failure Archaeology: Meta-Learning from High-Scored Ideas That Failed",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "meta_learning",
+      "machine_learning",
+      "learning_systems"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Anti-Convergence Engine: Constraint Wildcards Force Orthogonal Exploration",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "algorithm_design",
+      "ideation",
+      "diversity"
+    ]
+  },
+  {
+    "id": "idea-002-merged",
+    "title": "Temporal Constraint Layer: Shelf-Life Predictor + Regulatory + Assumption Debt",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "product_strategy",
+      "forecasting",
+      "regulatory_analysis",
+      "risk_analysis"
+    ]
+  },
+  {
+    "id": "gap-007",
+    "title": "Micro-Market Stress Test via Gig Worker Validation: 5-7 Day Real-World Testing",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "labor",
+      "logistics",
+      "validation",
+      "gig_economy"
+    ]
+  },
+  {
+    "id": "idea-002-004-005-merged",
+    "title": "Real-Time Market Signal Aggregator (Regulatory + Competitor + User Pain)",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "regulatory",
+      "competitive_intelligence",
+      "user_research",
+      "real-time_systems"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "Idea Recombination Synthesizer: Graph Neural Networks for Bundle/Platform Ideas",
+    "score": 6.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "product_strategy",
+      "synthesis",
+      "systems_thinking"
+    ]
+  },
+  {
+    "id": "idea-007-010-merged",
+    "title": "Idea Timing & Durability Calibrator",
+    "score": 6.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "product_strategy",
+      "market_timing",
+      "technology_forecasting"
+    ]
+  },
+  {
+    "id": "idea-001-006-merged",
+    "title": "Outcome Learning System: Success Reverse-Engineering + Failure Autopsy Database",
+    "score": 6.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "meta_learning",
+      "product_analysis",
+      "failure_analysis",
+      "business_intelligence"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Ethical Impact Filter + Stakeholder Harm Audit: Multi-Stakeholder Assessment",
+    "score": 6.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "ethics",
+      "sustainability",
+      "social_impact"
+    ]
+  },
+  {
+    "id": "idea-003-012-merged",
+    "title": "Founder-Idea Fit Analyzer",
+    "score": 6.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "founder_behavior",
+      "startup_ecosystem",
+      "product_development"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Inverse Validation Engine: Real-World Experiment Feedback Loop",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "product",
+      "validation",
+      "machine_learning"
+    ]
+  },
+  {
+    "id": "gap-008",
+    "title": "Idea Autopsy Post-Mortem Engine: Failure-Driven Model Retraining",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "learning_loops",
+      "failure_analysis",
+      "model_refinement"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Pain-Moment API: Real-Time User Frustration Signal Integration",
+    "score": 6.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "product",
+      "customer",
+      "data_integration"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Founder Skill-Gap Detector: Execution Capability Filtering",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "talent",
+      "founder_operations",
+      "execution_capability"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Real-Time Semantic Drift Tracker: Live Context Feed",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "technology",
+      "regulatory",
+      "linguistics"
+    ]
+  },
+  {
+    "id": "idea-008",
+    "title": "Cross-Domain Analogy Engine: Forced Pattern Remixing",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "architecture",
+      "analogy",
+      "innovation"
+    ]
+  },
+  {
+    "id": "gap-007",
+    "title": "Geographic Regulatory Arbitrage Mapper: Jurisdiction-Specific Ideation",
+    "score": 6.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "geography",
+      "regulatory_arbitrage",
+      "jurisdiction_strategy"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "Reverse Labor Shortage Mapper: Workforce Restructuring Opportunity Detection",
+    "score": 6.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "labor_markets",
+      "workforce_dynamics",
+      "economic_arbitrage"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Stealth Assumption Auditor",
+    "score": 8.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "risk_analysis",
+      "validation",
+      "epistemology"
+    ]
+  },
+  {
+    "id": "idea-009",
+    "title": "Capability-to-Idea Matcher",
+    "score": 7.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "self_awareness",
+      "capability_mapping",
+      "product_strategy"
+    ]
+  },
+  {
+    "id": "idea-007",
+    "title": "Idea Mutation Engine",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "algorithm_design",
+      "combinatorics",
+      "innovation"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Inverse Adversarial Ideation",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "ethics",
+      "adversarial_thinking",
+      "stakeholder_analysis"
+    ]
+  },
+  {
+    "id": "idea-021",
+    "title": "Idea Immune System",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "diversity",
+      "algorithm_design",
+      "anti_convergence"
+    ]
+  },
+  {
+    "id": "idea-012",
+    "title": "Idea Clustering by Execution Signature",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "execution_risk",
+      "product_operations",
+      "architecture"
+    ]
+  },
+  {
+    "id": "idea-020",
+    "title": "Rare-Constraint Ideation Mode",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "constraint_optimization",
+      "developing_world",
+      "resilience"
+    ]
+  },
+  {
+    "id": "gap-008",
+    "title": "Idea Sequencing Optimizer",
+    "score": 6.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "operations_research",
+      "project_management",
+      "portfolio_strategy"
+    ]
   }
 ]

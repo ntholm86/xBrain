@@ -92,8 +92,10 @@ DIVERGE_SYSTEM = (
 )
 
 DIVERGE_USER = """\
-Generate {idea_count} raw project idea seeds. Every idea must be a \
-buildable software project.
+Generate {idea_count} raw idea seeds. Ideas can be anything: software \
+projects, features, process changes, integrations, research directions, \
+architectural redesigns, or unconventional approaches. Let the brief \
+define what's in scope — don't pre-filter by format.
 
 {brief_context}
 {domain_context}
@@ -101,6 +103,8 @@ buildable software project.
 {memory_context}
 {immersion_context}
 {playbook_context}
+{winner_repulsion_context}
+{failure_taxonomy_context}
 
 Apply these techniques:
 
@@ -121,12 +125,19 @@ constraint that stress-tests real-world viability:
    - For underserved-market ideas: "must cost $0 to run"
    - For sensitive-data ideas: "must work without collecting PII"
 
-5. AI-AUGMENTABLE IDEAS: Actively generate ideas that would normally \
-require deep domain expertise BUT where AI can bridge the expertise gap. \
-Think: domains where a non-expert builder + AI tools (LLMs, code gen, \
-data analysis, document parsing) can deliver expert-level value. Don't \
-filter out ideas just because the builder lacks domain credentials — \
-if AI can substitute for that expertise, the idea is valid and valuable.
+5. EXPERTISE-AGNOSTIC: Don't filter out ideas based on assumed builder \
+skill level. If the brief doesn't specify who's building, generate ideas \
+across all difficulty levels — from quick wins to ambitious moonshots. \
+Include ideas that leverage AI tools where relevant, but also include \
+ideas that don't.
+
+6. MECHANISM STEALING (Inverse Ideation): Think of 3-5 products or \
+systems that have succeeded recently (in ANY domain). Extract their \
+core MECHANISM — the underlying pattern that makes them work (e.g., \
+"Uber's mechanism = real-time matching of idle capacity to immediate \
+demand"). Now apply each mechanism to the brief's domain or a completely \
+different domain. The idea should NOT be a clone — it should transplant \
+the mechanism into a new context where it creates unexpected value.
 
 Respond with ONLY valid JSON:
 {{
@@ -163,8 +174,20 @@ near-duplicates (same core concept, different wording).
 IDEAS:
 {ideas_json}
 
-For each cluster of duplicates, keep the BEST version (most specific, \
+DEDUP in TWO passes:
+
+PASS 1 — SURFACE DEDUP: Find ideas with the same core concept expressed \
+in different words. For each cluster, keep the BEST version (most specific, \
 most novel framing) and mark the rest for removal.
+
+PASS 2 — CONCEPTUAL CONVERGENCE: Step back and look at the ABSTRACT \
+solution shape of each surviving idea. Group ideas by their underlying \
+mechanism (e.g., "aggregation platform", "monitoring dashboard", \
+"marketplace connector", "AI analysis layer"). If more than 40% of \
+surviving ideas share the same abstract solution shape, mark the \
+weakest examples for removal and add their solution shape to \
+overrepresented_themes. The final set MUST have at least 3 genuinely \
+different solution approaches.
 
 Also report what themes are OVER-REPRESENTED (too many similar ideas) \
 and what areas have GAPS (no ideas generated despite being relevant).
@@ -235,8 +258,9 @@ CONVERGE_SYSTEM = (
 )
 
 CONVERGE_USER = """\
-Take these {idea_count} raw idea seeds and converge them into the top \
-{top_n} strongest candidates.
+Converge {idea_count} raw idea seeds into the top {top_n} candidates.
+
+{brief_context}
 
 RAW IDEAS:
 {ideas_json}
@@ -244,100 +268,70 @@ RAW IDEAS:
 {calibration_context}
 
 STEPS:
-1. CLUSTER: Group similar ideas. Merge overlapping concepts into stronger \
-hybrids. Eliminate duplicates.
+1. CLUSTER similar ideas, merge overlaps, eliminate duplicates.
+2. ADAPT OUTPUT TO BRIEF TYPE: Read the brief carefully and match your output:
+   - If the brief describes a PRODUCT/STARTUP opportunity → use product fields \
+(persona=target customer, cost=infrastructure cost, defensibility=market moat).
+   - If the brief describes an INTERNAL TOOL IMPROVEMENT → use internal fields \
+(persona=tool operator/developer, cost=implementation effort, \
+defensibility=why this approach is better than alternatives).
+   - If the brief describes a PROCESS/WORKFLOW change → use process fields \
+(persona=person doing the work, cost=transition cost, \
+defensibility=why this process is hard to replicate).
+   - If no brief or unclear → default to product fields.
+   CRITICAL: Do NOT force product framing on non-product ideas. If the brief \
+asks "how to improve X internally", the persona is the builder/operator of X, \
+not an external customer. The cost is implementation effort, not SaaS pricing.
+3. NOVELTY: Score 0.0-1.0. Does this exist? What's the gap?
+4. SCORE on 8 dimensions (0-10). effort/cost/ethical_risk are NEGATIVE (high=bad). \
+Consider AI leverage when scoring effort.
+   Dimensions: impact, confidence, effort, cost, ethical_risk, sustainability, \
+defensibility, market_timing.
+5. MOAT CHECK: For each idea, explicitly assess defensibility. If defensibility \
+scores below 4, suggest ONE concrete mutation that would strengthen the moat \
+(e.g., adding a data flywheel, network effect, or proprietary dataset). \
+Include this in defensibility_notes.
+6. INVERSE: 2-3 conditions that would make this terrible. inverse_confidence 0-10 \
+(10=fragile). If >6, reduce positive scores.
 
-2. PERSONA: For EVERY surviving idea, define a specific primary persona:
-   - who: specific role, not generic (e.g. "City council member in a \
-mid-size US city")
-   - pain: what problem does this solve for them?
-   - context: what's their day like? tools? technical literacy?
-   - motivation: why would they switch to this?
+SCORING RULES (mandatory):
+- FORCE-RANK all candidates 1 to N before assigning scores. \
+The #1 ranked idea MUST have the highest composite score. The last MUST have the lowest.
+- USE THE FULL RANGE: The best idea should score 8-10 on its strongest dimension. \
+The weakest should have at least one dimension scoring 3 or below.
+- SPREAD SCORES: The gap between the highest and lowest composite score MUST be \
+at least 3.0 points. If all ideas look similar, you're not being critical enough.
+- DIFFERENTIATE EFFORT: Not every idea is "medium" effort. At least one must be \
+"small" and at least one must be "large" (if {top_n} >= 3).
+- BE HARSH on ideas that are generic, vague, or that any competent developer \
+could build in a weekend. These should score below 5 on impact and defensibility.
+- DEFENSIBILITY GATE: Ideas with defensibility < 3 should be penalized heavily \
+in the composite score unless the brief explicitly doesn't care about moats.
 
-3. NOVELTY: Does this already exist? If so, what's the specific gap? \
-Score novelty 0.0 to 1.0.
-
-4. SCORE each candidate on 8 dimensions (each 0-10):
-   - impact: affected population size × pain severity × urgency
-   - confidence: certainty this will work, evidence strength
-   - effort: implementation complexity (10 = trivial, 0 = massive)
-   - cost: infrastructure cost (10 = free, 0 = very expensive)
-   - ethical_risk: misuse potential (10 = very risky, 0 = no risk)
-   - sustainability: revenue potential, community sustainability
-   - defensibility: network effects, data moats, switching costs
-   - market_timing: tech readiness, regulatory window, cultural moment
-
-   NOTE: effort, cost, ethical_risk are NEGATIVE factors — high = bad.
-   Be honest and critical, not generous.
-
-5. INVERSE SCORING: For EACH candidate, ALSO answer this question:
-   "What would need to be TRUE for this idea to be TERRIBLE?"
-   List 2-3 conditions. Then score an inverse_confidence (0-10) where:
-   - 10 = the 'terrible' conditions are extremely likely (idea is fragile)
-   - 0 = the 'terrible' conditions are nearly impossible (idea is robust)
-   Use this to adjust your scores: if inverse_confidence > 6, reduce \
-   your positive dimension scores by 0.5-1.5 points. This breaks the \
-   tendency to score everything 7-8.
-
-   IMPORTANT ON EFFORT: When scoring effort, consider whether AI tools \
-(LLMs, code generation, document parsing, data analysis) can dramatically \
-reduce the expertise barrier. An idea that requires deep domain knowledge \
-should NOT be penalized on effort if that knowledge gap is bridgeable \
-via AI. Score effort based on what a competent developer WITH AI tools \
-can achieve, not on raw unaided human expertise requirements.
-
-Respond with ONLY valid JSON:
+Respond with ONLY this JSON structure:
 {{
-  "clustering_summary": "Brief description of how ideas were clustered",
-  "candidates": [
-    {{
-      "id": "idea-001",
-      "title": "Short catchy title",
-      "rationale": "One paragraph — why this matters, what it does",
-      "source_technique": "domain_scan",
-      "domain_tags": ["political", "game_theory"],
-      "novelty_score": 0.78,
-      "primary_persona": {{
-        "who": "City council member in a mid-size US city",
-        "pain": "No way to preview policy impact before voting",
-        "context": "Non-technical, uses Excel and email",
-        "motivation": "Wants data-driven decisions without hiring analysts"
-      }},
-      "score_breakdown": {{
-        "impact": 9.0,
-        "confidence": 7.5,
-        "effort": 6.0,
-        "cost": 3.0,
-        "ethical_risk": 2.0,
-        "sustainability": 6.5,
-        "defensibility": 7.0,
-        "market_timing": 8.0
-      }},
-      "estimated_effort": "medium",
-      "estimated_cost_usd_month": 45,
-      "ethical_risk_level": "low",
-      "sustainability_model": "SaaS for municipalities at $99/month",
-      "defensibility_notes": "Data moat from municipal API integrations",
-      "market_timing_notes": "Open data mandates expanding",
-      "score_reasoning": {{
-        "impact": "Why this score — what affected population, severity, urgency",
-        "confidence": "Why this score — evidence strength, certainty level",
-        "effort": "Why this score — complexity factors, AI leverage",
-        "cost": "Why this score — infrastructure needs",
-        "ethical_risk": "Why this score — misuse potential",
-        "sustainability": "Why this score — revenue model viability",
-        "defensibility": "Why this score — moats, switching costs",
-        "market_timing": "Why this score — readiness, regulatory window"
-      }},
-      "inverse_score": {{
-        "terrible_conditions": ["condition 1", "condition 2"],
-        "inverse_confidence": 4.5
-      }}
-    }}
-  ]
+  "clustering_summary": "...",
+  "candidates": [{{
+    "id": "idea-001", "title": "...", "rationale": "one paragraph",
+    "source_technique": "...", "domain_tags": ["..."],
+    "novelty_score": 0.78,
+    "primary_persona": {{"who": "...", "pain": "...", "context": "...", "motivation": "..."}},
+    "score_breakdown": {{"impact": 9, "confidence": 7, "effort": 6, "cost": 3, \
+"ethical_risk": 2, "sustainability": 6, "defensibility": 7, "market_timing": 8}},
+    "estimated_effort": "small|medium|large",
+    "estimated_cost_usd_month": 45,
+    "ethical_risk_level": "low|medium|high",
+    "sustainability_model": "...",
+    "defensibility_notes": "...",
+    "market_timing_notes": "...",
+    "inverse_score": {{"terrible_conditions": ["..."], "inverse_confidence": 4.5}}
+  }}]
 }}
 
-Return EXACTLY {top_n} candidates, ranked by quality (best first).
+LENGTH LIMIT: Keep rationale under 200 characters. sustainability_model, \
+defensibility_notes, market_timing_notes each under 150 characters. Be dense.
+
+Return EXACTLY {top_n} candidates, best first. Be critical, not generous.
 """
 
 # ---------------------------------------------------------------------------
@@ -354,7 +348,9 @@ STRESS_TEST_SYSTEM = (
 
 STRESS_TEST_USER = """\
 Stress-test these {candidate_count} idea candidates. For EACH idea, \
-perform a thorough adversarial analysis.
+perform a thorough adversarial analysis, then assess feasibility.
+
+{brief_context}
 
 CANDIDATES:
 {candidates_json}
@@ -378,14 +374,35 @@ didn't anticipate. Think like:
    - Obsolescence: "In 2 years this'll be irrelevant because..."
    - Timing: "This is too early/too late because..."
    - Defensibility: "A competitor could clone this in [X] days"
-   - Expertise gap: "Building this requires domain expertise in [X] that \
-the builder likely lacks"
+   - Expertise gap: "Building this requires domain expertise in [X] — \
+assess whether that expertise is obtainable"
 
-3. VERDICT:
-   - BUILD: survived attacks, feasible, worth building now
-   - MUTATE: good core but needs changes (describe mutation)
-   - KILL: fatal flaws that can't be fixed
-   - INCUBATE: promising but wrong timing or missing dependency
+3. STRONGEST DEFENSE: For each structured attack, also provide the \
+strongest possible counter-argument in one sentence. Be fair — if the \
+idea has a genuine strength that neutralizes the attack, say so.
+
+4. FEASIBILITY (score each 1-5, where 5 is best/lowest risk):
+   - technical_risk, data_availability, regulatory_risk, cost_infra_month
+   - time_to_prototype, maintenance_burden, llm_capability_fit
+   - defensibility, market_timing
+
+5. KILL CRITERIA: 2-3 conditions that should abort a build if discovered.
+
+6. VERDICT (be decisive — MUTATE is not a safe default):
+   - BUILD: more attacks survived than failed, no single fatal flaw \
+that invalidates the core concept. Most ideas should get BUILD if they \
+have a strong core.
+   - MUTATE: the core concept is valid BUT a specific, named flaw \
+requires a concrete change (you MUST describe the exact mutation). \
+Do NOT use MUTATE as a hedge — if the idea works, say BUILD.
+   - KILL: a fatal flaw that cannot be fixed by any mutation. The \
+fundamental premise is wrong. Use this for ideas with broken economics, \
+impossible technical requirements, or saturated markets with no gap.
+   - INCUBATE: the idea is good but depends on something that doesn't \
+exist yet (regulation, technology, market shift). Name the dependency.
+
+LENGTH LIMIT: Keep each field under 150 characters. Each structured_attack \
+and defense entry must be ONE sentence. freeform_attack max 2 sentences. Be dense.
 
 Respond with ONLY valid JSON:
 {{
@@ -403,11 +420,32 @@ Respond with ONLY valid JSON:
         "Timing: ...",
         "Defensibility: ..."
       ],
+      "defenses": [
+        "Prior art defense: ...",
+        "Adoption defense: ...",
+        "Technical defense: ..."
+      ],
       "attacks_made": 9,
       "attacks_survived": 6,
       "attacks_fatal": 3,
       "strongest_argument": "The single most compelling attack",
+      "strongest_defense": "The single most compelling counter-argument",
       "suggested_mutation": "How the idea should change (empty if BUILD)",
+      "feasibility_matrix": {{
+        "technical_risk": 4,
+        "data_availability": 3,
+        "regulatory_risk": 4,
+        "cost_infra_month": 4,
+        "time_to_prototype": 3,
+        "maintenance_burden": 3,
+        "llm_capability_fit": 4,
+        "defensibility": 3,
+        "market_timing": 4
+      }},
+      "kill_criteria": [
+        "Abort if ...",
+        "Abort if ..."
+      ],
       "verdict": "BUILD"
     }}
   ]
@@ -448,6 +486,9 @@ adapt to neutralize it?
 
 4. Rate each exchange: did the defense SURVIVE (convincing counter), get \
 WEAKENED (partial counter), or is it FATAL (no viable defense)?
+
+LENGTH LIMIT: Keep each field under 150 characters. defense and pivot_if_needed \
+must be ONE sentence each. Be dense, not verbose.
 
 Respond with ONLY valid JSON:
 {{
@@ -512,6 +553,10 @@ concede what can't be defended.
 
 5. KILL CRITERIA: For surviving ideas, define 2-3 conditions that should \
 abort a build if discovered during execution.
+
+LENGTH LIMIT: Keep each field under 150 characters. Rebuttals must be ONE \
+sentence each. Limit to 4 exchanges per idea (most important angles only). \
+Be dense, not verbose.
 
 Respond with ONLY valid JSON:
 {{
@@ -590,6 +635,39 @@ def build_constraint_context(constraints: list[str] | None) -> str:
     return "USER-SPECIFIED CONSTRAINTS:\n" + "\n".join(f"- {c}" for c in constraints)
 
 
+def build_winner_repulsion_context(previous_winners: list[dict]) -> str:
+    """Build context that penalizes ideas too similar to previous run winners."""
+    if not previous_winners:
+        return ""
+    lines = [
+        "DIVERSITY RATCHET — Previous runs produced these winning ideas. "
+        "Do NOT generate ideas that are semantically similar to any of these. "
+        "Each new run must explore DIFFERENT solution spaces, mechanisms, and "
+        "domains. If you find yourself generating something that sounds like "
+        "a rephrasing of a previous winner, STOP and think of something "
+        "structurally different:"
+    ]
+    for w in previous_winners:
+        domains = ", ".join(w.get("domains", [])[:3])
+        lines.append(f"- [{w.get('score', 0):.1f}] {w['title']} ({domains})")
+    return "\n".join(lines)
+
+
+def build_failure_taxonomy_context(taxonomy: dict) -> str:
+    """Build context from structured failure taxonomy to help ideas pre-empt common failure modes."""
+    if not taxonomy:
+        return ""
+    lines = [
+        "FAILURE AUTOPSY — These are the most common ways ideas have died in "
+        "previous runs. Design your ideas to pre-empt these failure modes:"
+    ]
+    for category, entries in taxonomy.items():
+        if entries:
+            # Show category with count and most recent example
+            lines.append(f"- {category} ({len(entries)} occurrences): {entries[-1][:100]}")
+    return "\n".join(lines)
+
+
 def build_memory_context(
     past_idea_count: int,
     domain_heat_map: dict[str, int],
@@ -627,12 +705,29 @@ def build_immersion_context(domain_briefs: list[dict] | None) -> str:
 def build_refinement_context(
     mutations: list[dict] | None,
     attack_patterns: list[dict] | None,
+    banned_concepts: list[str] | None = None,
+    reframe_attacks: list[str] | None = None,
 ) -> str:
     """Build context from previous failed ideas to guide refinement round."""
-    if not mutations and not attack_patterns:
+    if not mutations and not attack_patterns and not banned_concepts and not reframe_attacks:
         return ""
 
     lines = ["LEARNING FROM PREVIOUS ROUND (Refinement Context):"]
+
+    if banned_concepts:
+        lines.append("\nBANNED CONCEPTS — DO NOT generate ideas similar to ANY of these. "
+                      "They have already been tried and either failed stress tests or are "
+                      "too similar to existing candidates. Generate ideas in COMPLETELY "
+                      "DIFFERENT solution spaces:")
+        for concept in banned_concepts:
+            lines.append(f"- {concept}")
+
+    if reframe_attacks:
+        lines.append("\nPROBLEM REFRAMES — Stress testing revealed these alternative ways "
+                      "to think about the problem. Use these as STARTING POINTS for new ideas "
+                      "instead of the original brief framing:")
+        for reframe in reframe_attacks:
+            lines.append(f"- {reframe}")
 
     if mutations:
         lines.append("\nSuggested mutations from MUTATE ideas:")
@@ -651,8 +746,9 @@ def build_refinement_context(
                 lines.append(f"- [{frequency}x]: {pattern_text}")
 
     lines.append(
-        "\nUSE THIS: Incorporate these learnings into divergence. "
-        "Generate NEW ideas that address these mutations and avoid these attack patterns."
+        "\nUSE THIS: Generate ideas that are STRUCTURALLY DIFFERENT from banned concepts, "
+        "explore the problem reframes as alternative angles, incorporate mutation learnings, "
+        "and pre-emptively defend against the common fatal attacks listed above."
     )
 
     return "\n".join(lines)

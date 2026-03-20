@@ -232,5 +232,88 @@
     "build_count": 0,
     "tokens_in": 74650,
     "tokens_out": 125227
+  },
+  {
+    "run_id": "20260319-153741-xbrain-is-an-ai-powered-idea-generation",
+    "timestamp": "2026-03-19T15:37:41.348803+00:00",
+    "ideas_generated": 20,
+    "candidates": 5,
+    "build_count": 0,
+    "tokens_in": 84460,
+    "tokens_out": 127069
+  },
+  {
+    "run_id": "20260319-163224-xbrain-is-an-ai-powered-idea-generation",
+    "timestamp": "2026-03-19T16:32:24.392729+00:00",
+    "ideas_generated": 26,
+    "candidates": 8,
+    "build_count": 1,
+    "tokens_in": 51277,
+    "tokens_out": 44850
+  },
+  {
+    "run_id": "20260319-152213-xbrain-is-an-ai-powered-idea-generation",
+    "timestamp": "2026-03-19T15:22:13.810386+00:00",
+    "ideas_generated": 23,
+    "candidates": 5,
+    "build_count": 0,
+    "tokens_in": 83173,
+    "tokens_out": 105487
+  },
+  {
+    "run_id": "20260319-165951-xbrain-is-an-ai-powered-idea-generation",
+    "timestamp": "2026-03-19T16:59:51.176200+00:00",
+    "ideas_generated": 28,
+    "candidates": 8,
+    "build_count": 1,
+    "tokens_in": 74589,
+    "tokens_out": 62158
+  },
+  {
+    "run_id": "20260319-152859-xbrain-is-an-ai-powered-idea-generation",
+    "timestamp": "2026-03-19T15:28:59.514366+00:00",
+    "ideas_generated": 22,
+    "candidates": 5,
+    "build_count": 0,
+    "tokens_in": 93714,
+    "tokens_out": 122175
+  },
+  {
+    "run_id": "20260319-173808-xbrain-is-an-ai-powered-idea-generation",
+    "timestamp": "2026-03-19T17:38:08.507588+00:00",
+    "ideas_generated": 23,
+    "candidates": 8,
+    "build_count": 0,
+    "tokens_in": 59155,
+    "tokens_out": 56175
+  },
+  {
+    "run_id": "20260319-183435-xbrain-is-an-ai-powered-idea-generation",
+    "timestamp": "2026-03-19T18:34:35.280625+00:00",
+    "ideas_generated": 22,
+    "candidates": 8,
+    "build_count": 0,
+    "tokens_in": 57338,
+    "tokens_out": 52216
+  },
+  {
+    "run_id": "20260319-184608-xbrain-is-an-ai-powered-idea-generation",
+    "timestamp": "2026-03-19T18:46:08.167449+00:00",
+    "ideas_generated": 25,
+    "candidates": 8,
+    "build_count": 0,
+    "pass_count": 8,
+    "tokens_in": 23144,
+    "tokens_out": 22524
+  },
+  {
+    "run_id": "20260319-185736-how-should-xbrain-improve-its-own",
+    "timestamp": "2026-03-19T18:57:36.987315+00:00",
+    "ideas_generated": 22,
+    "candidates": 8,
+    "build_count": 0,
+    "pass_count": 8,
+    "tokens_in": 23558,
+    "tokens_out": 22811
   }
 ]

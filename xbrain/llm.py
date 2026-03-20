@@ -20,8 +20,8 @@ class LLMClient:
     _WINDOW_SECONDS = 60
 
     def __init__(self, api_key: str, model: str, max_tokens: int = 16384):
-        self.client = anthropic.Anthropic(api_key=api_key)
-        self._async_client = anthropic.AsyncAnthropic(api_key=api_key)
+        self.client = anthropic.Anthropic(api_key=api_key, timeout=300.0)
+        self._async_client = anthropic.AsyncAnthropic(api_key=api_key, timeout=300.0)
         self.model = model
         self.max_tokens = max_tokens
         self.total_input_tokens = 0
@@ -44,7 +44,7 @@ class LLMClient:
         """Call the LLM and extract JSON from the response. Retries on transient errors."""
         use_model = model_override or self.model
         use_max_tokens = max_tokens or self.max_tokens
-        max_retries = 3
+        max_retries = 6
 
         for attempt in range(max_retries):
             try:
@@ -59,7 +59,7 @@ class LLMClient:
             except (anthropic.RateLimitError, anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
                 if attempt == max_retries - 1:
                     raise
-                wait = 2 ** attempt
+                wait = min(60, 5 * (2 ** attempt))
                 print(f"[RETRY] {type(e).__name__}, attempt {attempt + 1}/{max_retries}, waiting {wait}s...", file=sys.stderr)
                 time.sleep(wait)
 
@@ -104,7 +104,7 @@ class LLMClient:
             except (anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
                 if attempt == max_retries - 1:
                     raise
-                wait = 2 ** attempt
+                wait = min(60, 5 * (2 ** attempt))
                 print(f"[RETRY] {type(e).__name__}, attempt {attempt + 1}/{max_retries}, waiting {wait}s...", file=sys.stderr)
                 await asyncio.sleep(wait)
 
@@ -163,44 +163,70 @@ class LLMClient:
     @staticmethod
     def _extract_json(text: str, *, truncated: bool = False) -> dict | list:
         """Extract JSON from an LLM response, handling code blocks and truncation."""
-        # 1. Try ```json ... ``` blocks
-        match = re.search(r"```(?:json)?\s*\n(.*?)\n```", text, re.DOTALL)
+        # 1. Try ```json ... ``` blocks (complete fence)
+        match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
         if match:
+            inner = match.group(1).strip()
             try:
-                return json.loads(match.group(1))
+                return json.loads(inner)
             except json.JSONDecodeError:
-                pass
+                # Fence found but JSON is malformed/truncated — try repair
+                repaired = LLMClient._repair_truncated_json(inner)
+                if repaired is not None:
+                    print("[WARN] JSON in code fence was truncated; recovered partial JSON.", file=sys.stderr)
+                    return repaired
 
-        # 2. Try to find raw JSON starting with { or [
-        for i, ch in enumerate(text):
+        # 2. Check for OPEN fence with no closing fence (truncated response)
+        open_fence = re.search(r"```(?:json)?\s*\n?", text)
+        if open_fence and "```" not in text[open_fence.end():]:
+            # Opening fence found but no closing fence — extract everything after it
+            inner = text[open_fence.end():].strip()
+            try:
+                return json.loads(inner)
+            except json.JSONDecodeError:
+                repaired = LLMClient._repair_truncated_json(inner)
+                if repaired is not None:
+                    print("[WARN] JSON in unclosed code fence was truncated; recovered partial JSON.", file=sys.stderr)
+                    return repaired
+
+        # Strip remaining markdown fences so they don't interfere with raw search
+        cleaned = re.sub(r"```(?:json)?\s*\n?", "", text)
+        cleaned = re.sub(r"\n?\s*```", "", cleaned).strip()
+
+        # 3. Try to find raw JSON starting with { or [
+        for i, ch in enumerate(cleaned):
             if ch in "{[":
                 # Find the matching closing bracket
                 depth = 0
                 close = "}" if ch == "{" else "]"
-                for j in range(i, len(text)):
-                    if text[j] == ch:
+                for j in range(i, len(cleaned)):
+                    if cleaned[j] == ch:
                         depth += 1
-                    elif text[j] == close:
+                    elif cleaned[j] == close:
                         depth -= 1
                     if depth == 0:
                         try:
-                            return json.loads(text[i : j + 1])
+                            return json.loads(cleaned[i : j + 1])
                         except json.JSONDecodeError:
                             break
+                # Brackets never balanced — try truncation repair on everything from { onwards
+                repaired = LLMClient._repair_truncated_json(cleaned[i:])
+                if repaired is not None:
+                    print("[WARN] Unbalanced JSON brackets; recovered partial JSON.", file=sys.stderr)
+                    return repaired
                 break
 
-        # 3. Last resort: try the whole text
+        # 4. Last resort: try the whole cleaned text
         try:
-            return json.loads(text)
+            return json.loads(cleaned)
         except json.JSONDecodeError:
             pass
 
-        # 4. If truncated, try to repair by closing open brackets/braces
-        if truncated:
-            repaired = LLMClient._repair_truncated_json(text)
-            if repaired is not None:
-                print("[WARN] LLM response was truncated; recovered partial JSON.", file=sys.stderr)
-                return repaired
+        # 5. Final fallback: try repair on cleaned text
+        repaired = LLMClient._repair_truncated_json(cleaned)
+        if repaired is not None:
+            print("[WARN] LLM response was truncated; recovered partial JSON.", file=sys.stderr)
+            return repaired
 
         print("[ERROR] Could not parse JSON from LLM response. First 500 chars:", file=sys.stderr)
         print(text[:500], file=sys.stderr)

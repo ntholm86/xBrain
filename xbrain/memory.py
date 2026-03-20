@@ -35,6 +35,10 @@ class MemoryStore:
         """Return frequently occurring attack patterns from failed ideas."""
         return self._read("attack-patterns.json", [])
 
+    def get_failure_taxonomy(self) -> dict:
+        """Return structured failure taxonomy from past stress tests."""
+        return self._read("failure-taxonomy.json", {})
+
     def get_refinement_history(self) -> list[dict]:
         """Return history of refinement rounds."""
         return self._read("refinement-history.json", [])
@@ -101,6 +105,17 @@ class MemoryStore:
         """Persist attack patterns extracted from stress testing."""
         self._write("attack-patterns.json", patterns)
 
+    def save_failure_taxonomy(self, taxonomy: dict) -> None:
+        """Merge new failure classifications into the running taxonomy."""
+        existing = self.get_failure_taxonomy()
+        for category, entries in taxonomy.items():
+            if category not in existing:
+                existing[category] = []
+            existing[category].extend(entries)
+            # Keep only last 10 per category to prevent unbounded growth
+            existing[category] = existing[category][-10:]
+        self._write("failure-taxonomy.json", existing)
+
     def save_refinement_run(self, refinement_run: dict) -> None:
         """Record a refinement round."""
         history = self.get_refinement_history()
@@ -134,6 +149,18 @@ class MemoryStore:
         self._write("idea-genes.json", existing[-100:])
 
     # --- Helpers ---
+
+    def get_previous_winners(self, limit: int = 20) -> list[dict]:
+        """Return titles+domains of high-scoring ideas from previous runs for diversity repulsion."""
+        archive = self.get_idea_archive()
+        # Only ideas that passed (BUILD or MUTATE) with score >= 5.0
+        winners = [
+            {"title": a["title"], "domains": a.get("domains", []), "score": a.get("score", 0)}
+            for a in archive
+            if a.get("verdict") in ("BUILD", "MUTATE") and a.get("score", 0) >= 5.0
+        ]
+        # Return most recent first, limited
+        return winners[-limit:]
 
     def killed_idea_titles(self, limit: int = 15) -> list[str]:
         """Return recent killed idea titles for memory context."""

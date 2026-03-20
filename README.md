@@ -1,8 +1,22 @@
 # xBrain — AI Idea Engine
 
-Generate, score, stress-test, and refine project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then runs a 3-round adversarial debate — attacker vs defender with rebuttals — so only the genuinely strong ones survive.
+Generate, score, stress-test, and refine project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then runs adversarial stress testing — a devil's advocate attacks every idea from 9 angles — so only the genuinely strong ones survive.
 
-Now with **adversarial debate stress testing**, **cost forecasting**, **constraint conflict detection**, **project spec generation**, **idea lineage tracking**, **score explainability**, and **PMO export** (CSV/Jira/Markdown).
+Now with **adversarial stress testing**, **dynamic brief-adaptive scoring**, **cross-run diversity ratchet**, **failure taxonomy learning**, **mechanism stealing**, **moat archaeology**, **cost forecasting**, **constraint conflict detection**, **project spec generation**, **idea lineage tracking**, **score explainability**, and **PMO export** (CSV/Jira/Markdown).
+
+## What's New in v1.1
+
+**Dynamic CONVERGE** — The scoring/ranking phase now adapts its output fields to match the brief type. Product briefs get persona/ICP/go-to-market fields. Internal tool briefs get user role/workflow fit. Process briefs get current-state/proposed-change/metrics. No more forcing every idea into a SaaS product template.
+
+**Diversity Ratchet** — Cross-run winner repulsion. Previous high-scoring ideas are injected into DIVERGE as an exclusion list, pushing the engine toward unexplored territory instead of regenerating the same winning patterns.
+
+**Failure Taxonomy** — Structured learning from past attacks. Failed ideas are classified into 6 categories (prior art, adoption, technical, timing, defensibility, economics) and persisted. Future runs receive this taxonomy as context, steering generation away from idea shapes that repeatedly die to the same attack patterns.
+
+**Mechanism Stealing** (Inverse Ideation) — New DIVERGE technique (#6). Extracts working mechanisms from successful products in unrelated fields and transplants them into new contexts. Forces cross-pollination beyond simple domain collision.
+
+**Moat Archaeology** — Defensibility as a first-class constraint. During CONVERGE, any idea scoring below 4 on defensibility triggers a mandatory moat check: the AI must suggest a concrete mutation that would add a defensibility moat (network effects, data flywheel, switching costs, etc.). A defensibility gate also adjusts composite scores.
+
+**Streamlined Stress Test** — Reduced from 3-round adversarial debate (attack → defense → rebuttal) to single-round attack. Verdicts are now rendered immediately after the attack phase. This cut per-run cost from ~$0.30 to ~$0.14 and time from ~5 minutes to ~3 minutes, with no measurable loss in verdict quality.
 
 ## Setup
 
@@ -23,7 +37,7 @@ Now with **adversarial debate stress testing**, **cost forecasting**, **constrai
 python -m xbrain ideate
 ```
 
-That's it. Without `--domains`, the engine scans across ALL domains with no restrictions — technology, science, health, finance, agriculture, entertainment, and everything beyond. Use `--domains` to focus on specific areas. It generates ideas, deduplicates, fills gaps, scores, and stress-tests them through an adversarial debate. Results appear in `xbrain-runs/YYYYMMDD-HHMMSS-<brief-slug>/`.
+That's it. Without `--domains`, the engine scans across ALL domains with no restrictions — technology, science, health, finance, agriculture, entertainment, and everything beyond. Use `--domains` to focus on specific areas. It generates ideas, deduplicates, fills gaps, scores, and stress-tests them through adversarial attack. Results appear in `xbrain-runs/YYYYMMDD-HHMMSS-<brief-slug>/`.
 
 ## The Output
 
@@ -34,7 +48,7 @@ Each run creates a folder in `xbrain-runs/` containing:
 | **idea-report.md** | The main document to read — ranked ideas with scores, verdicts, and analysis |
 | idea-cards.json | Machine-readable idea data |
 | idea-log.json | Full pipeline trace |
-| stress-test-report.json | Adversarial debate results (attacker vs defender) |
+| stress-test-report.json | Adversarial stress test results (9-angle attack) |
 
 Open **idea-report.md** to review your ideas.
 
@@ -328,9 +342,9 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
            v                                    |   attack-patterns.json     |
   +========================================+    |   meta-metrics.json        |
   | PHASE -1: META-LEARN                   |    |   refinement-history.json  |
-  | (every 3 runs — runs FIRST)            |    +----------+-----------------+
-  |                                        |<---reads------+
-  |  Reads past run metrics, score history,|               |
+  | (every 3 runs — runs FIRST)            |    |   failure-taxonomy.json    |
+  |                                        |    +----------+-----------------+
+  |  Reads past run metrics, score history,|<---reads------+
   |  kill reasons, attack patterns.        |               |
   |  Distills into compact playbook        |               |
   |  (~200 tokens) + score calibration.    |               |
@@ -371,13 +385,14 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   | temp=0.9                               |<------| - Playbook (meta-learn)  |
   |                                        |       | - Domain briefs          |
   |  Generate N raw idea seeds using       |       | - Memory (past ideas,    |
-  |  5 simultaneous techniques:            |       |   killed titles, domain  |
+  |  6 simultaneous techniques:            |       |   killed titles, domain  |
   |                                        |       |   heat map)              |
   |  1. Domain Scan                        |       | - Brief text             |
   |  2. Cross-Domain Collision             |       | - Constraints            |
-  |  3. Contrarian Inversion              |       +==========================+
-  |  4. Contextual Constraints             |
-  |  5. AI-Augmentable Gap Detection       |
+  |  3. Contrarian Inversion              |       | - Winner repulsion list  |
+  |  4. Contextual Constraints             |       | - Failure taxonomy       |
+  |  5. AI-Augmentable Gap Detection       |       +==========================+
+  |  6. Mechanism Stealing                 |
   |                                        |
   |  Output: RawIdea[] (id, concept,       |
   |    source_technique, domain_tags,      |
@@ -436,34 +451,18 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
                      |
                      v
   +=================================================================+
-  | PHASE 3: STRESS TEST (3-Round Adversarial Debate)               |
+  | PHASE 3: STRESS TEST (Single-Round Attack)                      |
   | ALL ideas tested IN PARALLEL (async API calls per idea)         |
   |                                                                 |
   |  +-----------------------------------------------------------+ |
-  |  | Round 1/3: ATTACK (Devil's Advocate)         temp=0.4      | |
+  |  | ATTACK (Devil's Advocate)                     temp=0.4      | |
   |  |                                                            | |
   |  |  9 structured attack angles per idea:                      | |
   |  |  Prior art, Adoption failure, Technical blocker,           | |
   |  |  Problem reframe, Negative externalities, Obsolescence,    | |
   |  |  Timing, Defensibility, Expertise gap                      | |
   |  |  + 1 freeform devastating attack                           | |
-  |  +------------------------------+----------------------------+ |
-  |                                  |                              |
-  |                                  v                              |
-  |  +-----------------------------------------------------------+ |
-  |  | Round 2/3: DEFEND (Idea Champion)            temp=0.4      | |
-  |  |  (uses slim context: ID + title + score only)              | |
   |  |                                                            | |
-  |  |  Per attack: counter-argument + strengths ignored + pivot  | |
-  |  |  Outcome per exchange: SURVIVED / WEAKENED / FATAL         | |
-  |  +------------------------------+----------------------------+ |
-  |                                  |                              |
-  |                                  v                              |
-  |  +-----------------------------------------------------------+ |
-  |  | Round 3/3: REBUTTAL + VERDICT (Neutral Judge) temp=0.3    | |
-  |  |  (uses slim context: ID + title + score only)              | |
-  |  |                                                            | |
-  |  |  Attacker rebuts defenses, defender gives final word.      | |
   |  |  Judge renders per-idea:                                   | |
   |  |    - Feasibility matrix (9 dims, 1-5 scale)               | |
   |  |    - Kill criteria (abort conditions)                      | |
@@ -487,6 +486,8 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
                        |  |  2. Extract fatal attack patterns      |
                        |  |     (top 5 round 1, top 10 later)      |
                        |  |  3. Re-DIVERGE with learnings injected |
+                       |  |     + winner repulsion + failure       |
+                       |  |     taxonomy context                   |
                        |  |     (50%->33%->25% of idea count)      |
                        |  |  4. Re-CONVERGE + Re-STRESS TEST       |
                        |  |  5. Merge survivors (title dedup)      |
@@ -518,8 +519,8 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   |                                        |
   |  idea-report.md ............ Flagship  |
   |    human-readable ranked report with   |
-  |    full adversarial debates, scores,   |
-  |    personas, feasibility matrices.     |
+  |    scores, personas, stress tests,     |
+  |    moat checks, feasibility matrices.  |
   |                                        |
   |  idea-cards.json ........... Machine-  |
   |    readable survivor data.             |
@@ -569,12 +570,17 @@ Analyzes constraints for logical contradictions. Warns about conflicts and sugge
 Deep-dive domain research. For each domain, the AI maps tensions, incentive structures, regulatory landscape, existing players, historical failures, and underserved populations. This builds context that makes later idea generation more grounded.
 
 **Phase 1 — DIVERGE** (Round 1)
-Raw idea generation. Uses five techniques simultaneously:
+Raw idea generation. Uses six techniques simultaneously:
 1. **Domain Scan** — identify unsolved problems per domain
 2. **Cross-Domain Collision** — force novel intersections between unrelated fields
 3. **Contrarian Inversion** — flip conventional assumptions and build on the opposite
 4. **Contextual Constraints** — apply real-world constraints (offline, free, no PII)
 5. **AI-Augmentable Gap Detection** — find ideas where AI bridges the expertise gap, so a developer without domain credentials can still deliver expert-level value
+6. **Mechanism Stealing** (Inverse Ideation) — extract working mechanisms from successful products in unrelated fields and transplant them into new contexts
+
+Additional context injected:
+- **Winner repulsion list** — titles and domains of previous high-scoring ideas, instructing the AI to avoid similar territory (cross-run diversity ratchet)
+- **Failure taxonomy** — categorized attack patterns from past runs (prior art, adoption, technical, timing, defensibility, economics), steering generation away from repeatedly fatal idea shapes
 
 **Phase 1b — DEDUP** (Semantic Deduplication)
 Analyzes all raw ideas for semantic duplicates — same concept, different words. Collapses near-identical ideas and identifies which themes are over-represented and which areas have gaps. This prevents the scoring phase from wasting cycles on copies.
@@ -583,7 +589,15 @@ Analyzes all raw ideas for semantic duplicates — same concept, different words
 Multi-turn divergence. Takes the gaps identified by dedup and generates new ideas specifically designed to fill those gaps. Uses higher creativity (temperature=0.95) and is explicitly told NOT to repeat over-represented themes. This forces diversity.
 
 **Phase 2 — CONVERGE**
-Clusters, scores, and ranks. Each idea gets:
+Clusters, scores, and ranks. The output format dynamically adapts to the brief type:
+- **Product/startup briefs** → persona, ICP, go-to-market fields
+- **Internal tool briefs** → user role, workflow fit, integration surface
+- **Process/workflow briefs** → current state, proposed change, success metrics
+- **Default** → flexible format matching the brief's nature
+
+Each idea also gets a **moat check** — if defensibility scores below 4, the AI must suggest a concrete mutation that would add a defensibility moat (network effects, data flywheel, switching costs, etc.). This is the **Moat Archaeology** feature.
+
+Per idea:
 - A specific **target persona** — not generic demographics, but a concrete person: who they are, what pain they feel, what context they work in, and what motivates them
 - A **first customer profile (ICP)** — the ideal early adopter type, organization size, and readiness level
 - **8-dimension scoring** (0-10 each):
@@ -605,26 +619,23 @@ Clusters, scores, and ranks. Each idea gets:
 - **Inverse scoring** ("what would need to be TRUE for this to be TERRIBLE?") — breaks the tendency to score everything 7-8 by forcing the AI to articulate failure conditions. If the idea is fragile (inverse_confidence > 6), positive scores get reduced
 - **Score calibration** from the meta-learning playbook (if available). Scores are marked UNCALIBRATED until the meta-learning phase has run (every 3 runs). After calibration, weak dimensions are scored more harshly and inflated/deflated scores are adjusted
 
-**Phase 3 — STRESS TEST (Adversarial Debate)**
-Three-round adversarial debate between a Devil's Advocate (attacker) and an Idea Champion (defender), judged by a neutral arbiter. Each idea is tested **in parallel** — all ideas run their attack/defense/rebuttal concurrently using async API calls, significantly reducing wall-clock time:
+**Phase 3 — STRESS TEST (Adversarial Attack)**
+Single-round adversarial attack by a Devil's Advocate. Each idea is tested **in parallel** — all ideas run their attack concurrently using async API calls, significantly reducing wall-clock time:
 
-- **Round 1 — Attack:** The Devil's Advocate attacks each idea from 9 angles: prior art, adoption failure, technical blockers, problem reframe, negative externalities, obsolescence, timing, defensibility, and expertise gaps
-- **Round 2 — Defense:** The Idea Champion responds to every attack with specific counter-arguments, identifies strengths the attacker ignored, and proposes pivots for valid weaknesses. Uses slim context (ID + title + score only, not full candidate data) to reduce token cost
-- **Round 3 — Rebuttal + Verdict:** A neutral judge facilitates final rebuttals from both sides, then renders verdicts based on the full debate
+- **Attack:** The Devil's Advocate attacks each idea from 9 angles: prior art, adoption failure, technical blockers, problem reframe, negative externalities, obsolescence, timing, defensibility, and expertise gaps. A verdict is rendered immediately based on attack severity.
 
-The full debate (attack → defense → rebuttal) is visible in the report for each idea, letting you see exactly why an idea was approved or rejected.
+For expertise gap attacks, the AI evaluates whether AI tools can bridge the gap — only truly unbridgeable gaps (licensure, physical skills) count as fatal.
 
 Additional outputs per idea:
-- For expertise gap attacks, the AI evaluates whether AI tools can bridge the gap — only truly unbridgeable gaps (licensure, physical skills) count as fatal
-- Each idea gets a **feasibility matrix** (9 dimensions, scored 1-5): technical risk, data availability, regulatory risk, infrastructure cost, time to prototype, maintenance burden, LLM capability fit, defensibility, and market timing
-- Each idea gets **kill criteria** — specific conditions under which to abort building
-- Each idea gets a verdict: **BUILD**, **MUTATE**, **KILL**, or **INCUBATE**
+- **Feasibility matrix** (9 dimensions, scored 1-5): technical risk, data availability, regulatory risk, infrastructure cost, time to prototype, maintenance burden, LLM capability fit, defensibility, and market timing
+- **Kill criteria** — specific conditions under which to abort building
+- **Verdict**: BUILD, MUTATE, KILL, or INCUBATE
 
 **Phase 4 — REFINE** (automatic, if no BUILD verdicts)
 Iterative refinement loop — up to 3 rounds. Triggered when the stress test produces zero BUILD verdicts. Each round:
 1. **Extract mutations** — collects suggested improvements from every MUTATE verdict
 2. **Extract attack patterns** — identifies the most frequent fatal arguments (top 5 in round 1, top 10 in later rounds)
-3. **Re-generate** — runs a fresh DIVERGE with the mutations and patterns injected as context, using progressively lower creativity (temperature drops from 0.75 → 0.60 → 0.50) and fewer ideas (50% → 33% → 25% of original count)
+3. **Re-generate** — runs a fresh DIVERGE with the mutations, patterns, winner repulsion list, and failure taxonomy injected as context, using progressively lower creativity (temperature drops from 0.75 → 0.60 → 0.50) and fewer ideas (50% → 33% → 25% of original count)
 4. **Re-score and re-stress** — runs CONVERGE and STRESS TEST on the new batch
 5. **Merge survivors** — new BUILD ideas are merged with previous rounds. Title-based deduplication ensures the same concept (from different rounds) only appears once — the highest-scored version is kept
 
@@ -636,6 +647,7 @@ Persists all run data to cross-session memory:
 - **Kill log**: KILL ideas and their strongest fatal argument recorded for future avoidance
 - **Mutations**: MUTATE ideas with suggested improvements saved for refinement learning
 - **Attack patterns**: recurring fatal arguments extracted and stored
+- **Failure taxonomy**: attacks classified into 6 categories (prior art, adoption, technical, timing, defensibility, economics) for cross-run learning
 - **Domain heat map**: domains used in this run tallied for exploration tracking
 - **Lineage**: idea→run relationships recorded for cross-run lineage browsing
 - **Idea genes**: high-scoring ideas (score ≥ 6.5) decomposed into reusable solution patterns (capped at 100 genes)
@@ -657,6 +669,7 @@ xBrain remembers across runs. Files in `xbrain-memory/persistent/`:
 | `idea-genes.json` | Reusable idea patterns extracted from high-scoring ideas |
 | `mutation-archive.json` | MUTATE ideas with their suggested mutations |
 | `attack-patterns.json` | Recurring attack patterns from stress tests |
+| `failure-taxonomy.json` | Categorized failure patterns (prior art, adoption, technical, timing, defensibility, economics) |
 | `refinement-history.json` | History of refinement rounds |
 
 ### The Report
@@ -668,14 +681,14 @@ Each run generates `idea-report.md` with:
 - **Domain Briefs** — if IMMERSE ran, the full domain research (tensions, pressure points, regulatory windows)
 - **Ideas at a Glance** — quick comparison table with score, effort, and verdict
 - **Per-idea detail**:
-  - Target persona (who, pain, context, motivation)
-  - First customer profile (ICP type, org size, readiness)
+  - Target persona (who, pain, context, motivation) — dynamically adapted to brief type
+  - First customer profile (ICP type, org size, readiness) — for product briefs only
   - 8-dimension score table with reasoning per dimension
   - Inverse fragility check (what would make this terrible?)
   - Key assumptions (critical unknowns that must be validated)
-  - Stress test results: attacks made/survived/fatal, strongest attack, strongest defense, suggested mutation
-  - **Full adversarial debate** — each attack angle shown with attacker argument, defender response, attacker rebuttal, defender rebuttal, and outcome (SURVIVED/FATAL/WEAKENED)
+  - Stress test results: attacks made/survived/fatal, strongest attack, suggested mutation
   - Feasibility matrix (9 dimensions, 1-5 scale)
+  - Moat check — if defensibility < 4, a moat-strengthening mutation is suggested
   - Kill criteria (abort conditions for the build phase)
   - Competitive landscape and timeline alignment
 
@@ -691,13 +704,13 @@ Each pipeline phase prints a visual header, and at the end of a run, xBrain prin
 
 ## Cost
 
-The stress test runs **per-idea parallel API calls** — with 8 ideas, each round fires 8 concurrent requests instead of one batched request. This multiplies the number of API calls (8 ideas × 3 rounds = 24 stress calls) but dramatically reduces wall-clock time since all calls within a round execute simultaneously. Combined with the sequential phases (constraint check, immerse, diverge, dedup, gap-fill, converge), a typical run makes 30+ API calls but completes much faster than a sequential pipeline.
+The stress test runs **per-idea parallel API calls** — with 8 ideas, each fires 8 concurrent requests instead of one batched request. This multiplies the number of API calls but dramatically reduces wall-clock time since all calls execute simultaneously. Combined with the sequential phases (constraint check, immerse, diverge, dedup, gap-fill, converge), a typical run makes ~15 API calls and completes in under 3 minutes.
 
 If the refinement loop triggers (no BUILD verdicts), each refinement round adds diverge + converge + parallel stress test calls, up to 3 rounds.
 
-The actual cost (tokens in/out and dollar amount) is tracked and shown in the terminal output and in the report header. Defense and rebuttal rounds use **slim context** (just idea ID, title, and score instead of full candidate data), saving ~30-40% on input tokens for those phases.
+The actual cost (tokens in/out and dollar amount) is tracked and shown in the terminal output and in the report header.
 
-Approximate cost per run with Haiku: **$0.10–$0.30** (simple run), **$0.30–$0.60** (with refinement rounds).
+Approximate cost per run with Sonnet: **$0.10–$0.15** (simple run), **$0.20–$0.40** (with refinement rounds).
 
 API calls include automatic **retry with exponential backoff** for rate limits, timeouts, and connection errors (up to 3 attempts).
 
