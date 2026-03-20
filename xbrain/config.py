@@ -76,6 +76,23 @@ class Config:
         },
     }
 
+    # Per-phase max output tokens — keeps LLM responses tight and saves cost.
+    # Override globally with XBRAIN_MAX_TOKENS env var; tweak individual phases here.
+    PHASE_MAX_TOKENS: dict[str, int] = {
+        "meta":              2048,
+        "constraints":       1024,
+        "immerse":           4096,
+        "diverge":           10240,
+        "dedup":             2048,
+        "gapfill":           8192,
+        "converge-cluster":  6144,
+        "converge-compare":  12288,
+        "converge-enrich":   12288,
+        "stress-attack":     4096,
+        "refine-diverge":    8192,
+        "refine-converge":   12288,
+    }
+
     # Cheap model (used for routing)
     cheap_model: str = os.getenv("XBRAIN_CHEAP_MODEL", "claude-haiku-4-5-20251001")
     best_model: str = os.getenv("XBRAIN_BEST_MODEL", "") or os.getenv("XBRAIN_MODEL", "claude-sonnet-4-20250514")

@@ -3376,5 +3376,400 @@
       "legal_automation",
       "software_engineering"
     ]
+  },
+  {
+    "id": "idea-010",
+    "title": "Mechanism Library Extraction & Randomized Transplantation",
+    "score": 9.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "software_engineering",
+      "pattern_recognition",
+      "innovation_methodology"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Technique-Isolated Diverge with Per-Technique Temperature Tuning",
+    "score": 8.9,
+    "verdict": "BUILD",
+    "domains": [
+      "software_engineering",
+      "prompt_engineering",
+      "ideation_infrastructure"
+    ]
+  },
+  {
+    "id": "gap-007",
+    "title": "Technique-Specific Temperature & Sampling Strategy",
+    "score": 8.3,
+    "verdict": "BUILD",
+    "domains": [
+      "llm_optimization",
+      "sampling_strategy",
+      "prompt_engineering"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Competitive Gap Explosion: Explicit Competitor Obsolescence Ideation",
+    "score": 7.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "software_engineering",
+      "competitive_strategy",
+      "product_development"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Adversarial Domain Collision Matrix: Explicit Cross-Domain Pairing",
+    "score": 7.9,
+    "verdict": "BUILD",
+    "domains": [
+      "cross_domain_innovation",
+      "pattern_transfer",
+      "competitive_intelligence"
+    ]
+  },
+  {
+    "id": "idea-015",
+    "title": "Assumption Inversion Matrix: Systematic Assumption Negation",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "software_engineering",
+      "epistemology",
+      "risk_analysis"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Seed Mutation Engine with Failure Gene Inversion",
+    "score": 6.2,
+    "verdict": "BUILD",
+    "domains": [
+      "software_engineering",
+      "evolutionary_algorithms",
+      "memory_leverage"
+    ]
+  },
+  {
+    "id": "idea-001-PAIRWISE",
+    "title": "Pairwise Comparative Scoring Protocol",
+    "score": 7.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "software_engineering",
+      "prompt_engineering",
+      "comparative_judgment"
+    ]
+  },
+  {
+    "id": "gap-009-ASSUMPTION-DECOUPLING",
+    "title": "Assumption Decoupling and Criticality Ranking",
+    "score": 7.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "logic_modeling",
+      "risk_quantification",
+      "assumption_testing"
+    ]
+  },
+  {
+    "id": "idea-002-ASSUMPTION-INVERSION",
+    "title": "Assumption Stress-Testing via Inversion",
+    "score": 7.3,
+    "verdict": "BUILD",
+    "domains": [
+      "software_engineering",
+      "epistemology",
+      "risk_analysis"
+    ]
+  },
+  {
+    "id": "idea-010-MARKET-TIMING-SIGNALS",
+    "title": "Market Timing as S-Curve Position (Web Search Calibration)",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "software_engineering",
+      "market_analysis",
+      "data_integration"
+    ]
+  },
+  {
+    "id": "idea-007-EFFORT-BREAKDOWN",
+    "title": "Effort Estimation via Component Breakdown",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "software_engineering",
+      "project_management",
+      "estimation"
+    ]
+  },
+  {
+    "id": "idea-004-DECOMPOSED",
+    "title": "Decomposed Scoring Pipeline with Error Recovery",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "software_engineering",
+      "pipeline_architecture",
+      "error_recovery"
+    ]
+  },
+  {
+    "id": "idea-006-KILL-PATTERN-MINING",
+    "title": "Kill-Pattern Transplantation from Archive",
+    "score": 6.3,
+    "verdict": "BUILD",
+    "domains": [
+      "software_engineering",
+      "knowledge_management",
+      "pattern_recognition"
+    ]
+  },
+  {
+    "id": "gap-001-FOUNDER-FIT",
+    "title": "Founder-Idea Fit Matcher",
+    "score": 6.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "organizational_psychology",
+      "talent_management",
+      "execution_risk"
+    ]
+  },
+  {
+    "id": "idea-001-merged",
+    "title": "Comparative Scoring via Ranked Pair Elimination",
+    "score": 8.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "prompt_engineering",
+      "decision_theory",
+      "scoring_architecture"
+    ]
+  },
+  {
+    "id": "gap-002-merged",
+    "title": "Assumption Validation Sequencing via Criticality Ranking",
+    "score": 7.5,
+    "verdict": "BUILD",
+    "domains": [
+      "risk_prioritization",
+      "empirical_validation",
+      "assumption_quality"
+    ]
+  },
+  {
+    "id": "idea-004-merged",
+    "title": "Persona Grounding via Inverse User Research from Brief Context",
+    "score": 7.4,
+    "verdict": "BUILD",
+    "domains": [
+      "product_design",
+      "user_research",
+      "context_grounding"
+    ]
+  },
+  {
+    "id": "gap-006-merged",
+    "title": "Null Hypothesis Scoring via Falsification Tests",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "scientific_rigor",
+      "hypothesis_testing",
+      "confidence_calibration"
+    ]
+  },
+  {
+    "id": "gap-008-merged",
+    "title": "Scoring Transparency Audit Trail: Justification per Dimension",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "explainability",
+      "auditability",
+      "stakeholder_alignment"
+    ]
+  },
+  {
+    "id": "idea-003-merged",
+    "title": "Effort Estimation via Analog Retrieval from Memory Archive",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "project_management",
+      "memory_leverage",
+      "effort_estimation"
+    ]
+  },
+  {
+    "id": "idea-008-merged",
+    "title": "Market Timing via S-Curve Positioning & Recent Signal Integration",
+    "score": 6.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "market_analysis",
+      "data_integration",
+      "temporal_positioning"
+    ]
+  },
+  {
+    "id": "gap-005-merged",
+    "title": "Time-Decay Score Mutation: 12-Month Trajectory Analysis",
+    "score": 6.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "temporal_dynamics",
+      "strategic_positioning",
+      "scenario_planning"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Assumption Criticality Ranking via Logical Dependency Graph",
+    "score": 8.1,
+    "verdict": "BUILD",
+    "domains": [
+      "logic_modeling",
+      "assumption_quality",
+      "risk_analysis"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Persona Grounding via Inverse Brief Parse",
+    "score": 7.9,
+    "verdict": "BUILD",
+    "domains": [
+      "persona_design",
+      "prompt_engineering",
+      "context_grounding"
+    ]
+  },
+  {
+    "id": "idea-008",
+    "title": "Scoring Justification Audit Trail",
+    "score": 7.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "auditability",
+      "explainability",
+      "prompt_engineering"
+    ]
+  },
+  {
+    "id": "idea-018",
+    "title": "Effort Estimation Decomposition via Component Inventory",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "effort_estimation",
+      "project_management",
+      "decomposition"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Scoring via Deliberate Disagreement (Dual-Prompt Scoring)",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "scoring_architecture",
+      "epistemology",
+      "prompt_engineering"
+    ]
+  },
+  {
+    "id": "idea-017",
+    "title": "Persona Validation via Role-Play Interrogation",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "persona_design",
+      "validation",
+      "user_research"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Idea Mutation Engine",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "product_strategy",
+      "ideation_architecture"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Pairwise Scoring via Ranked Batch Elimination",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "comparative_judgment",
+      "scoring_architecture",
+      "decision_theory"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Adversarial Ideation Partner",
+    "score": 7.4,
+    "verdict": "BUILD",
+    "domains": [
+      "ideation_architecture",
+      "adversarial_learning",
+      "prompt_engineering"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Autonomy-as-Constraint Generator",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "ideation_architecture",
+      "systems_design",
+      "self_awareness"
+    ]
+  },
+  {
+    "id": "idea-013",
+    "title": "Autonomy as Multi-Agent Negotiation",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "ideation_architecture",
+      "multi_agent_systems",
+      "decision_theory"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "Post-Launch Learning Loop",
+    "score": 6.0,
+    "verdict": "BUILD",
+    "domains": [
+      "feedback_loops",
+      "validation",
+      "continuous_learning"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "Human-AI Disagreement Resolution Protocol",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "collaboration",
+      "human_ai_teaming",
+      "conflict_resolution"
+    ]
   }
 ]

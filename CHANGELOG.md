@@ -1,5 +1,73 @@
 # Changelog
 
+## v1.9.0 — 2026-03-20
+
+### New Features
+
+#### Per-Phase Cost Breakdown
+Every run now persists a full per-phase cost breakdown in `idea-log.json`, recording the model used, input/output token counts, and dollar cost for each LLM call. The `idea-report.md` renders this as a **Cost Breakdown** table in the summary section, giving immediate visibility into where tokens are spent.
+
+#### Configurable Per-Phase Token Budgets
+New `PHASE_MAX_TOKENS` dict in `config.py` centralizes the max output-token budget for every pipeline phase (meta, constraints, immerse, diverge, dedup, gapfill, converge-cluster, converge-compare, converge-enrich, stress-attack, refine-diverge, refine-converge). All `generate_json` calls now read from this config via `_max_tokens_for_phase()` instead of using hardcoded values. Unknown phases fall back to the global `max_tokens` default.
+
+### Fixes
+
+#### Score Value Clamping
+The LLM occasionally returns dollar amounts (e.g. `cost: 12000`) instead of 0–10 scores in `score_breakdown`, causing `ValidationError` crashes. `_parse_candidate()` now clamps all numeric score values to [0, 10] before passing to `ScoreBreakdown`.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.9.0
+- `xbrain/config.py` — added `PHASE_MAX_TOKENS` dict
+- `xbrain/ideate.py` — `_max_tokens_for_phase()` helper, all LLM calls use it, score clamping in `_parse_candidate()`, cost_info persisted in idea-log.json
+- `xbrain/output.py` — Cost Breakdown table in report summary
+
+---
+
+## v1.8.0 — 2026-03-20
+
+### New Features
+
+#### Decomposed CONVERGE Pipeline
+The single CONVERGE phase is now split into three sub-phases for better scoring accuracy:
+- **2A — Cluster + Initial Score**: Clusters raw ideas and produces initial multi-dimensional scores. Prompt is simplified — no more persona, assumptions, or moat analysis at this stage.
+- **2B — Comparative Ranking**: Force-ranks candidates head-to-head on impact, confidence, and defensibility. Adjusts scores to enforce a ≥3.0 point spread. Replaces the old mechanical score-stretching with LLM-driven comparative judgment.
+- **2C — Enrich + Assumption Inversion**: Adds personas, key assumptions, moat analysis, customer profiles, and sustainability models. Each assumption gets an **inverse claim** and **fragility rating** — if the inverse is easy to defend (score ≥4/5), the assumption is flagged 🔴 fragile. Enrichment is batched (4 candidates per call) to avoid token truncation.
+
+#### Assumption Inversion & Fragility Badges
+Each key assumption now includes `inverse_claim`, `inverse_defense_quality` (1-5), and `fragility_flag` (fragile/solid). Reports render 🔴/🟢 badges and show the inverse claim with defense quality rating. Fragile assumptions surface critical vulnerabilities before stress testing.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.8.0
+- `xbrain/prompts.py` — simplified CONVERGE_USER, new CONVERGE_COMPARE_SYSTEM/USER and CONVERGE_ENRICH_SYSTEM/USER prompts
+- `xbrain/ideate.py` — `_phase_converge()` decomposed into 3 sub-phases with batched enrichment, `_normalize_assumptions()` preserves inversion fields, removed score-stretch enforcement
+- `xbrain/output.py` — fragility badges (🔴/🟢) and inverse claims in assumption rendering
+
+---
+
+## v1.7.0 — 2026-03-20
+
+### New Features
+
+#### Web Search Grounding
+xBrain now grounds its analysis in live web data. Before the IMMERSE phase LLM call, the pipeline queries DuckDuckGo and HackerNews for each domain (e.g. `"{domain} startups trends 2025 2026"`, `"{domain} biggest problems pain points"`). Search results are injected as `CURRENT MARKET DATA` context, so domain briefs reflect current reality instead of Claude's training cutoff. In the STRESS TEST phase, each idea is searched for prior art (`"{title} existing product competitor"`) before the attack, grounding the prior art attack angle in real competitors.
+
+#### Pluggable Search Architecture
+New `xbrain/search.py` module with a `SearchProvider` base class and `SearchAggregator` that fans queries to all enabled providers and deduplicates results by URL. Adding a new provider = subclass `SearchProvider` + implement `search()` + register in `from_config()`. Current providers:
+- **DuckDuckGoProvider** — free, no API key, requires `duckduckgo-search` or `ddgs` package
+- **HackerNewsProvider** — free, no API key, uses stdlib `urllib` against Algolia API
+
+Search is best-effort: if no providers are available (packages not installed, network down), the pipeline runs exactly as before with no errors.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.7.0
+- `xbrain/search.py` — NEW: pluggable search module with DuckDuckGo + HackerNews providers
+- `xbrain/ideate.py` — search aggregator initialization in `__init__`, web search in `_phase_immerse()` and `_phase_stress_test()`
+- `xbrain/prompts.py` — `{search_context}` placeholder in `IMMERSE_USER`, new `build_search_context()` function
+- `xbrain/output.py` — compact adversarial debate formatting (removed blank lines between attacker/defender quotes)
+- `requirements.txt` — added `duckduckgo-search>=7.0.0`
+
+---
+
 ## v1.6.0 — 2026-03-20
 
 ### New Features

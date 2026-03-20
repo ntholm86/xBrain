@@ -48,6 +48,21 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         lines.append(f"- **Actual Cost:** ${cost_info['total_cost_usd']:.4f}")
     lines.append("")
 
+    # Per-phase cost breakdown table
+    if cost_info and cost_info.get("phases"):
+        lines.append("### Cost Breakdown")
+        lines.append("")
+        lines.append("| Phase | Model | Input | Output | Cost |")
+        lines.append("|-------|-------|------:|-------:|-----:|")
+        for p in cost_info["phases"]:
+            model_short = p["model"].split("-")[1] if "-" in p["model"] else p["model"]
+            lines.append(
+                f"| {p['phase']} | {model_short} | "
+                f"{p['input_tokens']:,} | {p['output_tokens']:,} | "
+                f"${p['cost_usd']:.4f} |"
+            )
+        lines.append("")
+
     # Sort survivors for comparative summary
     sorted_survivors = sorted(result.survivors, key=lambda c: c.composite_score, reverse=True)
     
@@ -189,7 +204,14 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
                     method = assumption.get("validation_method", "")
                     cost_badge = f" `[{cost}]`" if cost else ""
                     method_suffix = f" — *{method}*" if method else ""
-                    lines.append(f"{j}. {claim}{cost_badge}{method_suffix}")
+                    fragility = assumption.get("fragility_flag", "")
+                    frag_badge = f" {'🔴' if fragility == 'fragile' else '🟢'}" if fragility else ""
+                    lines.append(f"{j}. {claim}{cost_badge}{frag_badge}{method_suffix}")
+                    inverse = assumption.get("inverse_claim", "")
+                    if inverse:
+                        defense_q = assumption.get("inverse_defense_quality", "")
+                        q_note = f" (defense: {defense_q}/5)" if defense_q else ""
+                        lines.append(f"   - *Inverse:* {inverse}{q_note}")
                 else:
                     lines.append(f"{j}. {assumption}")
         else:
@@ -328,19 +350,15 @@ def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
                 lines.append(f"**{rnd.angle}** {outcome_emoji} *{outcome_label}*")
             else:
                 lines.append(f"**{rnd.angle}**")
-            lines.append("")
             if rnd.attack:
                 lines.append(f"> **\U0001f525 Attacker:** {rnd.attack}")
-                lines.append("")
             if rnd.defense:
                 lines.append(f"> **\U0001f6e1\ufe0f Defender:** {rnd.defense}")
-                lines.append("")
             if rnd.attacker_rebuttal:
                 lines.append(f"> **\U0001f525 Attacker (rebuttal):** {rnd.attacker_rebuttal}")
-                lines.append("")
             if rnd.defender_rebuttal:
                 lines.append(f"> **\U0001f6e1\ufe0f Defender (rebuttal):** {rnd.defender_rebuttal}")
-                lines.append("")
+            lines.append("")
         lines.append("")
 
     # Feasibility matrix

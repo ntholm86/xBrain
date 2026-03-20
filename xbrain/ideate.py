@@ -28,11 +28,16 @@ from xbrain.models import (
     compute_composite_score,
 )
 from xbrain.output import generate_idea_report
+from xbrain.search import SearchAggregator, format_search_results
 from xbrain.prompts import (
     CONSTRAINT_CHECK_SYSTEM,
     CONSTRAINT_CHECK_USER,
     CONVERGE_SYSTEM,
     CONVERGE_USER,
+    CONVERGE_COMPARE_SYSTEM,
+    CONVERGE_COMPARE_USER,
+    CONVERGE_ENRICH_SYSTEM,
+    CONVERGE_ENRICH_USER,
     DEDUP_SYSTEM,
     DEDUP_USER,
     DIVERGE_GAPFILL_SYSTEM,
@@ -56,6 +61,7 @@ from xbrain.prompts import (
     build_winner_repulsion_context,
     build_failure_taxonomy_context,
     build_failure_blocklist_context,
+    build_search_context,
     CANONICAL_FAILURE_TYPES,
 )
 
@@ -141,6 +147,11 @@ class IdeatePipeline:
                     "ANTHROPIC_API_KEY not set. Copy .env.example to .env and add your key."
                 )
             self.llm = LLMClient(self.cfg.api_key, self.cfg.model, self.cfg.max_tokens)
+        self.search = SearchAggregator.from_config()
+        if self.search.enabled:
+            _log("SEARCH", f"Web search enabled: {', '.join(self.search.provider_names)}")
+        else:
+            _log("SEARCH", "No search providers available (install duckduckgo-search for web grounding)")
 
     # ------------------------------------------------------------------
     # Public API
@@ -449,7 +460,7 @@ class IdeatePipeline:
         data = self.llm.generate_json(
             META_LEARN_SYSTEM, prompt, temperature=0.3,
             model_override=self._model_for_phase("meta"), phase="meta",
-            max_tokens=2048,
+            max_tokens=self._max_tokens_for_phase("meta"),
         )
 
         playbook = data.get("playbook", "")
@@ -482,7 +493,7 @@ class IdeatePipeline:
             data = self.llm.generate_json(
                 CONSTRAINT_CHECK_SYSTEM, prompt, temperature=0.2,
                 model_override=self._model_for_phase("constraints"), phase="constraints",
-                max_tokens=1024,
+                max_tokens=self._max_tokens_for_phase("constraints"),
             )
 
             conflicts = data.get("conflicts", [])
@@ -505,11 +516,24 @@ class IdeatePipeline:
     def _phase_immerse(self, domains: list[str]) -> list[DomainBrief]:
         _log("IMMERSE", f"Deep-diving into: {', '.join(domains)}")
 
-        prompt = IMMERSE_USER.format(domains=", ".join(domains))
+        # ── Web search grounding ──────────────────────────────────
+        search_text = ""
+        if self.search.enabled:
+            queries: list[str] = []
+            for d in domains:
+                queries.append(f"{d} startups trends 2025 2026")
+                queries.append(f"{d} biggest problems pain points")
+            _log("IMMERSE", f"  Searching web for {len(queries)} queries...")
+            results = self.search.search_many(queries, max_results_per_query=3)
+            search_text = format_search_results(results, max_chars=3000)
+            _log("IMMERSE", f"  Got {len(results)} search results ({len(search_text)} chars)")
+
+        search_ctx = build_search_context(search_text)
+        prompt = IMMERSE_USER.format(domains=", ".join(domains), search_context=search_ctx)
         data = self.llm.generate_json(
             self._sys(IMMERSE_SYSTEM), prompt, temperature=0.6,
             model_override=self._model_for_phase("immerse"), phase="immerse",
-            max_tokens=4096,
+            max_tokens=self._max_tokens_for_phase("immerse"),
         )
         briefs_raw = data.get("domain_briefs", [])
 
@@ -565,7 +589,7 @@ class IdeatePipeline:
         data = self.llm.generate_json(
             self._sys(DIVERGE_SYSTEM), prompt, temperature=0.9,
             model_override=self._model_for_phase("diverge"), phase="diverge",
-            max_tokens=10240,
+            max_tokens=self._max_tokens_for_phase("diverge"),
         )
         ideas_raw = data.get("ideas", [])
 
@@ -606,7 +630,7 @@ class IdeatePipeline:
         data = self.llm.generate_json(
             self._sys(DEDUP_SYSTEM), prompt, temperature=0.2,
             model_override=self._model_for_phase("dedup"), phase="dedup",
-            max_tokens=2048,
+            max_tokens=self._max_tokens_for_phase("dedup"),
         )
 
         keep_ids = set(data.get("keep", [i.id for i in raw_ideas]))
@@ -656,7 +680,7 @@ class IdeatePipeline:
         data = self.llm.generate_json(
             self._sys(DIVERGE_GAPFILL_SYSTEM), prompt, temperature=0.95,
             model_override=self._model_for_phase("gapfill"), phase="gapfill",
-            max_tokens=8192,
+            max_tokens=self._max_tokens_for_phase("gapfill"),
         )
 
         ideas_raw = data.get("ideas", [])
@@ -672,9 +696,11 @@ class IdeatePipeline:
         return gap_ideas
 
     def _phase_converge(self, raw_ideas: list[RawIdea]) -> list[IdeaCard]:
-        _log("CONVERGE", f"Clustering and scoring {len(raw_ideas)} ideas...")
+        _log("CONVERGE", f"Decomposed scoring pipeline for {len(raw_ideas)} ideas...")
 
-        # Send only essential fields to keep prompt compact
+        # ── Sub-phase 2A: CLUSTER + INITIAL SCORE ────────────────
+        _log("CONVERGE", "  [2A] Clustering and initial scoring...")
+
         ideas_compact = [
             {"id": i.id, "concept": i.concept, "domain_tags": i.domain_tags,
              "source_technique": i.source_technique}
@@ -684,7 +710,7 @@ class IdeatePipeline:
 
         calibration_ctx = build_calibration_context(self.memory.get_score_stats())
 
-        prompt = CONVERGE_USER.format(
+        prompt_a = CONVERGE_USER.format(
             idea_count=len(raw_ideas),
             top_n=self.cfg.converge_top_n,
             ideas_json=ideas_json,
@@ -692,44 +718,136 @@ class IdeatePipeline:
             brief_context=build_brief_context(self._brief_text),
         )
 
-        data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5,
-                                       model_override=self._model_for_phase("converge"), phase="converge",
-                                       max_tokens=8192)
+        data_a = self.llm.generate_json(
+            self._sys(CONVERGE_SYSTEM), prompt_a, temperature=0.5,
+            model_override=self._model_for_phase("converge"), phase="converge-cluster",
+            max_tokens=self._max_tokens_for_phase("converge-cluster"),
+        )
 
-        clustering = data.get("clustering_summary", "")
+        clustering = data_a.get("clustering_summary", "")
         if clustering:
             _log("CONVERGE", f"  Clustering: {clustering[:120]}")
 
-        candidates_raw = data.get("candidates", [])
+        candidates_raw = data_a.get("candidates", [])
         candidates = []
         for c in candidates_raw:
             card = self._parse_candidate(c)
             candidates.append(card)
-
-        # Sort by composite score descending
         candidates.sort(key=lambda c: c.composite_score, reverse=True)
+        _log("CONVERGE", f"  [2A] {len(candidates)} candidates with initial scores.")
 
-        # ── Enforce score spread ≥ 3.0 ───────────────────────────
+        if not candidates:
+            return candidates
+
+        # ── Sub-phase 2B: COMPARATIVE RANKING ────────────────────
+        _log("CONVERGE", "  [2B] Pairwise comparative re-ranking...")
+
+        compare_input = [
+            {"id": c.id, "title": c.title, "rationale": c.rationale,
+             "score_breakdown": c.score_breakdown.model_dump()}
+            for c in candidates
+        ]
+        compare_json = json.dumps(compare_input, indent=2, ensure_ascii=False)
+
+        prompt_b = CONVERGE_COMPARE_USER.format(
+            candidate_count=len(candidates),
+            candidates_json=compare_json,
+            brief_context=build_brief_context(self._brief_text),
+        )
+
+        data_b = self.llm.generate_json(
+            self._sys(CONVERGE_COMPARE_SYSTEM), prompt_b, temperature=0.3,
+            model_override=self._model_for_phase("converge"), phase="converge-compare",
+            max_tokens=self._max_tokens_for_phase("converge-compare"),
+        )
+
+        # Apply adjusted scores from comparative ranking
+        final_ranking = data_b.get("final_ranking", [])
+        adjusted_scores = {s["id"]: s for s in data_b.get("adjusted_scores", [])}
+
+        if adjusted_scores:
+            for card in candidates:
+                adj = adjusted_scores.get(card.id)
+                if adj and "score_breakdown" in adj:
+                    sb_raw = adj["score_breakdown"]
+                    card.score_breakdown = ScoreBreakdown(**sb_raw)
+                    card.composite_score = compute_composite_score(card.score_breakdown)
+
+        # Re-sort by final ranking if available, otherwise by composite score
+        if final_ranking:
+            rank_map = {id_: idx for idx, id_ in enumerate(final_ranking)}
+            candidates.sort(key=lambda c: rank_map.get(c.id, 999))
+            _log("CONVERGE", f"  [2B] Final ranking: {' → '.join(c.title[:25] for c in candidates[:4])}...")
+        else:
+            candidates.sort(key=lambda c: c.composite_score, reverse=True)
+
+        # Log score spread after comparative ranking
         if len(candidates) >= 2:
-            top = candidates[0].composite_score
-            bot = candidates[-1].composite_score
-            spread = top - bot
-            if spread < 3.0 and spread > 0:
-                target_spread = 3.0
-                mid = (top + bot) / 2
-                scale = target_spread / spread
-                for c in candidates:
-                    stretched = mid + (c.composite_score - mid) * scale
-                    c.composite_score = round(max(0.0, min(10.0, stretched)), 1)
-                new_spread = candidates[0].composite_score - candidates[-1].composite_score
-                _log("CONVERGE", f"  Score spread stretched: {spread:.1f} → {new_spread:.1f}")
+            spread = candidates[0].composite_score - candidates[-1].composite_score
+            _log("CONVERGE", f"  [2B] Score spread after comparison: {spread:.1f}")
+
+        # ── Sub-phase 2C: ENRICH + ASSUMPTION INVERSION ──────────
+        _log("CONVERGE", "  [2C] Enriching with personas, assumptions + inversion...")
+
+        # Batch enrichment to avoid token limit truncation (max 4 candidates per call)
+        ENRICH_BATCH = 4
+        all_enrichments: dict[str, dict] = {}
+        for batch_start in range(0, len(candidates), ENRICH_BATCH):
+            batch = candidates[batch_start:batch_start + ENRICH_BATCH]
+            enrich_input = [
+                {"id": c.id, "title": c.title, "rationale": c.rationale,
+                 "domain_tags": c.domain_tags}
+                for c in batch
+            ]
+            enrich_json = json.dumps(enrich_input, indent=2, ensure_ascii=False)
+
+            prompt_c = CONVERGE_ENRICH_USER.format(
+                candidate_count=len(batch),
+                candidates_json=enrich_json,
+                brief_context=build_brief_context(self._brief_text),
+            )
+
+            data_c = self.llm.generate_json(
+                self._sys(CONVERGE_ENRICH_SYSTEM), prompt_c, temperature=0.5,
+                model_override=self._model_for_phase("converge"), phase="converge-enrich",
+                max_tokens=self._max_tokens_for_phase("converge-enrich"),
+            )
+
+            for e in data_c.get("enrichments", []):
+                all_enrichments[e["id"]] = e
+
+        # Merge enrichment data into candidates
+        fragile_count = 0
+        for card in candidates:
+            enrich = all_enrichments.get(card.id)
+            if not enrich:
+                continue
+            # Persona
+            persona_raw = enrich.get("primary_persona", {})
+            if persona_raw:
+                card.primary_persona = Persona(**persona_raw)
+            # Assumptions with inversion
+            raw_assumptions = enrich.get("key_assumptions", [])
+            card.key_assumptions = self._normalize_assumptions(raw_assumptions)
+            # Count fragile assumptions
+            for a in card.key_assumptions:
+                if a.get("fragility_flag") == "fragile":
+                    fragile_count += 1
+            # Other fields
+            card.sustainability_model = enrich.get("sustainability_model", "")
+            card.defensibility_notes = enrich.get("defensibility_notes", "")
+            card.market_timing_notes = enrich.get("market_timing_notes", "")
+            card.first_customer_profile = enrich.get("first_customer_profile", {})
+            inv = enrich.get("inverse_score", {})
+            card.inverse_terrible_conditions = inv.get("terrible_conditions", [])
+            card.inverse_confidence = inv.get("inverse_confidence", 0.0)
+
+        _log("CONVERGE", f"  [2C] Enriched {len(all_enrichments)} candidates, {fragile_count} fragile assumptions flagged.")
 
         # ── Enforce effort diversity ──────────────────────────────
         if len(candidates) >= 3:
             efforts = [c.estimated_effort for c in candidates]
             if len(set(efforts)) == 1:
-                # All same effort — remap using the effort dimension score
-                # Higher effort score = harder = "large"; lower = "small"
                 by_effort_score = sorted(candidates, key=lambda c: c.score_breakdown.effort)
                 by_effort_score[0].estimated_effort = "small"
                 by_effort_score[-1].estimated_effort = "large"
@@ -787,19 +905,39 @@ class IdeatePipeline:
         sys_attack = self._sys(STRESS_TEST_SYSTEM)
         brief_ctx = build_brief_context(self._brief_text)
 
+        # ── Prior art search for each candidate ──────────────────────
+        prior_art_by_id: dict[str, str] = {}
+        if self.search.enabled:
+            _log("STRESS", "Searching for prior art / competitors...")
+            for c in candidates:
+                # Short title-based query to find existing products
+                results = self.search.search(f"{c.title} existing product competitor", max_results=3)
+                if results:
+                    prior_art_by_id[c.id] = format_search_results(results, max_chars=800)
+                    _log("STRESS", f"  {c.title[:40]}: {len(results)} results")
+
         # ── Single round: Attack + Feasibility + Verdict (parallel across ideas) ──
         _log("STRESS", f"Attacking {len(candidates)} candidates ({len(candidates)} parallel calls)...")
 
         async def _attack_one(c: IdeaCard) -> AttackResponse:
             cj = json.dumps([compact_by_id[c.id]], ensure_ascii=False)
+            prior_art_ctx = ""
+            if c.id in prior_art_by_id:
+                prior_art_ctx = (
+                    "\nPRIOR ART SEARCH RESULTS (from live web search — use these "
+                    "to ground your prior art attack in real competitors):\n"
+                    f"{prior_art_by_id[c.id]}\n---\n"
+                )
             prompt = STRESS_TEST_USER.format(
                 candidate_count=1, candidates_json=cj, brief_context=brief_ctx,
             )
+            if prior_art_ctx:
+                prompt = prior_art_ctx + prompt
             try:
                 data = await self.llm.generate_json_async(
                     sys_attack, prompt, temperature=0.4,
                     model_override=stress_model, phase="stress-attack",
-                    max_tokens=4096,
+                    max_tokens=self._max_tokens_for_phase("stress-attack"),
                 )
                 raw = _unwrap_single(data, "results", c.id, "attack")
                 return AttackResponse.model_validate(raw)
@@ -1060,7 +1198,7 @@ class IdeatePipeline:
         
         data = self.llm.generate_json(self._sys(DIVERGE_SYSTEM), refined_prompt, temperature=temperature,
                                        model_override=self._model_for_phase("refine"), phase="refine-diverge",
-                                       max_tokens=8192)
+                                       max_tokens=self._max_tokens_for_phase("refine-diverge"))
         ideas_raw = data.get("ideas", [])
 
         refined_raw_ideas = []
@@ -1090,7 +1228,7 @@ class IdeatePipeline:
         _log("REFINE", f"  CONVERGE: Scoring {len(refined_raw_ideas)} ideas, selecting top {converge_top_n}...")
         data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5,
                                        model_override=self._model_for_phase("refine"), phase="refine-converge",
-                                       max_tokens=12288)
+                                       max_tokens=self._max_tokens_for_phase("refine-converge"))
 
         clustering = data.get("clustering_summary", "")
         if clustering:
@@ -1136,6 +1274,10 @@ class IdeatePipeline:
     def _parse_candidate(self, c: dict) -> IdeaCard:
         """Parse a candidate dict from the LLM into an IdeaCard with computed score."""
         sb_raw = c.get("score_breakdown", {})
+        # Clamp all score values to [0, 10] — LLM sometimes returns dollar amounts
+        for k, v in list(sb_raw.items()):
+            if isinstance(v, (int, float)):
+                sb_raw[k] = max(0.0, min(10.0, float(v)))
         sb = ScoreBreakdown(**sb_raw)
         composite = compute_composite_score(sb)
 
@@ -1230,9 +1372,11 @@ class IdeatePipeline:
             json.dumps(cards, indent=2, ensure_ascii=False), encoding="utf-8",
         )
 
-        # idea-log.json — full trace
+        # idea-log.json — full trace (includes per-phase cost breakdown)
+        log_data = result.model_dump()
+        log_data["cost_info"] = cost_info
         (run_dir / "idea-log.json").write_text(
-            json.dumps(result.model_dump(), indent=2, ensure_ascii=False),
+            json.dumps(log_data, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
 
@@ -1378,22 +1522,31 @@ class IdeatePipeline:
         """Normalize key_assumptions to structured dicts.
 
         The LLM may return plain strings (old format) or dicts with
-        claim/validation_cost/validation_method (new format).  Always
-        return a list of dicts sorted by validation cost.
+        claim/validation_cost/validation_method and optional inversion
+        fields (inverse_claim, inverse_defense_quality, fragility_flag).
+        Always return a list of dicts sorted by validation cost.
         """
         COST_ORDER = {"low": 0, "medium": 1, "high": 2}
         result = []
         for item in raw:
             if isinstance(item, str):
-                result.append({"claim": item, "validation_cost": "medium", "validation_method": ""})
+                entry = {"claim": item, "validation_cost": "medium", "validation_method": ""}
             elif isinstance(item, dict):
-                result.append({
+                entry = {
                     "claim": item.get("claim", str(item)),
                     "validation_cost": item.get("validation_cost", "medium"),
                     "validation_method": item.get("validation_method", ""),
-                })
+                }
+                # Preserve inversion fields if present
+                if "inverse_claim" in item:
+                    entry["inverse_claim"] = item["inverse_claim"]
+                if "inverse_defense_quality" in item:
+                    entry["inverse_defense_quality"] = item["inverse_defense_quality"]
+                if "fragility_flag" in item:
+                    entry["fragility_flag"] = item["fragility_flag"]
             else:
-                result.append({"claim": str(item), "validation_cost": "medium", "validation_method": ""})
+                entry = {"claim": str(item), "validation_cost": "medium", "validation_method": ""}
+            result.append(entry)
         result.sort(key=lambda a: COST_ORDER.get(a.get("validation_cost", "medium"), 1))
         return result
 
@@ -1425,6 +1578,10 @@ class IdeatePipeline:
         if tier == "cheap":
             return self.cfg.cheap_model or None
         return (self.cfg.best_model or self.cfg.model) or None
+
+    def _max_tokens_for_phase(self, phase: str) -> int:
+        """Return the max output-tokens budget for *phase* from config."""
+        return self.cfg.PHASE_MAX_TOKENS.get(phase, self.cfg.max_tokens)
 
     # ------------------------------------------------------------------
     # Async helpers

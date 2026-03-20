@@ -4,6 +4,18 @@ Generate, score, stress-test, and refine project ideas using Claude. xBrain runs
 
 Now with **adversarial stress testing**, **dynamic brief-adaptive scoring**, **cross-run diversity ratchet**, **failure taxonomy learning**, **mechanism stealing**, **moat archaeology**, **cost forecasting**, **constraint conflict detection**, **project spec generation**, **idea lineage tracking**, **score explainability**, and **PMO export** (CSV/Jira/Markdown).
 
+## What's New in v1.9
+
+**Per-Phase Cost Visibility** — Every run now shows a Cost Breakdown table in the report with per-phase token counts, model used, and dollar cost. The same data is persisted in `idea-log.json` for programmatic analysis. **Configurable Token Budgets** — New `PHASE_MAX_TOKENS` config centralizes output-token limits for all 12 pipeline phases, making cost tuning a single-file change. **Score Clamping** — LLM score values are now clamped to [0, 10] to prevent crashes from malformed responses.
+
+## What's New in v1.8
+
+**Decomposed CONVERGE** — CONVERGE is now three sub-phases: (2A) Cluster + Initial Score, (2B) Comparative Ranking with force-ranked head-to-head judgment, and (2C) Enrich + Assumption Inversion. The old mechanical score-stretching is replaced by LLM-driven comparative analysis. **Assumption Inversion** — Each assumption gets an inverse claim and fragility rating (🔴 fragile / 🟢 solid). If the inverse is easy to defend, the assumption is a critical vulnerability.
+
+## What's New in v1.7
+
+**Web Search Grounding** — xBrain now searches the live internet before generating ideas. The IMMERSE phase queries DuckDuckGo and HackerNews for current trends, competitors, and developer pain points per domain, injecting results as `CURRENT MARKET DATA` so domain briefs reflect 2025/2026 reality instead of stale training data. The STRESS TEST phase searches for prior art per idea before attacking, grounding the "this already exists" angle in real products. The search architecture is pluggable — new providers can be added by subclassing `SearchProvider`. Search is best-effort: if providers are unavailable (no package installed, network down), the pipeline runs exactly as before.
+
 ## What's New in v1.6
 
 **Calibration Enforcement** — META-LEARN now produces per-dimension multipliers (0.5–1.5) that are applied mathematically post-CONVERGE. Scores are no longer advisory-only — inflated/deflated dimensions get corrected in code. **Stress Test Fidelity** — API crashes during stress testing are tagged `api_crash` instead of silently becoming INCUBATE verdicts. Reports show crash indicators so you know which verdicts are genuine. **Refinement Failure Blocklist** — Canonical failure types from KILL/MUTATE ideas (prior_art, adoption, technical, timing, defensibility, economics) are injected as hard prohibitions into refinement rounds, not just soft context.
@@ -391,6 +403,11 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   | PHASE 0: IMMERSE                       |
   | (optional, when --domains provided)    |
   |                                        |
+  |  Web search grounding:                 |
+  |    - DuckDuckGo: trends, competitors   |
+  |    - HackerNews: developer sentiment   |
+  |    (pluggable — more sources planned)  |
+  |                                        |
   |  Per-domain deep dive:                 |
   |    - Incentive structures              |
   |    - Regulatory landscape              |
@@ -478,6 +495,9 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   +=================================================================+
   | PHASE 3: STRESS TEST (Single-Round Attack)                      |
   | ALL ideas tested IN PARALLEL (async API calls per idea)         |
+  |                                                                 |
+  |  Web search: prior art lookup per idea                          |
+  |    (title + "existing product competitor")                      |
   |                                                                 |
   |  +-----------------------------------------------------------+ |
   |  | ATTACK (Devil's Advocate)                     temp=0.4      | |
@@ -600,7 +620,7 @@ The playbook is injected into future runs as fixed-size context (~200 tokens), r
 Analyzes constraints for logical contradictions. Warns about conflicts and suggests resolutions. Non-blocking — the pipeline continues regardless.
 
 **Phase 0 — IMMERSE** (optional, when `--domains` is provided)
-Deep-dive domain research. For each domain, the AI maps tensions, incentive structures, regulatory landscape, existing players, historical failures, and underserved populations. This builds context that makes later idea generation more grounded.
+Deep-dive domain research. Before the LLM call, xBrain runs live web searches (DuckDuckGo + HackerNews) with queries like `"{domain} startups trends 2025 2026"` and `"{domain} biggest problems pain points"`. The search results are injected as `CURRENT MARKET DATA` context, grounding the LLM's analysis in current reality instead of stale training data. The AI then maps tensions, incentive structures, regulatory landscape, existing players, historical failures, and underserved populations — correcting any outdated assumptions against the search results.
 
 **Phase 1 — DIVERGE** (Round 1)
 Raw idea generation. Uses six techniques simultaneously:
@@ -654,6 +674,8 @@ Per idea:
 
 **Phase 3 — STRESS TEST (Adversarial Attack)**
 Single-round adversarial attack by a Devil's Advocate. Each idea is tested **in parallel** — all ideas run their attack concurrently using async API calls, significantly reducing wall-clock time:
+
+Before attacks begin, xBrain searches the web for each idea's title + "existing product competitor" to find real prior art. These search results are injected as `PRIOR ART SEARCH RESULTS` context into the attack prompt, grounding the prior art attack angle in real competitors instead of hallucinated ones.
 
 - **Attack:** The Devil's Advocate attacks each idea from 9 angles: prior art, adoption failure, technical blockers, problem reframe, negative externalities, obsolescence, timing, defensibility, and expertise gaps. A verdict is rendered immediately based on attack severity.
 

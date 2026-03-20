@@ -55,6 +55,7 @@ IMMERSE_SYSTEM = (
 IMMERSE_USER = """\
 Perform a deep-dive domain study for: {domains}
 
+{search_context}
 For EACH domain, study and report:
 1. Incentive structures — who are the players? misaligned incentives?
 2. Regulatory landscape — what's legal, changing, ambiguous?
@@ -247,13 +248,15 @@ Respond with ONLY valid JSON:
 """
 
 # ---------------------------------------------------------------------------
-# Phase 2: CONVERGE
+# Phase 2: CONVERGE (decomposed into 3 sub-phases)
 # ---------------------------------------------------------------------------
+
+# --- Sub-phase 2A: CLUSTER + INITIAL SCORE ---
 
 CONVERGE_SYSTEM = (
     "You are a convergence and evaluation engine. You take raw idea seeds "
-    "and filter them through clustering, persona definition, novelty "
-    "assessment, and multi-dimensional scoring. You are rigorous but fair. "
+    "and filter them through clustering and multi-dimensional scoring. "
+    "You are rigorous but fair. "
     "You MUST respond with valid JSON only — no markdown, no commentary."
 )
 
@@ -287,46 +290,16 @@ not an external customer. The cost is implementation effort, not SaaS pricing.
 Consider AI leverage when scoring effort.
    Dimensions: impact, confidence, effort, cost, ethical_risk, sustainability, \
 defensibility, market_timing.
-5. MOAT CHECK: For each idea, explicitly assess defensibility. If defensibility \
-scores below 4, suggest ONE concrete mutation that would strengthen the moat \
-(e.g., adding a data flywheel, network effect, or proprietary dataset). \
-Include this in defensibility_notes.
-6. INVERSE: 2-3 conditions that would make this terrible. inverse_confidence 0-10 \
-(10=fragile). If >6, reduce positive scores.
 
 SCORING RULES (mandatory):
-- FORCE-RANK all candidates 1 to N before assigning scores. \
-The #1 ranked idea MUST have the highest composite score. The last MUST have the lowest.
 - USE THE FULL RANGE: The best idea should score 8-10 on its strongest dimension. \
 The weakest should have at least one dimension scoring 3 or below.
-- SPREAD SCORES: The gap between the highest and lowest composite score MUST be \
-at least 3.0 points. If all ideas look similar, you're not being critical enough. \
-HARD RULE: Assign scores AFTER force-ranking. The #1 idea gets the highest \
-composite; the last gets at least 3.0 points lower. If you're tempted to cluster \
-scores within 2 points of each other, you haven't differentiated enough.
-- KEY ASSUMPTIONS: For each idea, list 3-5 assumptions that are UNIQUE TO THAT IDEA. \
-Do NOT use generic assumptions like "target persona exists" or "market timing is right" \
-— those apply to everything. Instead name the specific, falsifiable claim that makes \
-THIS idea succeed or fail. Each assumption MUST include a validation_cost (low = can \
-test in a day for free, medium = needs a week or small budget, high = needs months or \
-significant resources) and a validation_method (one sentence: how to test this cheaply). \
-Order assumptions cheapest-to-validate FIRST. Example: {{"claim": "Claude can parse \
-regulatory filings with >90% accuracy", "validation_cost": "low", \
-"validation_method": "Run 50 sample filings through the API and measure accuracy"}}
 - DIFFERENTIATE EFFORT: Not every idea is "medium" effort. At least one must be \
 "small" and at least one must be "large" (if {top_n} >= 3). \
 Use the effort SCORE to decide: effort >= 7 → "large", effort <= 3 → "small". \
 DO NOT mark all ideas as medium — that means you failed to differentiate.
 - BE HARSH on ideas that are generic, vague, or that any competent developer \
 could build in a weekend. These should score below 5 on impact and defensibility.
-- DEFENSIBILITY GATE: Ideas with defensibility < 3 should be penalized heavily \
-in the composite score unless the brief explicitly doesn't care about moats.
-- ICP GROUNDING: The first_customer_profile MUST match the scale and context \
-described in the brief. If the brief describes a solo developer tool, the first \
-customer is a solo developer — NOT an enterprise. If the brief describes an \
-internal improvement, the customer is the tool's operator. Read the brief and \
-match the ICP to what the brief actually describes. Do NOT default to \
-"Series B startup" or "enterprise team" unless the brief specifically targets them.
 
 Respond with ONLY this JSON structure:
 {{
@@ -335,28 +308,145 @@ Respond with ONLY this JSON structure:
     "id": "idea-001", "title": "...", "rationale": "one paragraph",
     "source_technique": "...", "domain_tags": ["..."],
     "novelty_score": 0.78,
-    "primary_persona": {{"who": "...", "pain": "...", "context": "...", "motivation": "..."}},
     "score_breakdown": {{"impact": 9, "confidence": 7, "effort": 6, "cost": 3, \
 "ethical_risk": 2, "sustainability": 6, "defensibility": 7, "market_timing": 8}},
     "estimated_effort": "small|medium|large",
     "estimated_cost_usd_month": 45,
     "cost_context": "monthly infra|one-time implementation|monthly labor|transition cost",
-    "ethical_risk_level": "low|medium|high",
-    "sustainability_model": "...",
-    "defensibility_notes": "...",
-    "market_timing_notes": "...",
-    "key_assumptions": [
-      {{"claim": "Specific falsifiable claim", "validation_cost": "low|medium|high", "validation_method": "How to test this cheaply"}}
-    ],
-    "first_customer_profile": {{"type": "...", "size": "...", "readiness": "...", "why_first": "..."}},
-    "inverse_score": {{"terrible_conditions": ["..."], "inverse_confidence": 4.5}}
+    "ethical_risk_level": "low|medium|high"
   }}]
 }}
 
-LENGTH LIMIT: Keep rationale under 200 characters. sustainability_model, \
-defensibility_notes, market_timing_notes each under 150 characters. Be dense.
+LENGTH LIMIT: Keep rationale under 200 characters. Be dense.
 
 Return EXACTLY {top_n} candidates, best first. Be critical, not generous.
+"""
+
+# --- Sub-phase 2B: COMPARATIVE RANKING ---
+
+CONVERGE_COMPARE_SYSTEM = (
+    "You are a comparative judgment engine. You force-rank ideas by direct "
+    "head-to-head comparison on specific dimensions. You are decisive and "
+    "must pick clear winners — never declare ties. "
+    "You MUST respond with valid JSON only — no markdown fences, no commentary, no ```."
+)
+
+CONVERGE_COMPARE_USER = """\
+You have {candidate_count} idea candidates with initial scores. Your job \
+is to FORCE-RANK them by comparative analysis on 3 key dimensions: \
+impact, confidence, and defensibility.
+
+{brief_context}
+
+CANDIDATES (with initial scores):
+{candidates_json}
+
+PROCESS:
+1. For EACH of the 3 dimensions, produce a ranked list from strongest to \
+weakest. No ties allowed. Justify each ranking with one sentence.
+2. Synthesize the 3 dimension rankings into a SINGLE overall final ranking.
+3. Produce adjusted scores that SPREAD across the full range.
+
+SCORING ADJUSTMENTS:
+- The gap between rank #1 and rank #{candidate_count} must be at least 3.0 \
+points on impact, confidence, and defensibility.
+- Rank #1 gets 9-10 on its strongest dim. Last place gets 3-5.
+- Keep effort, cost, ethical_risk, sustainability, market_timing from the \
+initial scores unless you found a clear error.
+
+Respond with ONLY this JSON (no markdown fences):
+{{
+  "dimension_rankings": {{
+    "impact": [{{"id": "idea-001", "reason": "One sentence"}}],
+    "confidence": [{{"id": "idea-001", "reason": "One sentence"}}],
+    "defensibility": [{{"id": "idea-001", "reason": "One sentence"}}]
+  }},
+  "final_ranking": ["idea-001", "idea-003", "idea-002"],
+  "adjusted_scores": [
+    {{
+      "id": "idea-001",
+      "score_breakdown": {{"impact": 9, "confidence": 8, "effort": 6, "cost": 3, \
+"ethical_risk": 2, "sustainability": 7, "defensibility": 8, "market_timing": 7}},
+      "rank_rationale": "One sentence: why this rank"
+    }}
+  ]
+}}
+"""
+
+# --- Sub-phase 2C: ENRICH + ASSUMPTION INVERSION ---
+
+CONVERGE_ENRICH_SYSTEM = (
+    "You are an idea enrichment and risk analysis engine. Your job is to "
+    "deeply characterize ranked idea candidates: define personas, generate "
+    "specific assumptions, stress-test those assumptions via inversion, "
+    "and build customer profiles. You are thorough and evidence-based. "
+    "You MUST respond with valid JSON only — no markdown fences, no commentary, no ```."
+)
+
+CONVERGE_ENRICH_USER = """\
+Enrich these {candidate_count} ranked idea candidates with deep characterization.
+
+{brief_context}
+
+CANDIDATES (already scored and ranked):
+{candidates_json}
+
+For EACH candidate, generate:
+
+1. PRIMARY PERSONA: Match the brief's context.
+   - If brief describes internal tooling → persona = tool operator/developer
+   - If brief describes a product → persona = target customer
+   - NEVER default to "Series B startup" unless the brief says so.
+
+2. KEY ASSUMPTIONS with INVERSION TEST: For each idea, list 3-5 assumptions \
+that are UNIQUE TO THAT IDEA. Do NOT use generic assumptions like "target \
+persona exists" — name the specific, falsifiable claim.
+
+   For EACH assumption, also generate:
+   - inverse_claim: The OPPOSITE of the assumption (e.g., if assumption is \
+"LLM can parse regulatory filings with >90% accuracy", the inverse is \
+"LLM CANNOT parse regulatory filings with >90% accuracy")
+   - inverse_defense_quality: 1-5 rating of how well the INVERSE can be \
+defended. If the inverse is easy to defend (score 4-5), the original \
+assumption is FRAGILE and the idea has a critical vulnerability.
+   - fragility_flag: "fragile" if inverse_defense_quality >= 4, else "solid"
+
+   Order assumptions cheapest-to-validate FIRST.
+
+3. MOAT CHECK: Assess defensibility. If weak, suggest a concrete mutation.
+
+4. INVERSE CONDITIONS: 2-3 conditions that would make this terrible. \
+Rate inverse_confidence 0-10 (10=fragile).
+
+5. FIRST CUSTOMER PROFILE: Must match the brief's scale and context.
+
+Respond with ONLY this JSON:
+{{
+  "enrichments": [
+    {{
+      "id": "idea-001",
+      "primary_persona": {{"who": "...", "pain": "...", "context": "...", "motivation": "..."}},
+      "key_assumptions": [
+        {{
+          "claim": "Specific falsifiable claim",
+          "inverse_claim": "The opposite claim",
+          "inverse_defense_quality": 3,
+          "fragility_flag": "solid",
+          "validation_cost": "low|medium|high",
+          "validation_method": "How to test this cheaply"
+        }}
+      ],
+      "sustainability_model": "...",
+      "defensibility_notes": "...",
+      "market_timing_notes": "...",
+      "first_customer_profile": {{"type": "...", "size": "...", "readiness": "...", "why_first": "..."}},
+      "inverse_score": {{"terrible_conditions": ["..."], "inverse_confidence": 4.5}}
+    }}
+  ]
+}}
+
+LENGTH LIMIT: sustainability_model, defensibility_notes, market_timing_notes \
+each under 150 characters. claims and inverse_claims under 100 characters. Be dense.
 """
 
 # ---------------------------------------------------------------------------
@@ -627,6 +717,20 @@ Respond with ONLY valid JSON:
   ]
 }}
 """
+
+def build_search_context(search_text: str) -> str:
+    if not search_text:
+        return ""
+    return (
+        "CURRENT MARKET DATA (from live web search — use this to ground your analysis "
+        "in current reality, validate competitors, and identify recent trends):\n"
+        f"{search_text}\n"
+        "---\n"
+        "Use the above search results to inform your analysis. Correct any outdated "
+        "assumptions. If search results contradict your prior knowledge, prefer the "
+        "search results (they are more recent).\n"
+    )
+
 
 def build_brief_context(brief_text: str | None) -> str:
     if not brief_text:

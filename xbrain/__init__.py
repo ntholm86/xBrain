@@ -1,2 +1,2 @@
 """xBrain: Self-Thinking AI Idea Engine"""
-__version__ = "1.6.0"
+__version__ = "1.9.0"

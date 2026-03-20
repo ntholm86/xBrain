@@ -355,5 +355,55 @@
     "pass_count": 8,
     "tokens_in": 32523,
     "tokens_out": 26957
+  },
+  {
+    "run_id": "20260320-091458-xbrain-is-an-ai-powered-ideation",
+    "timestamp": "2026-03-20T09:14:58.284222+00:00",
+    "ideas_generated": 21,
+    "candidates": 7,
+    "build_count": 4,
+    "pass_count": 7,
+    "tokens_in": 31260,
+    "tokens_out": 25678
+  },
+  {
+    "run_id": "20260320-093851-xbrain-is-an-ai-powered-ideation",
+    "timestamp": "2026-03-20T09:38:51.784206+00:00",
+    "ideas_generated": 22,
+    "candidates": 8,
+    "build_count": 2,
+    "pass_count": 8,
+    "tokens_in": 41589,
+    "tokens_out": 28746
+  },
+  {
+    "run_id": "20260320-101117-xbrain-is-an-ai-powered-ideation",
+    "timestamp": "2026-03-20T10:11:17.502908+00:00",
+    "ideas_generated": 20,
+    "candidates": 8,
+    "build_count": 2,
+    "pass_count": 8,
+    "tokens_in": 43833,
+    "tokens_out": 32872
+  },
+  {
+    "run_id": "20260320-101548-xbrain-is-an-ai-powered-ideation",
+    "timestamp": "2026-03-20T10:15:48.211708+00:00",
+    "ideas_generated": 27,
+    "candidates": 8,
+    "build_count": 2,
+    "pass_count": 8,
+    "tokens_in": 46938,
+    "tokens_out": 33289
+  },
+  {
+    "run_id": "20260320-104220-how-should-xbrain-improve-its-own",
+    "timestamp": "2026-03-20T10:42:20.984301+00:00",
+    "ideas_generated": 18,
+    "candidates": 5,
+    "build_count": 2,
+    "pass_count": 5,
+    "tokens_in": 20553,
+    "tokens_out": 20139
   }
 ]
