@@ -18,6 +18,11 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
     lines.append("")
     lines.append(f"**Run ID:** `{result.run_id}`")
     lines.append(f"**Date:** {result.timestamp[:10]}")
+    if result.brief_text:
+        lines.append("")
+        lines.append("**Original Brief:**")
+        lines.append(f"> {result.brief_text}")
+        lines.append("")
     if result.constraints:
         lines.append(f"**Constraints:** {', '.join(result.constraints)}")
     lines.append("")
@@ -123,14 +128,24 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
     # Ideas at a Glance
     lines.append("## Ideas at a Glance")
     lines.append("")
-    lines.append("| # | Title | Score | Effort | Verdict |")
-    lines.append("|---|-------|-------|--------|---------|")
+    # Add Gen column only when multi-generation run
+    has_evolution = any(c.generation > 1 for c in sorted_survivors)
+    if has_evolution:
+        lines.append("| # | Title | Score | Effort | Verdict | Gen |")
+        lines.append("|---|-------|-------|--------|---------|-----|")
+    else:
+        lines.append("| # | Title | Score | Effort | Verdict |")
+        lines.append("|---|-------|-------|--------|---------|")
     for i, card in enumerate(sorted_survivors):
         stress_entry = stress_map.get(card.id)
         verdict = card.stress_test_verdict or (stress_entry.verdict if stress_entry else "?")
         if stress_entry and stress_entry.error_source:
             verdict = f"{verdict} (! {stress_entry.error_source})"
-        lines.append(f"| {i+1} | {card.title[:50]}{'...' if len(card.title) > 50 else ''} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict} |")
+        title_cell = f"{card.title[:50]}{'...' if len(card.title) > 50 else ''}"
+        if has_evolution:
+            lines.append(f"| {i+1} | {title_cell} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict} | {card.generation} |")
+        else:
+            lines.append(f"| {i+1} | {title_cell} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict} |")
     lines.append("")
     lines.append("---")
     lines.append("")
@@ -246,6 +261,12 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         # Meta
         lines.append(f"**Domains:** {', '.join(card.domain_tags)}")
         lines.append(f"**Source:** {card.source_technique}")
+        if card.generation > 1:
+            lines.append(f"**Generation:** {card.generation}")
+            if card.evolution_rationale:
+                lines.append(f"**Evolution Operator:** {card.evolution_rationale}")
+            if card.parent_ideas:
+                lines.append(f"**Parent Ideas:** {', '.join(card.parent_ideas)}")
         lines.append(f"**Novelty:** {card.novelty_score:.2f}")
         lines.append(f"**Estimated Effort:** {card.estimated_effort}")
         cost_label = card.cost_context if card.cost_context else "monthly"

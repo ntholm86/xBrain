@@ -6,13 +6,27 @@ import asyncio
 import json
 import re
 import time
-import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
 from xbrain.config import Config
 from xbrain.llm import LLMClient
-from xbrain.log import log as _log, log_phase as _log_phase_header, log_llm_call, log_progress, log_summary_block, _C
+from xbrain.log import (
+    log as _log,
+    log_ok as _log_ok,
+    log_warn as _log_warn,
+    log_error as _log_error,
+    log_detail as _log_detail,
+    log_verdict as _log_verdict,
+    log_phase as _log_phase_header,
+    log_llm_call,
+    log_progress,
+    log_summary_block,
+    fmt_verdict,
+    fmt_verdicts,
+    VERDICT_COLORS,
+    _C,
+)
 from xbrain.memory import MemoryStore
 from xbrain.models import (
     AttackResponse,
@@ -27,6 +41,7 @@ from xbrain.models import (
     compute_composite_score,
 )
 from xbrain.output import generate_idea_report
+from xbrain.pipeline_helpers import apply_calibration, sanitize_text, make_run_id
 from xbrain.search import SearchAggregator, format_search_results
 from xbrain.prompts import (
     CONSTRAINT_CHECK_SYSTEM,
@@ -70,25 +85,25 @@ from xbrain.prompts import (
 )
 
 
-
 # ------------------------------------------------------------------
-# Text helpers
+# Phase name constants
 # ------------------------------------------------------------------
 
-def _sanitize_text(text: str) -> str:
-    """Replace common Unicode characters with ASCII-safe equivalents."""
-    return (text
-        .replace("\u2014", "--")   # em dash
-        .replace("\u2013", "-")    # en dash
-        .replace("\u2018", "'")    # left single quote
-        .replace("\u2019", "'")    # right single quote
-        .replace("\u201c", '"')    # left double quote
-        .replace("\u201d", '"')    # right double quote
-        .replace("\u2026", "...")   # ellipsis
-        .replace("\u2192", "->")   # right arrow
-        .replace("\u2190", "<-")   # left arrow
-        .replace("\u2248", "~")    # approximately equal
-    )
+PHASE_META = "meta"
+PHASE_CONSTRAINTS = "constraints"
+PHASE_DIVERGE = "diverge"
+PHASE_DEDUP = "dedup"
+PHASE_GAPFILL = "gapfill"
+PHASE_CONVERGE = "converge"
+PHASE_CONVERGE_CLUSTER = "converge-cluster"
+PHASE_CONVERGE_COMPARE = "converge-compare"
+PHASE_CONVERGE_ENRICH = "converge-enrich"
+PHASE_STRESS = "stress"
+PHASE_STRESS_ATTACK = "stress-attack"
+PHASE_EVOLVE = "evolve"
+PHASE_REFINE = "refine"
+PHASE_REFINE_DIVERGE = "refine-diverge"
+PHASE_REFINE_CONVERGE = "refine-converge"
 
 
 # ------------------------------------------------------------------
@@ -106,33 +121,18 @@ def _unwrap_single(data: dict | list, wrapper_key: str, idea_id: str, phase: str
     if isinstance(data, list):
         # Rare: LLM returned a bare list
         item = data[0] if data else {}
-        _log("STRESS", f"  [unwrap] {phase}/{idea_id}: bare list (len={len(data)})")
+        _log_warn("STRESS", f"[unwrap] {phase}/{idea_id}: bare list (len={len(data)})")
     elif wrapper_key in data:
         items = data[wrapper_key]
         item = items[0] if items else {}
     else:
         # LLM omitted the wrapper — the dict IS the item
         item = data
-        _log("STRESS", f"  [unwrap] {phase}/{idea_id}: wrapper '{wrapper_key}' missing, using raw dict")
+        _log_warn("STRESS", f"[unwrap] {phase}/{idea_id}: wrapper '{wrapper_key}' missing, using raw dict")
 
     if isinstance(item, dict):
         item.setdefault("idea_id", idea_id)
     return item
-
-
-
-def _coerce_str(item) -> str:
-    """Coerce an LLM value to a plain string.
-
-    The LLM sometimes returns dicts (e.g. {"point": "...", "opportunity": "..."})
-    where a plain string is expected.  Join all values into one string.
-    """
-    if isinstance(item, str):
-        return item
-    if isinstance(item, dict):
-        return "; ".join(str(v) for v in item.values() if v)
-    return str(item)
-
 
 
 class IdeatePipeline:
@@ -156,9 +156,9 @@ class IdeatePipeline:
             self.llm = LLMClient(self.cfg.api_key, self.cfg.model, self.cfg.max_tokens)
         self.search = SearchAggregator.from_config()
         if self.search.enabled:
-            _log("SEARCH", f"Web search enabled: {', '.join(self.search.provider_names)}")
+            _log_detail("SEARCH", f"Web search enabled: {', '.join(self.search.provider_names)}")
         else:
-            _log("SEARCH", "No search providers available (install duckduckgo-search for web grounding)")
+            _log_detail("SEARCH", "No search providers available (install duckduckgo-search for web grounding)")
 
     # ------------------------------------------------------------------
     # Public API
@@ -173,7 +173,7 @@ class IdeatePipeline:
         """Execute the full ideation pipeline and return the run directory."""
         self._language = language
         self._brief_text = brief_text
-        run_id = self._make_run_id(brief_text)
+        run_id = make_run_id(brief_text)
         run_dir = self.cfg.runs_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
@@ -181,13 +181,13 @@ class IdeatePipeline:
         _log("IDEATE", f"Pipeline 1 started.  Run ID: {run_id}")
         if brief_text:
             preview = brief_text[:120] + ("..." if len(brief_text) > 120 else "")
-            _log("IDEATE", f"Brief: {preview}")
+            _log_detail("IDEATE", f"Brief: {preview}")
         if constraints:
-            _log("IDEATE", f"Constraints: {', '.join(constraints)}")
+            _log_detail("IDEATE", f"Constraints: {', '.join(constraints)}")
         if language:
-            _log("IDEATE", f"Language: {language}")
+            _log_detail("IDEATE", f"Language: {language}")
         if self.cfg.model_strategy != "single":
-            _log("IDEATE", f"Model strategy: {self.cfg.model_strategy}")
+            _log_detail("IDEATE", f"Model strategy: {self.cfg.model_strategy}")
 
         # Cost estimate
         estimate = self.estimate_cost(
@@ -200,10 +200,11 @@ class IdeatePipeline:
             cheap_model=self.cfg.cheap_model,
             generations=self.cfg.generations,
         )
-        _log("IDEATE", f"Estimated cost: ${estimate['total_est_cost_usd']:.4f}")
+        _log_detail("IDEATE", f"Estimated cost: ${estimate['total_est_cost_usd']:.4f}")
 
         result = IdeateRunResult(
             run_id=run_id,
+            brief_text=brief_text or "",
             constraints=constraints or [],
         )
 
@@ -231,20 +232,20 @@ class IdeatePipeline:
             if gap_ideas:
                 raw_ideas.extend(gap_ideas)
                 result.raw_ideas = raw_ideas
-        _log("DIVERGE", f"done in {time.monotonic() - tp:.0f}s")
+        _log_ok("DIVERGE", f"done in {time.monotonic() - tp:.0f}s")
 
         # Phase 2 — Converge
         _log_phase_header("CONVERGE", f"Scoring and ranking {len(raw_ideas)} ideas")
         tp = time.monotonic()
         candidates = self._phase_converge(raw_ideas)
-        _log("CONVERGE", f"done in {time.monotonic() - tp:.0f}s")
+        _log_ok("CONVERGE", f"done in {time.monotonic() - tp:.0f}s")
         result.candidates = candidates
 
         # Phase 3 — Stress Test
         _log_phase_header("STRESS TEST", f"Adversarial debate for {len(candidates)} candidates")
         tp = time.monotonic()
         stress_results = self._phase_stress_test(candidates)
-        _log("STRESS", f"done in {time.monotonic() - tp:.0f}s")
+        _log_ok("STRESS", f"done in {time.monotonic() - tp:.0f}s")
         result.stress_test_results = stress_results
 
         # Merge stress results into candidates to produce survivors
@@ -263,8 +264,8 @@ class IdeatePipeline:
         try:
             while pass_count == 0 and refinement_round < max_refinement_rounds:
                 refinement_round += 1
-                _log("IDEATE", f"")
-                _log("IDEATE", f"Refinement Round {refinement_round}/{max_refinement_rounds}: No passing verdicts found. Extracting learnings...")
+                _log("IDEATE", "")
+                _log_warn("IDEATE", f"Refinement Round {refinement_round}/{max_refinement_rounds}: No passing verdicts found. Extracting learnings...")
 
                 if _cached_ctx is None:
                     _cached_ctx = {
@@ -287,7 +288,7 @@ class IdeatePipeline:
                 )
                 
                 if not refinement_survivors:
-                    _log("REFINE", "  No refined candidates generated. Stopping refinement loop.")
+                    _log_warn("REFINE", "No refined candidates generated. Stopping refinement loop.")
                     break
                 
                 # Re-run stress test on refined ideas
@@ -305,30 +306,30 @@ class IdeatePipeline:
                 pass_count = sum(1 for s in refinement_stress if s.verdict in ("BUILD", "MUTATE"))
                 kill_count = sum(1 for s in refinement_stress if s.verdict == "KILL")
                 
-                _log("IDEATE", f"  Refinement round {refinement_round} results: {pass_count} passed, {kill_count} KILL")
+                _log_detail("IDEATE", f"Refinement round {refinement_round} results: {pass_count} passed, {kill_count} KILL")
                 
                 if pass_count > 0:
-                    _log("IDEATE", f"  OK: {pass_count} idea(s) passed stress test!")
+                    _log_ok("IDEATE", f"{pass_count} idea(s) passed stress test!")
                     break
                 elif refinement_round < max_refinement_rounds:
-                    _log("IDEATE", f"  -> Will continue refining ({refinement_round}/{max_refinement_rounds})")
+                    _log_detail("IDEATE", f"-> Will continue refining ({refinement_round}/{max_refinement_rounds})")
             
             if pass_count == 0 and refinement_round >= max_refinement_rounds:
                 _log("IDEATE", f"")
-                _log("IDEATE", f"Reached maximum refinement rounds ({max_refinement_rounds}). Proceeding with {len(survivors)} candidates.")
+                _log_warn("IDEATE", f"Reached maximum refinement rounds ({max_refinement_rounds}). Proceeding with {len(survivors)} candidates.")
         
         except Exception as e:
             refinement_error = e
             _log("IDEATE", f"")
-            _log("IDEATE", f"!! Refinement error after round {refinement_round}: {str(e)}")
-            _log("IDEATE", f"Proceeding with round {refinement_round} results.")
+            _log_warn("IDEATE", f"Refinement error after round {refinement_round}: {str(e)}")
+            _log_detail("IDEATE", f"Proceeding with round {refinement_round} results.")
 
         # ── Multi-generation evolution loop ──────────────────────────
         if self.cfg.generations > 1:
             for gen in range(2, self.cfg.generations + 1):
                 gen_pass = sum(1 for s in result.stress_test_results if s.verdict in ("BUILD", "MUTATE"))
                 if gen_pass == 0:
-                    _log("IDEATE", f"  No survivors for generation {gen}. Stopping evolution.")
+                    _log_warn("IDEATE", f"No survivors for generation {gen}. Stopping evolution.")
                     break
 
                 # EVOLVE phase: mutate, crossover, novelty-explore
@@ -337,14 +338,21 @@ class IdeatePipeline:
                 )
 
                 if not evolved_raw:
-                    _log("EVOLVE", f"  No evolved ideas produced in generation {gen}. Stopping.")
+                    _log_warn("EVOLVE", f"No evolved ideas produced in generation {gen}. Stopping.")
                     break
 
                 # CONVERGE on evolved ideas
                 _log_phase_header("CONVERGE", f"Gen {gen}: Scoring {len(evolved_raw)} evolved ideas")
                 tp2 = time.monotonic()
                 evolved_candidates = self._phase_converge(evolved_raw)
-                _log("CONVERGE", f"Gen {gen} done in {time.monotonic() - tp2:.0f}s")
+                _log_ok("CONVERGE", f"Gen {gen} done in {time.monotonic() - tp2:.0f}s")
+
+                # Tag evolution metadata on converged candidates
+                # Build lookup of raw evolved idea source_technique by id
+                evolved_technique_map = {r.id: r.source_technique for r in evolved_raw}
+                for ec in evolved_candidates:
+                    ec.generation = gen
+                    ec.evolution_rationale = evolved_technique_map.get(ec.id, ec.source_technique)
 
                 # Combine elites with evolved candidates for stress testing
                 all_gen_candidates = list(elites) + evolved_candidates
@@ -353,7 +361,7 @@ class IdeatePipeline:
                 _log_phase_header("STRESS TEST", f"Gen {gen}: Testing {len(all_gen_candidates)} candidates")
                 tp2 = time.monotonic()
                 gen_stress = self._phase_stress_test(all_gen_candidates)
-                _log("STRESS", f"Gen {gen} done in {time.monotonic() - tp2:.0f}s")
+                _log_ok("STRESS", f"Gen {gen} done in {time.monotonic() - tp2:.0f}s")
 
                 # Merge into result
                 result.stress_test_results.extend(gen_stress)
@@ -362,6 +370,7 @@ class IdeatePipeline:
                 # Tag generation on each survivor
                 for s in gen_survivors:
                     s.phase = f"gen_{gen}"
+                    s.generation = gen
 
                 # Replace survivors with new generation (elites + evolved)
                 survivors = gen_survivors
@@ -370,8 +379,8 @@ class IdeatePipeline:
                 gen_build = sum(1 for s in gen_stress if s.verdict == "BUILD")
                 gen_mutate = sum(1 for s in gen_stress if s.verdict == "MUTATE")
                 gen_kill = sum(1 for s in gen_stress if s.verdict == "KILL")
-                _log("EVOLVE", f"  Gen {gen} results: {_C.GREEN}{gen_build} BUILD{_C.RESET} | "
-                     f"{_C.YELLOW}{gen_mutate} MUTATE{_C.RESET} | {_C.RED}{gen_kill} KILL{_C.RESET}")
+                gen_verdicts = {"BUILD": gen_build, "MUTATE": gen_mutate, "KILL": gen_kill}
+                _log_ok("EVOLVE", f"Gen {gen} results: {fmt_verdicts(gen_verdicts)}")
 
         # Token totals
         result.total_input_tokens = self.llm.total_input_tokens
@@ -390,9 +399,9 @@ class IdeatePipeline:
         # Write outputs (do this BEFORE any other processing to ensure files exist)
         try:
             self._write_outputs(run_dir, result)
-            _log("IDEATE", f"OK Outputs written to {run_dir}/")
+            _log_ok("IDEATE", f"Outputs written to {run_dir}/")
         except Exception as write_error:
-            _log("IDEATE", f"FAIL Failed to write outputs: {write_error}")
+            _log_error("IDEATE", f"Failed to write outputs: {write_error}")
             if refinement_error:
                 raise refinement_error  # Raise refinement error if outputs failed
             else:
@@ -407,6 +416,7 @@ class IdeatePipeline:
         final_mutate = sum(1 for s in result.stress_test_results if s.verdict == "MUTATE")
         final_kill = sum(1 for s in result.stress_test_results if s.verdict == "KILL")
         final_incubate = sum(1 for s in result.stress_test_results if s.verdict == "INCUBATE")
+        final_counts = {"BUILD": final_build, "MUTATE": final_mutate, "KILL": final_kill, "INCUBATE": final_incubate}
 
         sorted_survivors = sorted(result.survivors, key=lambda c: c.composite_score, reverse=True)
 
@@ -418,7 +428,7 @@ class IdeatePipeline:
             "",
             f"  Ideas generated:  {len(result.raw_ideas)}",
             f"  After scoring:    {len(result.candidates)}",
-            f"  Verdicts:         {_C.GREEN}{final_build} BUILD{_C.RESET}  |  {_C.YELLOW}{final_mutate} MUTATE{_C.RESET}  |  {_C.RED}{final_kill} KILL{_C.RESET}  |  {_C.DIM}{final_incubate} INCUBATE{_C.RESET}",
+            f"  Verdicts:         {fmt_verdicts(final_counts)}",
         ]
         if refinement_round > 0:
             lines.append(f"  Refinement:       {refinement_round} round(s)")
@@ -429,11 +439,10 @@ class IdeatePipeline:
         final_pass = final_build + final_mutate
         if sorted_survivors:
             lines.append("  Top ideas:")
-            _verdict_color = {"BUILD": _C.GREEN, "MUTATE": _C.YELLOW, "KILL": _C.RED, "INCUBATE": _C.DIM}
             for i, c in enumerate(sorted_survivors[:5]):
                 verdict = c.stress_test_verdict or "?"
                 emoji = {"BUILD": "+", "MUTATE": "~", "KILL": "x", "INCUBATE": "?"}.get(verdict, " ")
-                vc = _verdict_color.get(verdict, "")
+                vc = VERDICT_COLORS.get(verdict, "")
                 lines.append(f"    {vc}[{emoji}]{_C.RESET} #{i+1}  {c.composite_score:.1f}  {c.title}")
             lines.append("")
 
@@ -512,8 +521,8 @@ class IdeatePipeline:
         timer = log_llm_call("META", "Distilling cross-run playbook")
         data = self.llm.generate_json(
             META_LEARN_SYSTEM, prompt, temperature=0.3,
-            model_override=self._model_for_phase("meta"), phase="meta",
-            max_tokens=self._max_tokens_for_phase("meta"),
+            model_override=self._model_for_phase(PHASE_META), phase=PHASE_META,
+            max_tokens=self._max_tokens_for_phase(PHASE_META),
         )
         timer.done()
 
@@ -522,24 +531,24 @@ class IdeatePipeline:
 
         if playbook:
             self.memory.save_playbook(playbook, total_runs)
-            _log("META", f"  Playbook distilled ({len(playbook)} chars)")
+            _log_ok("META", f"Playbook distilled ({len(playbook)} chars)")
 
         if calibration:
             self.memory.save_score_calibration(calibration)
             bias = calibration.get("bias_direction", "?")
             weak = calibration.get("weak_dimensions", [])
-            _log("META", f"  Score calibration: bias={bias}, weak={weak}")
+            _log_detail("META", f"Score calibration: bias={bias}, weak={weak}")
 
         anti_patterns = data.get("anti_patterns", [])
         if anti_patterns:
-            _log("META", f"  Anti-patterns: {'; '.join(anti_patterns[:3])}")
+            _log_detail("META", f"Anti-patterns: {'; '.join(anti_patterns[:3])}")
 
         technique_weights = data.get("technique_weights", {})
         if technique_weights:
             self.memory.save_technique_weights(technique_weights)
             adjusted = {k: v for k, v in technique_weights.items() if v != 1.0}
             if adjusted:
-                _log("META", f"  Technique weights: {adjusted}")
+                _log_detail("META", f"Technique weights: {adjusted}")
 
     def _phase_check_constraints(self, constraints: list[str]) -> None:
         """Detect contradictions in user-specified constraints before running the pipeline."""
@@ -554,27 +563,27 @@ class IdeatePipeline:
             timer = log_llm_call("CONSTCHK", "Validating constraints")
             data = self.llm.generate_json(
                 CONSTRAINT_CHECK_SYSTEM, prompt, temperature=0.2,
-                model_override=self._model_for_phase("constraints"), phase="constraints",
-                max_tokens=self._max_tokens_for_phase("constraints"),
+                model_override=self._model_for_phase(PHASE_CONSTRAINTS), phase=PHASE_CONSTRAINTS,
+                max_tokens=self._max_tokens_for_phase(PHASE_CONSTRAINTS),
             )
             timer.done()
 
             conflicts = data.get("conflicts", [])
             if conflicts:
-                _log("CONSTCHK", f"  !! {len(conflicts)} conflict(s) detected:")
+                _log_warn("CONSTCHK", f"{len(conflicts)} conflict(s) detected:")
                 for conflict in conflicts:
                     pair = conflict.get("constraints", [])
                     reason = conflict.get("reason", "")
                     suggestion = conflict.get("suggestion", "")
-                    _log("CONSTCHK", f"    CONFLICT: {' vs '.join(pair)}")
-                    _log("CONSTCHK", f"      Why: {reason}")
+                    _log_warn("CONSTCHK", f"  CONFLICT: {' vs '.join(pair)}")
+                    _log_detail("CONSTCHK", f"    Why: {reason}")
                     if suggestion:
-                        _log("CONSTCHK", f"      Fix: {suggestion}")
-                _log("CONSTCHK", "  Proceeding anyway -- constraints will be applied as-is.")
+                        _log_detail("CONSTCHK", f"    Fix: {suggestion}")
+                _log_detail("CONSTCHK", "Proceeding anyway -- constraints will be applied as-is.")
             else:
-                _log("CONSTCHK", "  OK No conflicts detected.")
+                _log_ok("CONSTCHK", "No conflicts detected.")
         except Exception as e:
-            _log("CONSTCHK", f"  Skipped (error: {e})")
+            _log_warn("CONSTCHK", f"Skipped (error: {e})")
 
     def _phase_diverge(
         self,
@@ -614,8 +623,8 @@ class IdeatePipeline:
         timer = log_llm_call("DIVERGE", f"Generating {self.cfg.ideas_per_round} idea seeds")
         data = self.llm.generate_json(
             self._sys(DIVERGE_SYSTEM), prompt, temperature=0.9,
-            model_override=self._model_for_phase("diverge"), phase="diverge",
-            max_tokens=self._max_tokens_for_phase("diverge"),
+            model_override=self._model_for_phase(PHASE_DIVERGE), phase=PHASE_DIVERGE,
+            max_tokens=self._max_tokens_for_phase(PHASE_DIVERGE),
         )
         timer.done()
         ideas_raw = data.get("ideas", [])
@@ -629,12 +638,12 @@ class IdeatePipeline:
         for idea in ideas:
             techniques[idea.source_technique] = techniques.get(idea.source_technique, 0) + 1
         tech_str = ", ".join(f"{k} ({v})" for k, v in techniques.items())
-        _log("DIVERGE", f"  {len(ideas)} raw idea seeds generated.")
-        _log("DIVERGE", f"  Techniques: {tech_str}")
+        _log_ok("DIVERGE", f"{len(ideas)} raw idea seeds generated.")
+        _log_detail("DIVERGE", f"Techniques: {tech_str}")
 
         # List all raw ideas so user can follow the pipeline
         for idx, idea in enumerate(ideas, 1):
-            _log("DIVERGE", f"  {_C.DIM}  {idx:>2}. [{idea.source_technique}] {idea.concept[:80]}{_C.RESET}")
+            _log_detail("DIVERGE", f"    {idx:>2}. [{idea.source_technique}] {idea.concept[:80]}")
 
         return ideas
 
@@ -661,8 +670,8 @@ class IdeatePipeline:
         timer = log_llm_call("DEDUP", "Detecting duplicates")
         data = self.llm.generate_json(
             self._sys(DEDUP_SYSTEM), prompt, temperature=0.2,
-            model_override=self._model_for_phase("dedup"), phase="dedup",
-            max_tokens=self._max_tokens_for_phase("dedup"),
+            model_override=self._model_for_phase(PHASE_DEDUP), phase=PHASE_DEDUP,
+            max_tokens=self._max_tokens_for_phase(PHASE_DEDUP),
         )
         timer.done()
 
@@ -672,23 +681,23 @@ class IdeatePipeline:
         overrepresented = data.get("overrepresented_themes", [])
 
         if removed:
-            _log("DEDUP", f"  Removed {len(removed)} duplicates:")
+            _log_warn("DEDUP", f"Removed {len(removed)} duplicates:")
             for r in removed[:3]:
-                _log("DEDUP", f"    - {r.get('id', '?')} ~ {r.get('duplicate_of', '?')}: {r.get('reason', '')[:60]}")
+                _log_detail("DEDUP", f"  - {r.get('id', '?')} ~ {r.get('duplicate_of', '?')}: {r.get('reason', '')[:60]}")
 
         if overrepresented:
-            _log("DEDUP", f"  Over-represented: {'; '.join(overrepresented[:3])}")
+            _log_warn("DEDUP", f"Over-represented: {'; '.join(overrepresented[:3])}")
 
         if gaps:
-            _log("DEDUP", f"  Gaps found: {'; '.join(gaps[:3])}")
+            _log_detail("DEDUP", f"Gaps found: {'; '.join(gaps[:3])}")
 
         filtered = [i for i in raw_ideas if i.id in keep_ids]
-        _log("DEDUP", f"  {len(raw_ideas)} -> {len(filtered)} unique ideas")
+        _log_ok("DEDUP", f"{len(raw_ideas)} -> {len(filtered)} unique ideas")
 
         # List surviving ideas after dedup
         if removed:
             for idx, idea in enumerate(filtered, 1):
-                _log("DEDUP", f"  {_C.DIM}  {idx:>2}. {idea.concept[:80]}{_C.RESET}")
+                _log_detail("DEDUP", f"    {idx:>2}. {idea.concept[:80]}")
 
         return filtered, gaps, overrepresented
 
@@ -717,24 +726,24 @@ class IdeatePipeline:
         timer = log_llm_call("DIVERGE", f"Gap-filling {gap_count} ideas")
         data = self.llm.generate_json(
             self._sys(DIVERGE_GAPFILL_SYSTEM), prompt, temperature=0.95,
-            model_override=self._model_for_phase("gapfill"), phase="gapfill",
-            max_tokens=self._max_tokens_for_phase("gapfill"),
+            model_override=self._model_for_phase(PHASE_GAPFILL), phase=PHASE_GAPFILL,
+            max_tokens=self._max_tokens_for_phase(PHASE_GAPFILL),
         )
         timer.done()
 
         ideas_raw = data.get("ideas", [])
         gap_ideas = [RawIdea(**item) for item in ideas_raw]
 
-        _log("DIVERGE", f"  Gap-fill generated {len(gap_ideas)} new ideas")
+        _log_ok("DIVERGE", f"Gap-fill generated {len(gap_ideas)} new ideas")
         if gap_ideas:
             techniques = {}
             for idea in gap_ideas:
                 techniques[idea.source_technique] = techniques.get(idea.source_technique, 0) + 1
-            _log("DIVERGE", f"  Techniques: {', '.join(f'{k} ({v})' for k, v in techniques.items())}")
+            _log_detail("DIVERGE", f"Techniques: {', '.join(f'{k} ({v})' for k, v in techniques.items())}")
 
             # List gap-fill ideas
             for idx, idea in enumerate(gap_ideas, 1):
-                _log("DIVERGE", f"  {_C.DIM}  {idx:>2}. [gap] {idea.concept[:80]}{_C.RESET}")
+                _log_detail("DIVERGE", f"    {idx:>2}. [gap] {idea.concept[:80]}")
 
         return gap_ideas
 
@@ -742,7 +751,7 @@ class IdeatePipeline:
         _log("CONVERGE", f"Decomposed scoring pipeline for {len(raw_ideas)} ideas...")
 
         # ── Sub-phase 2A: CLUSTER + INITIAL SCORE ────────────────
-        _log("CONVERGE", "  [2A] Clustering and initial scoring...")
+        _log_detail("CONVERGE", "[2A] Clustering and initial scoring...")
 
         ideas_compact = [
             {"id": i.id, "concept": i.concept, "domain_tags": i.domain_tags,
@@ -768,14 +777,14 @@ class IdeatePipeline:
         timer = log_llm_call("CONVERGE", f"Clustering {len(raw_ideas)} ideas → top {self.cfg.converge_top_n}")
         data_a = self.llm.generate_json(
             self._sys(CONVERGE_SYSTEM), prompt_a, temperature=0.5,
-            model_override=self._model_for_phase("converge"), phase="converge-cluster",
-            max_tokens=self._max_tokens_for_phase("converge-cluster"),
+            model_override=self._model_for_phase(PHASE_CONVERGE), phase=PHASE_CONVERGE_CLUSTER,
+            max_tokens=self._max_tokens_for_phase(PHASE_CONVERGE_CLUSTER),
         )
         timer.done()
 
         clustering = data_a.get("clustering_summary", "")
         if clustering:
-            _log("CONVERGE", f"  Clustering: {clustering[:120]}")
+            _log_detail("CONVERGE", f"Clustering: {clustering[:120]}")
 
         candidates_raw = data_a.get("candidates", [])
         candidates = []
@@ -783,19 +792,19 @@ class IdeatePipeline:
             card = self._parse_candidate(c)
             candidates.append(card)
         candidates.sort(key=lambda c: c.composite_score, reverse=True)
-        _log("CONVERGE", f"  [2A] {len(candidates)} candidates with initial scores.")
+        _log_ok("CONVERGE", f"[2A] {len(candidates)} candidates with initial scores.")
 
         # Show which ideas were selected vs dropped
         selected_ids = {c.id for c in candidates}
         dropped = [i for i in raw_ideas if i.id not in selected_ids]
         if dropped:
-            _log("CONVERGE", f"  {_C.DIM}Dropped {len(dropped)}: {', '.join(i.concept[:30] for i in dropped[:6])}{'...' if len(dropped) > 6 else ''}{_C.RESET}")
+            _log_detail("CONVERGE", f"  Dropped {len(dropped)}: {', '.join(i.concept[:30] for i in dropped[:6])}{'...' if len(dropped) > 6 else ''}")
 
         if not candidates:
             return candidates
 
         # ── Sub-phase 2B: COMPARATIVE RANKING ────────────────────
-        _log("CONVERGE", "  [2B] Pairwise comparative re-ranking...")
+        _log_detail("CONVERGE", "[2B] Pairwise comparative re-ranking...")
 
         compare_input = [
             {"id": c.id, "title": c.title, "rationale": c.rationale,
@@ -813,8 +822,8 @@ class IdeatePipeline:
         timer = log_llm_call("CONVERGE", "Pairwise comparative re-ranking")
         data_b = self.llm.generate_json(
             self._sys(CONVERGE_COMPARE_SYSTEM), prompt_b, temperature=0.3,
-            model_override=self._model_for_phase("converge"), phase="converge-compare",
-            max_tokens=self._max_tokens_for_phase("converge-compare"),
+            model_override=self._model_for_phase(PHASE_CONVERGE), phase=PHASE_CONVERGE_COMPARE,
+            max_tokens=self._max_tokens_for_phase(PHASE_CONVERGE_COMPARE),
         )
         timer.done()
 
@@ -834,17 +843,17 @@ class IdeatePipeline:
         if final_ranking:
             rank_map = {id_: idx for idx, id_ in enumerate(final_ranking)}
             candidates.sort(key=lambda c: rank_map.get(c.id, 999))
-            _log("CONVERGE", f"  [2B] Final ranking: {' -> '.join(c.title[:25] for c in candidates[:4])}...")
+            _log_ok("CONVERGE", f"[2B] Final ranking: {' -> '.join(c.title[:25] for c in candidates[:4])}...")
         else:
             candidates.sort(key=lambda c: c.composite_score, reverse=True)
 
         # Log score spread after comparative ranking
         if len(candidates) >= 2:
             spread = candidates[0].composite_score - candidates[-1].composite_score
-            _log("CONVERGE", f"  [2B] Score spread after comparison: {spread:.1f}")
+            _log_detail("CONVERGE", f"[2B] Score spread after comparison: {spread:.1f}")
 
         # ── Sub-phase 2C: ENRICH + ASSUMPTION INVERSION ──────────
-        _log("CONVERGE", "  [2C] Enriching with personas, assumptions + inversion...")
+        _log_detail("CONVERGE", "[2C] Enriching with personas, assumptions + inversion...")
 
         # Batch enrichment to avoid token limit truncation (max 4 candidates per call)
         ENRICH_BATCH = 4
@@ -870,8 +879,8 @@ class IdeatePipeline:
 
             data_c = self.llm.generate_json(
                 self._sys(CONVERGE_ENRICH_SYSTEM), prompt_c, temperature=0.5,
-                model_override=self._model_for_phase("converge"), phase="converge-enrich",
-                max_tokens=self._max_tokens_for_phase("converge-enrich"),
+                model_override=self._model_for_phase(PHASE_CONVERGE), phase=PHASE_CONVERGE_ENRICH,
+                max_tokens=self._max_tokens_for_phase(PHASE_CONVERGE_ENRICH),
             )
             timer.done()
 
@@ -904,7 +913,7 @@ class IdeatePipeline:
             card.inverse_terrible_conditions = inv.get("terrible_conditions", [])
             card.inverse_confidence = inv.get("inverse_confidence", 0.0)
 
-        _log("CONVERGE", f"  [2C] Enriched {len(all_enrichments)} candidates, {fragile_count} fragile assumptions flagged.")
+        _log_ok("CONVERGE", f"[2C] Enriched {len(all_enrichments)} candidates, {fragile_count} fragile assumptions flagged.")
 
         # ── Enforce effort diversity ──────────────────────────────
         if len(candidates) >= 3:
@@ -913,41 +922,23 @@ class IdeatePipeline:
                 by_effort_score = sorted(candidates, key=lambda c: c.score_breakdown.effort)
                 by_effort_score[0].estimated_effort = "small"
                 by_effort_score[-1].estimated_effort = "large"
-                _log("CONVERGE", f"  Effort diversity enforced: "
+                _log_warn("CONVERGE", f"Effort diversity enforced: "
                      f"{by_effort_score[0].title[:30]}→small, "
                      f"{by_effort_score[-1].title[:30]}→large")
 
         # ── Apply mathematical calibration from META-LEARN ────────
-        calibration_data = self.memory.get_score_stats()
-        multipliers = (calibration_data.get("dimension_multipliers") or {}) if calibration_data else {}
-        if multipliers:
-            for c in candidates:
-                sb = c.score_breakdown
-                for dim in ("impact", "confidence", "effort", "cost", "ethical_risk",
-                            "sustainability", "defensibility", "market_timing"):
-                    m = multipliers.get(dim)
-                    if m is not None and m != 1.0:
-                        orig = getattr(sb, dim)
-                        setattr(sb, dim, round(max(0.0, min(10.0, orig * m)), 2))
-                c.composite_score = compute_composite_score(sb)
-            candidates.sort(key=lambda c: c.composite_score, reverse=True)
-            for c in candidates:
-                c.scoring_calibration_status = "calibrated"
-            _log("CONVERGE", f"  Calibration applied: {multipliers}")
-            cal_status = "CALIBRATED"
-        else:
-            cal_status = "UNCALIBRATED"
+        cal_status = apply_calibration(candidates, self.memory.get_score_stats(), tag="CONVERGE")
 
-        _log("CONVERGE", f"  {len(candidates)} candidates scored.  ({cal_status})")
+        _log_ok("CONVERGE", f"{len(candidates)} candidates scored.  ({cal_status})")
         for i, c in enumerate(candidates[:5]):
             sc = c.composite_score
             _sc_color = _C.GREEN if sc >= 7.5 else (_C.YELLOW if sc >= 5.0 else _C.RED)
             _log("CONVERGE", f"  #{i+1} {_sc_color}[{sc:.1f}]{_C.RESET} \"{c.title}\"")
-            _log("CONVERGE", f"       {_C.DIM}Domains: {', '.join(c.domain_tags)}{_C.RESET}")
+            _log_detail("CONVERGE", f"       Domains: {', '.join(c.domain_tags)}")
             if c.primary_persona.who:
-                _log("CONVERGE", f"       {_C.DIM}Persona: {c.primary_persona.who}{_C.RESET}")
+                _log_detail("CONVERGE", f"       Persona: {c.primary_persona.who}")
             if c.primary_persona.pain:
-                _log("CONVERGE", f"       {_C.DIM}Pain: {c.primary_persona.pain[:80]}{_C.RESET}")
+                _log_detail("CONVERGE", f"       Pain: {c.primary_persona.pain[:80]}")
 
         return candidates
 
@@ -965,7 +956,7 @@ class IdeatePipeline:
                 "domain_tags": c.domain_tags,
             }
 
-        stress_model = self._model_for_phase("stress")
+        stress_model = self._model_for_phase(PHASE_STRESS)
         sys_attack = self._sys(STRESS_TEST_SYSTEM)
         brief_ctx = build_brief_context(self._brief_text)
         adaptive_ctx = build_adaptive_stress_context(
@@ -975,13 +966,13 @@ class IdeatePipeline:
         # ── Prior art search for each candidate ──────────────────────
         prior_art_by_id: dict[str, str] = {}
         if self.search.enabled:
-            _log("STRESS", "Searching for prior art / competitors...")
+            _log_detail("STRESS", "Searching for prior art / competitors...")
             for c in candidates:
                 # Short title-based query to find existing products
                 results = self.search.search(f"{c.title} existing product competitor", max_results=3)
                 if results:
                     prior_art_by_id[c.id] = format_search_results(results, max_chars=800)
-                    _log("STRESS", f"  {c.title[:40]}: {len(results)} results")
+                    _log_detail("STRESS", f"  {c.title[:40]}: {len(results)} results")
 
         # ── Single round: Attack + Feasibility + Verdict (parallel across ideas) ──
         _log("STRESS", f"Attacking {len(candidates)} candidates ({len(candidates)} parallel calls)...")
@@ -991,7 +982,7 @@ class IdeatePipeline:
 
         async def _attack_one(c: IdeaCard) -> AttackResponse:
             nonlocal _attack_done
-            _log("STRESS", f"  ... [{_attack_done}/{_attack_total}] Attacking: {c.title[:50]}...")
+            _log_detail("STRESS", f"[{_attack_done}/{_attack_total}] Attacking: {c.title[:50]}...")
             cj = json.dumps([compact_by_id[c.id]], ensure_ascii=False)
             prior_art_ctx = ""
             if c.id in prior_art_by_id:
@@ -1009,20 +1000,20 @@ class IdeatePipeline:
             try:
                 data = await self.llm.generate_json_async(
                     sys_attack, prompt, temperature=0.4,
-                    model_override=stress_model, phase="stress-attack",
-                    max_tokens=self._max_tokens_for_phase("stress-attack"),
+                    model_override=stress_model, phase=PHASE_STRESS_ATTACK,
+                    max_tokens=self._max_tokens_for_phase(PHASE_STRESS_ATTACK),
                 )
                 raw = _unwrap_single(data, "results", c.id, "attack")
                 _attack_done += 1
-                _log("STRESS", f"  OK [{_attack_done}/{_attack_total}] {c.title[:50]} - attack received")
+                _log_ok("STRESS", f"[{_attack_done}/{_attack_total}] {c.title[:50]} - attack received")
                 return AttackResponse.model_validate(raw)
             except (ValueError, Exception) as e:
                 _attack_done += 1
-                _log("STRESS", f"  [WARN] Attack failed for {c.id} (API crash -> INCUBATE): {e}")
+                _log_warn("STRESS", f"Attack failed for {c.id} (API crash -> INCUBATE): {e}")
                 return AttackResponse(idea_id=c.id, freeform_attack="(attack failed — API crash, not a genuine verdict)", structured_attacks=[], verdict="INCUBATE", error_source="api_crash")
 
         attack_results = self._run_parallel([_attack_one(c) for c in candidates])
-        _log("STRESS", f"  All {_attack_total} attacks completed in {time.monotonic() - _attack_t0:.1f}s")
+        _log_ok("STRESS", f"All {_attack_total} attacks completed in {time.monotonic() - _attack_t0:.1f}s")
 
         # ── Assemble final StressTestResults directly from attack ────
 
@@ -1037,12 +1028,12 @@ class IdeatePipeline:
             idea_id = ar.idea_id
             title = next((c.title for c in candidates if c.id == idea_id), idea_id)
 
-            _log("STRESS", f"  {title}")
-            _log("STRESS", f"    Freeform: {ar.freeform_attack[:100]}")
+            _log_detail("STRESS", f"  {title}")
+            _log_detail("STRESS", f"    Freeform: {ar.freeform_attack[:100]}")
             for atk in ar.structured_attacks[:3]:
-                _log("STRESS", f"    - {atk[:90]}")
+                _log_detail("STRESS", f"    - {atk[:90]}")
             if len(ar.structured_attacks) > 3:
-                _log("STRESS", f"    ... and {len(ar.structured_attacks) - 3} more attacks")
+                _log_detail("STRESS", f"    ... and {len(ar.structured_attacks) - 3} more attacks")
 
             # Build debate rounds from attack + defense pairs
             debate_rounds: list[DebateExchange] = []
@@ -1087,10 +1078,9 @@ class IdeatePipeline:
             survived = st.attacks_survived
             fatal = st.attacks_fatal
             if st.error_source:
-                _log("STRESS", f"    -> {_C.YELLOW}!! CRASH-INCUBATE{_C.RESET} (API error, not a genuine verdict)")
+                _log_warn("STRESS", f"  -> CRASH-INCUBATE (API error, not a genuine verdict)")
             else:
-                _vc = {"BUILD": _C.GREEN, "MUTATE": _C.YELLOW, "KILL": _C.RED}.get(st.verdict, "")
-                _log("STRESS", f"    -> {survived} survived, {fatal} fatal -> {_vc}{st.verdict}{_C.RESET}")
+                _log_detail("STRESS", f"    -> {survived} survived, {fatal} fatal -> {fmt_verdict(st.verdict)}")
 
         # ── Programmatic verdict enforcement ────────────────────
         # The LLM tends to hedge with MUTATE even when its own numbers
@@ -1101,7 +1091,7 @@ class IdeatePipeline:
             if (r.verdict == "MUTATE"
                     and r.attacks_survived >= 5
                     and r.attacks_fatal <= 1):
-                _log("STRESS", f"  >> Override {r.idea_id}: MUTATE->BUILD "
+                _log_warn("STRESS", f">> Override {r.idea_id}: MUTATE->BUILD "
                      f"(survived={r.attacks_survived}, fatal={r.attacks_fatal})")
                 r.verdict = "BUILD"
                 overrides += 1
@@ -1110,10 +1100,8 @@ class IdeatePipeline:
         verdicts: dict[str, int] = {}
         for r in results:
             verdicts[r.verdict] = verdicts.get(r.verdict, 0) + 1
-        if overrides:
-            _log("STRESS", f"  Verdicts (after {overrides} override(s)): {verdicts}")
-        else:
-            _log("STRESS", f"  Verdicts: {verdicts}")
+        override_note = f" (after {overrides} override(s))" if overrides else ""
+        _log_ok("STRESS", f"Verdicts{override_note}: {fmt_verdicts(verdicts)}")
 
         return results
 
@@ -1137,15 +1125,15 @@ class IdeatePipeline:
         all_passing = build_ideas + mutate_ideas
 
         if not all_passing:
-            _log("EVOLVE", "  No survivors to evolve. Skipping.")
+            _log_warn("EVOLVE", "No survivors to evolve. Skipping.")
             return [], []
 
         # Elites: top BUILD ideas carry forward unchanged
         elite_count = max(1, len(build_ideas) // 2)
         elites = sorted(build_ideas, key=lambda c: c.composite_score, reverse=True)[:elite_count]
-        _log("EVOLVE", f"  Elites (carry-forward): {len(elites)}")
+        _log_ok("EVOLVE", f"Elites (carry-forward): {len(elites)}")
         for e in elites:
-            _log("EVOLVE", f"    {_C.GREEN}[BUILD]{_C.RESET} {e.composite_score:.1f} {e.title}")
+            _log_verdict("EVOLVE", "BUILD", f"{e.composite_score:.1f} {e.title}")
 
         # Build survivors JSON with stress test context
         survivors_data = []
@@ -1187,8 +1175,8 @@ class IdeatePipeline:
         timer = log_llm_call("EVOLVE", f"Evolving generation {generation} ({evolve_count} offspring)")
         data = self.llm.generate_json(
             self._sys(EVOLVE_SYSTEM), prompt, temperature=0.85,
-            model_override=self._model_for_phase("evolve"), phase="evolve",
-            max_tokens=self._max_tokens_for_phase("evolve"),
+            model_override=self._model_for_phase(PHASE_EVOLVE), phase=PHASE_EVOLVE,
+            max_tokens=self._max_tokens_for_phase(PHASE_EVOLVE),
         )
         timer.done()
 
@@ -1200,17 +1188,17 @@ class IdeatePipeline:
                 idea = RawIdea(**item)
                 evolved_ideas.append(idea)
             except Exception:
-                _log("EVOLVE", f"  [WARN] Failed to parse evolved idea: {item.get('id', '?')}")
+                _log_warn("EVOLVE", f"Failed to parse evolved idea: {item.get('id', '?')}")
 
         # Log results
         techniques = {}
         for idea in evolved_ideas:
             techniques[idea.source_technique] = techniques.get(idea.source_technique, 0) + 1
         tech_str = ", ".join(f"{k} ({v})" for k, v in techniques.items())
-        _log("EVOLVE", f"  {len(evolved_ideas)} evolved ideas: {tech_str}")
+        _log_ok("EVOLVE", f"{len(evolved_ideas)} evolved ideas: {tech_str}")
         for idx, idea in enumerate(evolved_ideas, 1):
             parents = ", ".join(idea.domain_tags[:2])
-            _log("EVOLVE", f"  {_C.DIM}  {idx:>2}. [{idea.source_technique}] {idea.concept[:70]} ({parents}){_C.RESET}")
+            _log_detail("EVOLVE", f"    {idx:>2}. [{idea.source_technique}] {idea.concept[:70]} ({parents})")
 
         return elites, evolved_ideas
 
@@ -1243,10 +1231,10 @@ class IdeatePipeline:
                     "suggested_mutation": stress.suggested_mutation,
                 })
 
-        _log("REFINE", f"  Mutations extracted: {len(mutations)} suggested improvements from MUTATE verdicts")
+        _log_detail("REFINE", f"Mutations extracted: {len(mutations)} suggested improvements from MUTATE verdicts")
         if mutations[:2]:
             for m in mutations[:2]:
-                _log("REFINE", f"    - {m['idea_title']}: {m['suggested_mutation'][:80]}")
+                _log_detail("REFINE", f"  - {m['idea_title']}: {m['suggested_mutation'][:80]}")
 
         # Extract attack patterns (what kills ideas repeatedly?)
         attack_counter = {}
@@ -1263,18 +1251,18 @@ class IdeatePipeline:
             for v in sorted(attack_counter.values(), key=lambda x: -x["count"])[:max_patterns]
         ]
 
-        _log("REFINE", f"  Attack patterns identified: {len(attack_patterns)} recurring threat vectors")
+        _log_detail("REFINE", f"Attack patterns identified: {len(attack_patterns)} recurring threat vectors")
         if attack_patterns[:2]:
             for p in attack_patterns[:2]:
-                _log("REFINE", f"    - [{p['frequency']}x] {p['pattern'][:70]}")
+                _log_detail("REFINE", f"  - [{p['frequency']}x] {p['pattern'][:70]}")
 
-        _log("REFINE", f"  Extracted {len(mutations)} mutations and {len(attack_patterns)} attack patterns")
+        _log_ok("REFINE", f"Extracted {len(mutations)} mutations and {len(attack_patterns)} attack patterns")
 
         # Extract banned concepts: titles + one-line concepts of ALL prior candidates
         banned_concepts = []
         for c in candidates:
             banned_concepts.append(f"{c.title}: {c.rationale[:100] if c.rationale else c.title}")
-        _log("REFINE", f"  Banned concepts: {len(banned_concepts)} previous ideas will be excluded")
+        _log_detail("REFINE", f"Banned concepts: {len(banned_concepts)} previous ideas will be excluded")
 
         # Extract problem reframes from stress test structured attacks
         reframe_attacks = []
@@ -1298,14 +1286,14 @@ class IdeatePipeline:
                             reframe_attacks.append(sentence)
         # Deduplicate and limit
         reframe_attacks = list(dict.fromkeys(reframe_attacks))[:5]
-        _log("REFINE", f"  Problem reframes extracted: {len(reframe_attacks)} alternative framings from stress tests")
+        _log_detail("REFINE", f"Problem reframes extracted: {len(reframe_attacks)} alternative framings from stress tests")
         if reframe_attacks[:2]:
             for r in reframe_attacks[:2]:
-                _log("REFINE", f"    - {r[:80]}")
+                _log_detail("REFINE", f"  - {r[:80]}")
 
         # Build refinement context for diverge phase
         refinement_ctx = build_refinement_context(mutations, attack_patterns, banned_concepts, reframe_attacks)
-        _log("REFINE", f"  Learning context prepared: {len(mutations[:5])} mutations + {len(attack_patterns[:5])} patterns")
+        _log_detail("REFINE", f"Learning context prepared: {len(mutations[:5])} mutations + {len(attack_patterns[:5])} patterns")
 
         # ── Extract canonical failure types for hard blocklist ────
         failure_types: dict[str, list[str]] = {}
@@ -1321,7 +1309,7 @@ class IdeatePipeline:
                             failure_types[category].append(example)
         blocklist_ctx = build_failure_blocklist_context(failure_types)
         if failure_types:
-            _log("REFINE", f"  Failure blocklist: {', '.join(failure_types.keys())}")
+            _log_detail("REFINE", f"Failure blocklist: {', '.join(failure_types.keys())}")
 
         # Use cached context if available, otherwise build fresh
         if cached_context:
@@ -1367,12 +1355,12 @@ class IdeatePipeline:
 
         # Adjust temperature: less creative on later iterations (more focused on solving problems)
         temperature = max(0.5, 0.9 - (iteration * 0.15))
-        _log("REFINE", f"  DIVERGE: Generating {diverge_ideas_count} focused ideas (temperature={temperature:.2f})...")
+        _log_detail("REFINE", f"DIVERGE: Generating {diverge_ideas_count} focused ideas (temperature={temperature:.2f})...")
         
         timer = log_llm_call("REFINE", f"Generating {diverge_ideas_count} refined ideas")
         data = self.llm.generate_json(self._sys(DIVERGE_SYSTEM), refined_prompt, temperature=temperature,
-                                       model_override=self._model_for_phase("refine"), phase="refine-diverge",
-                                       max_tokens=self._max_tokens_for_phase("refine-diverge"))
+                                       model_override=self._model_for_phase(PHASE_REFINE), phase=PHASE_REFINE_DIVERGE,
+                                       max_tokens=self._max_tokens_for_phase(PHASE_REFINE_DIVERGE))
         timer.done()
         ideas_raw = data.get("ideas", [])
 
@@ -1384,7 +1372,7 @@ class IdeatePipeline:
         for idea in refined_raw_ideas:
             techniques[idea.source_technique] = techniques.get(idea.source_technique, 0) + 1
         tech_str = ", ".join(f"{k} ({v})" for k, v in techniques.items())
-        _log("REFINE", f"  DIVERGE result: {len(refined_raw_ideas)} ideas -- {tech_str}")
+        _log_ok("REFINE", f"DIVERGE result: {len(refined_raw_ideas)} ideas -- {tech_str}")
 
         # Converge on refined ideas
         ideas_json = json.dumps(
@@ -1403,16 +1391,16 @@ class IdeatePipeline:
             brief_context=build_brief_context(self._brief_text),
         )
 
-        _log("REFINE", f"  CONVERGE: Scoring {len(refined_raw_ideas)} ideas, selecting top {converge_top_n}...")
+        _log_detail("REFINE", f"CONVERGE: Scoring {len(refined_raw_ideas)} ideas, selecting top {converge_top_n}...")
         timer = log_llm_call("REFINE", f"Scoring {len(refined_raw_ideas)} refined candidates")
         data = self.llm.generate_json(self._sys(CONVERGE_SYSTEM), prompt, temperature=0.5,
-                                       model_override=self._model_for_phase("refine"), phase="refine-converge",
-                                       max_tokens=self._max_tokens_for_phase("refine-converge"))
+                                       model_override=self._model_for_phase(PHASE_REFINE), phase=PHASE_REFINE_CONVERGE,
+                                       max_tokens=self._max_tokens_for_phase(PHASE_REFINE_CONVERGE))
         timer.done()
 
         clustering = data.get("clustering_summary", "")
         if clustering:
-            _log("REFINE", f"    Clustering: {clustering[:100]}...")
+            _log_detail("REFINE", f"  Clustering: {clustering[:100]}...")
 
         candidates_raw = data.get("candidates", [])
         refined_candidates = []
@@ -1421,24 +1409,11 @@ class IdeatePipeline:
             refined_candidates.append(card)
 
         # Apply calibration to refinement candidates too
-        cal_data = self.memory.get_score_stats()
-        cal_multipliers = (cal_data.get("dimension_multipliers") or {}) if cal_data else {}
-        if cal_multipliers:
-            for c in refined_candidates:
-                sb = c.score_breakdown
-                for dim in ("impact", "confidence", "effort", "cost", "ethical_risk",
-                            "sustainability", "defensibility", "market_timing"):
-                    m = cal_multipliers.get(dim)
-                    if m is not None and m != 1.0:
-                        orig = getattr(sb, dim)
-                        setattr(sb, dim, round(max(0.0, min(10.0, orig * m)), 2))
-                c.composite_score = compute_composite_score(sb)
-                c.scoring_calibration_status = "calibrated"
-            refined_candidates.sort(key=lambda c: c.composite_score, reverse=True)
+        apply_calibration(refined_candidates, self.memory.get_score_stats(), tag="REFINE")
 
-        _log("REFINE", f"  CONVERGE result: {len(refined_candidates)} candidates ready for stress test")
+        _log_ok("REFINE", f"CONVERGE result: {len(refined_candidates)} candidates ready for stress test")
         for i, c in enumerate(refined_candidates[:3]):
-            _log("REFINE", f"    #{i+1} [{c.composite_score:.1f}] {c.title}")
+            _log_detail("REFINE", f"  #{i+1} [{c.composite_score:.1f}] {c.title}")
 
         # Save refinement run to memory
         self.memory.save_refinement_run({
@@ -1537,7 +1512,7 @@ class IdeatePipeline:
             seen_titles[key] = len(unique)
             unique.append(card)
         if dupes:
-            _log("MERGE", f"  Removed {dupes} duplicate idea(s) by title")
+            _log_warn("MERGE", f"Removed {dupes} duplicate idea(s) by title")
         return unique
 
     def _write_outputs(self, run_dir: Path, result: IdeateRunResult) -> None:
@@ -1545,7 +1520,7 @@ class IdeatePipeline:
         # idea-report.md
         cost_info = self.actual_cost()
         report = generate_idea_report(result, cost_info=cost_info)
-        report = _sanitize_text(report)
+        report = sanitize_text(report)
         (run_dir / "idea-report.md").write_text(report, encoding="utf-8")
 
         # idea-cards.json — only survivors with BUILD or INCUBATE
@@ -1731,20 +1706,6 @@ class IdeatePipeline:
             result.append(entry)
         result.sort(key=lambda a: COST_ORDER.get(a.get("validation_cost", "medium"), 1))
         return result
-
-    @staticmethod
-    def _make_run_id(brief_text: str | None = None) -> str:
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        if not brief_text:
-            return ts
-        # Normalize unicode, keep ASCII letters/digits, collapse whitespace to hyphens
-        slug = unicodedata.normalize("NFKD", brief_text).encode("ascii", "ignore").decode()
-        slug = re.sub(r"[^a-zA-Z0-9\s-]", "", slug)
-        slug = re.sub(r"[\s_-]+", "-", slug).strip("-").lower()
-        # Truncate to ~40 chars on a word boundary
-        if len(slug) > 40:
-            slug = slug[:40].rsplit("-", 1)[0]
-        return f"{ts}-{slug}" if slug else ts
 
     # ------------------------------------------------------------------
     # Model routing

@@ -10,7 +10,7 @@ import time
 
 import anthropic
 
-from xbrain.log import log as _log
+from xbrain.log import log as _log, log_warn as _log_warn, log_error as _log_error
 
 
 class LLMClient:
@@ -62,7 +62,7 @@ class LLMClient:
                 if attempt == max_retries - 1:
                     raise
                 wait = min(60, 5 * (2 ** attempt))
-                _log("RETRY", f"{type(e).__name__}, attempt {attempt + 1}/{max_retries}, waiting {wait}s...")
+                _log_warn("LLM", f"{type(e).__name__}, attempt {attempt + 1}/{max_retries}, waiting {wait}s...")
                 time.sleep(wait)
 
         self._record_usage(use_model, phase, response.usage)
@@ -101,13 +101,13 @@ class LLMClient:
                 if attempt == max_retries - 1:
                     raise
                 wait = self._get_retry_after(e) or min(60, 15 * (2 ** attempt))
-                _log("RETRY", f"RateLimitError, attempt {attempt + 1}/{max_retries}, waiting {wait:.0f}s...")
+                _log_warn("LLM", f"RateLimitError, attempt {attempt + 1}/{max_retries}, waiting {wait:.0f}s...")
                 await asyncio.sleep(wait)
             except (anthropic.APITimeoutError, anthropic.APIConnectionError) as e:
                 if attempt == max_retries - 1:
                     raise
                 wait = min(60, 5 * (2 ** attempt))
-                _log("RETRY", f"{type(e).__name__}, attempt {attempt + 1}/{max_retries}, waiting {wait}s...")
+                _log_warn("LLM", f"{type(e).__name__}, attempt {attempt + 1}/{max_retries}, waiting {wait}s...")
                 await asyncio.sleep(wait)
 
         self._record_usage(use_model, phase, response.usage)
@@ -146,7 +146,7 @@ class LLMClient:
             with self._token_lock:
                 oldest = min((t for t, _ in self._token_window if t > cutoff), default=time.time())
             wait = max(1.0, oldest + self._WINDOW_SECONDS - time.time() + 0.5)
-            _log("THROTTLE", f"{used}/{self._OUTPUT_TOKEN_LIMIT} output tokens/min used, pausing {wait:.0f}s...")
+            _log_warn("LLM", f"{used}/{self._OUTPUT_TOKEN_LIMIT} output tokens/min used, pausing {wait:.0f}s...")
             await asyncio.sleep(wait)
 
     @staticmethod
@@ -175,7 +175,7 @@ class LLMClient:
                 # Fence found but JSON is malformed/truncated — try repair
                 repaired = LLMClient._repair_truncated_json(inner)
                 if repaired is not None:
-                    _log("WARN", "JSON in code fence was truncated; recovered partial JSON.")
+                    _log_warn("LLM", "JSON in code fence was truncated; recovered partial JSON.")
                     return repaired
 
         # 2. Check for OPEN fence with no closing fence (truncated response)
@@ -188,7 +188,7 @@ class LLMClient:
             except json.JSONDecodeError:
                 repaired = LLMClient._repair_truncated_json(inner)
                 if repaired is not None:
-                    _log("WARN", "JSON in unclosed code fence was truncated; recovered partial JSON.")
+                    _log_warn("LLM", "JSON in unclosed code fence was truncated; recovered partial JSON.")
                     return repaired
 
         # Strip remaining markdown fences so they don't interfere with raw search
@@ -214,7 +214,7 @@ class LLMClient:
                 # Brackets never balanced — try truncation repair on everything from { onwards
                 repaired = LLMClient._repair_truncated_json(cleaned[i:])
                 if repaired is not None:
-                    _log("WARN", "Unbalanced JSON brackets; recovered partial JSON.")
+                    _log_warn("LLM", "Unbalanced JSON brackets; recovered partial JSON.")
                     return repaired
                 break
 
@@ -227,10 +227,10 @@ class LLMClient:
         # 5. Final fallback: try repair on cleaned text
         repaired = LLMClient._repair_truncated_json(cleaned)
         if repaired is not None:
-            _log("WARN", "LLM response was truncated; recovered partial JSON.")
+            _log_warn("LLM", "LLM response was truncated; recovered partial JSON.")
             return repaired
 
-        _log("ERROR", f"Could not parse JSON from LLM response. First 500 chars: {text[:500]}")
+        _log_error("LLM", f"Could not parse JSON from LLM response. First 500 chars: {text[:500]}")
         raise ValueError("No valid JSON found in LLM response")
 
     @staticmethod

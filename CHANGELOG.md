@@ -1,5 +1,75 @@
 # Changelog
 
+## v1.16.0 — 2026-03-21
+
+### Refactored — DRY Extraction & Phase Constants
+
+#### New Module: `pipeline_helpers.py`
+Extracted shared helper functions into `xbrain/pipeline_helpers.py` to eliminate DRY violations:
+- `apply_calibration()` — replaces a 12-line calibration block that was duplicated verbatim in `_phase_converge()` and `_phase_refine()`. Applies META-LEARN dimension multipliers, clamps scores, recomputes composites, and re-sorts candidates.
+- `sanitize_text()` — Unicode→ASCII text cleanup (moved from `ideate.py`)
+- `make_run_id()` — timestamped run ID generation (moved from `ideate.py`)
+- `coerce_str()` — LLM value coercion utility (was dead code in `ideate.py`, preserved for future use)
+
+#### Phase Name Constants
+Added 15 module-level constants for all pipeline phase names (`PHASE_META`, `PHASE_DIVERGE`, `PHASE_CONVERGE`, etc.). All 13 LLM call sites and model-routing calls now use constants instead of magic strings, preventing typo bugs and enabling IDE navigation.
+
+#### Dead Code Removal
+- Removed unused `_coerce_str()` function from `ideate.py`
+- Removed `_sanitize_text()` and `_make_run_id()` method definitions (moved to `pipeline_helpers.py`)
+- Removed unused `unicodedata` import
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.16.0
+- `xbrain/pipeline_helpers.py` — NEW: extracted shared helpers
+- `xbrain/ideate.py` — replaced duplicated calibration blocks with `apply_calibration()`, replaced `_make_run_id`/`_sanitize_text` with module imports, added 15 phase constants, replaced all 26 phase string literals with constants, removed dead code
+
+## v1.15.0 — 2026-03-21
+
+### Added — Comprehensive Terminal Coloring
+
+#### Full Semantic Log Migration
+Migrated all remaining terminal output across the entire codebase to use semantic log functions. Every `print()` call and plain `_log()` call now uses the appropriate semantic function (`log_ok`, `log_warn`, `log_error`, `log_detail`) for consistent, meaningful coloring.
+
+#### New Tag Colors
+Added 9 new tag colors to `log.py`: `CLI` (cyan), `DRY-RUN` (cyan), `ESTIMATE` (cyan), `LINEAGE` (blue), `EXPORT` (green), `RETRY` (yellow), `THROTTLE` (yellow), `LLM` (dim), `SPECIFY` (cyan). Upgraded existing tags: `META` dim→magenta, `DEDUP` dim→blue, `SEARCH` dim→cyan.
+
+#### CLI Output Overhaul
+Replaced all 39 raw `print()` calls in `cli.py` with semantic log functions. Dry-run, estimate, lineage, and export commands now display with proper tag prefixes and color semantics. Lineage table uses `fmt_verdict()` for colored verdict display.
+
+#### Pipeline Log Cleanup
+- `ideate.py`: Migrated ~30 remaining `_log()` calls across DIVERGE, DEDUP, CONVERGE, STRESS, EVOLVE, REFINE, and MERGE phases to semantic functions
+- `llm.py`: Migrated 9 calls using unregistered tags (RETRY, THROTTLE, WARN, ERROR) to `log_warn`/`log_error` with `LLM` tag
+- `specify.py`: Migrated 4 calls to `log_ok`/`log_detail` with `SPECIFY` tag
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.15.0
+- `xbrain/log.py` — added 9 new tag colors, upgraded 3 existing tag colors
+- `xbrain/ideate.py` — migrated ~30 remaining plain _log() calls to semantic functions
+- `xbrain/llm.py` — migrated all 9 log calls to log_warn/log_error with LLM tag
+- `xbrain/specify.py` — migrated 4 log calls to log_ok/log_detail
+- `xbrain/cli.py` — replaced all 39 print() calls with semantic log functions, added log imports
+
+## v1.14.0 — 2026-03-21
+
+### Added — Semantic Logging, Brief in Report, Evolution Metadata
+
+#### Standardized Terminal Coloring
+Added semantic log functions to `log.py`: `log_ok()`, `log_warn()`, `log_error()`, `log_detail()`, `log_verdict()`, `fmt_verdict()`, `fmt_verdicts()`. Migrated all ~40 ad-hoc color patterns in `ideate.py` to use these functions, ensuring consistent color semantics: GREEN=success/BUILD, YELLOW=warning/MUTATE, RED=error/KILL, CYAN=phase info, DIM=detail, MAGENTA=evolution. Verdict counts now display with proper coloring everywhere (terminal summary, stress test results, evolution results).
+
+#### Original Brief in Report
+Added `brief_text` field to `IdeateRunResult` model. The original prompt/brief is now displayed prominently in the report header as a blockquote, so readers always know what the run was about.
+
+#### Evolution Metadata per Idea
+Added `generation` and `evolution_rationale` fields to `IdeaCard` model. Multi-generation runs now tag each idea with its generation number and the evolutionary operator that created it. The "Ideas at a Glance" table adds a "Gen" column for multi-gen runs, and detailed cards show generation, evolution operator, and parent ideas when applicable.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.14.0
+- `xbrain/log.py` — added color semantics docstring, `EVOLVE` tag color, `VERDICT_COLORS` dict, 7 semantic log functions
+- `xbrain/ideate.py` — migrated all log calls to semantic functions, added `VERDICT_COLORS` import, set `brief_text` on result, tag `generation`/`evolution_rationale` on evolved ideas
+- `xbrain/models.py` — added `brief_text` to `IdeateRunResult`, added `generation` and `evolution_rationale` to `IdeaCard`
+- `xbrain/output.py` — display brief in report header, add Gen column to glance table, show evolution metadata in detailed cards
+
 ## v1.13.1 — 2026-03-21
 
 ### Fixed — Dead Code Cleanup & Pipeline Wiring

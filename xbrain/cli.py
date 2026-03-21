@@ -9,6 +9,15 @@ import traceback
 from pathlib import Path
 
 from xbrain.config import Config
+from xbrain.log import (
+    log as _log,
+    log_ok as _log_ok,
+    log_warn as _log_warn,
+    log_error as _log_error,
+    log_detail as _log_detail,
+    log_summary_line,
+    fmt_verdict,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -180,7 +189,7 @@ def _resolve_brief(value: str | None) -> str | None:
     if path.is_file():
         text = path.read_text(encoding="utf-8").strip()
         if not text:
-            print(f"WARNING: Brief file '{value}' is empty — ignoring.", file=sys.stderr)
+            _log_warn("CLI", f"Brief file '{value}' is empty — ignoring.")
             return None
         return text
     # Treat as inline text
@@ -217,39 +226,36 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
             cheap_model=cfg.cheap_model,
             generations=cfg.generations,
         )
-        print("[DRY-RUN] Pipeline 1: IDEATE")
-        print(f"  Model:       {cfg.model}")
-        print(f"  Strategy:    {cfg.model_strategy}")
-        print(f"  Max tokens:  {cfg.max_tokens}")
-        print(f"  Constraints: {constraints or '(none)'}")
-        print(f"  Ideas:       {cfg.ideas_per_round}")
-        print(f"  Top N:       {cfg.converge_top_n}")
-        print(f"  Generations: {cfg.generations}")
-        print(f"  Language:    {language or 'english'}")
+        _log("DRY-RUN", "Pipeline 1: IDEATE")
+        _log_detail("DRY-RUN", f"Model:       {cfg.model}")
+        _log_detail("DRY-RUN", f"Strategy:    {cfg.model_strategy}")
+        _log_detail("DRY-RUN", f"Max tokens:  {cfg.max_tokens}")
+        _log_detail("DRY-RUN", f"Constraints: {constraints or '(none)'}")
+        _log_detail("DRY-RUN", f"Ideas:       {cfg.ideas_per_round}")
+        _log_detail("DRY-RUN", f"Top N:       {cfg.converge_top_n}")
+        _log_detail("DRY-RUN", f"Generations: {cfg.generations}")
+        _log_detail("DRY-RUN", f"Language:    {language or 'english'}")
         if brief_text:
             preview = brief_text[:200] + ("..." if len(brief_text) > 200 else "")
-            print(f"  Brief:       {preview}")
+            _log_detail("DRY-RUN", f"Brief:       {preview}")
         else:
-            print(f"  Brief:       (none — open-ended ideation)")
-        print(f"  Runs dir:    {cfg.runs_dir}")
-        print(f"  Memory dir:  {cfg.memory_dir}")
-        print(f"  Est. cost:   ${estimate['total_est_cost_usd']:.4f}")
-        print()
-        print("  Phase breakdown:")
+            _log_detail("DRY-RUN", f"Brief:       (none — open-ended ideation)")
+        _log_detail("DRY-RUN", f"Runs dir:    {cfg.runs_dir}")
+        _log_detail("DRY-RUN", f"Memory dir:  {cfg.memory_dir}")
+        _log_ok("DRY-RUN", f"Est. cost:   ${estimate['total_est_cost_usd']:.4f}")
+        _log("DRY-RUN", "")
+        _log("DRY-RUN", "Phase breakdown:")
         for p in estimate["phases"]:
-            print(f"    {p['phase']:<12s} {p['model']:<35s} ~${p['est_cost_usd']:.4f}")
-        print()
-        print("No API call will be made. Remove --dry-run to execute.")
+            _log_detail("DRY-RUN", f"  {p['phase']:<12s} {p['model']:<35s} ~${p['est_cost_usd']:.4f}")
+        _log("DRY-RUN", "")
+        _log_warn("DRY-RUN", "No API call will be made. Remove --dry-run to execute.")
         return
 
     if not cfg.api_key:
-        print(
-            "ERROR: ANTHROPIC_API_KEY not set.\n"
-            "  1. Copy .env.example to .env\n"
-            "  2. Add your Anthropic API key\n"
-            "  3. Run again",
-            file=sys.stderr,
-        )
+        _log_error("CLI", "ANTHROPIC_API_KEY not set.")
+        _log_detail("CLI", "1. Copy .env.example to .env")
+        _log_detail("CLI", "2. Add your Anthropic API key")
+        _log_detail("CLI", "3. Run again")
         sys.exit(1)
 
     # Lazy import keeps startup fast when just checking --help
@@ -263,12 +269,12 @@ def _cmd_specify(args: argparse.Namespace) -> None:
     cfg = Config()
 
     if not cfg.api_key:
-        print("ERROR: ANTHROPIC_API_KEY not set.", file=sys.stderr)
+        _log_error("CLI", "ANTHROPIC_API_KEY not set.")
         sys.exit(1)
 
     idea_path = Path(args.idea)
     if not idea_path.exists():
-        print(f"ERROR: File not found: {args.idea}", file=sys.stderr)
+        _log_error("CLI", f"File not found: {args.idea}")
         sys.exit(1)
 
     # Auto-discover stress test report in same directory
@@ -302,21 +308,21 @@ def _cmd_estimate(args: argparse.Namespace) -> None:
         generations=args.generations,
     )
 
-    print("xBrain Cost Estimate")
-    print("=" * 50)
-    print(f"  Model:       {cfg.model}")
-    print(f"  Strategy:    {args.strategy}")
-    print(f"  Ideas:       {args.ideas}")
-    print(f"  Top N:       {args.top}")
-    print()
-    print("  Phase breakdown:")
+    _log("ESTIMATE", "xBrain Cost Estimate")
+    _log("ESTIMATE", "=" * 50)
+    _log_detail("ESTIMATE", f"Model:       {cfg.model}")
+    _log_detail("ESTIMATE", f"Strategy:    {args.strategy}")
+    _log_detail("ESTIMATE", f"Ideas:       {args.ideas}")
+    _log_detail("ESTIMATE", f"Top N:       {args.top}")
+    _log("ESTIMATE", "")
+    _log("ESTIMATE", "Phase breakdown:")
     for p in estimate["phases"]:
-        print(f"    {p['phase']:<12s} {p['model']:<35s} ~${p['est_cost_usd']:.6f}")
-    print()
-    print(f"  TOTAL ESTIMATED COST: ${estimate['total_est_cost_usd']:.4f}")
-    print()
+        _log_detail("ESTIMATE", f"  {p['phase']:<12s} {p['model']:<35s} ~${p['est_cost_usd']:.6f}")
+    _log("ESTIMATE", "")
+    _log_ok("ESTIMATE", f"TOTAL ESTIMATED COST: ${estimate['total_est_cost_usd']:.4f}")
+    _log("ESTIMATE", "")
     # Compare strategies
-    print("  Compare strategies:")
+    _log("ESTIMATE", "Compare strategies:")
     for strat in ["cheapest", "balanced", "best"]:
         est = IdeatePipeline.estimate_cost(
             model=cfg.model,
@@ -328,7 +334,7 @@ def _cmd_estimate(args: argparse.Namespace) -> None:
             cheap_model=cfg.cheap_model,
             generations=args.generations,
         )
-        print(f"    {strat:<12s} ${est['total_est_cost_usd']:.4f}")
+        _log_detail("ESTIMATE", f"  {strat:<12s} ${est['total_est_cost_usd']:.4f}")
 
 
 def _cmd_lineage(args: argparse.Namespace) -> None:
@@ -340,7 +346,7 @@ def _cmd_lineage(args: argparse.Namespace) -> None:
     lineage = memory.get_lineage()
 
     if not lineage:
-        print("No idea lineage yet. Run 'python -m xbrain ideate' first.")
+        _log_warn("LINEAGE", "No idea lineage yet. Run 'python -m xbrain ideate' first.")
         return
 
     # Apply filters
@@ -355,39 +361,39 @@ def _cmd_lineage(args: argparse.Namespace) -> None:
     lineage = lineage[:args.top]
 
     if not lineage:
-        print("No ideas match the filter criteria.")
+        _log_warn("LINEAGE", "No ideas match the filter criteria.")
         return
 
     # Print table
-    print(f"{'ID':<25s} {'Score':>5s}  {'Verdict':<8s} {'Run':<22s} {'Title'}")
-    print("-" * 100)
+    log_summary_line(f"{'ID':<25s} {'Score':>5s}  {'Verdict':<8s} {'Run':<22s} {'Title'}")
+    log_summary_line("-" * 100)
     for entry in lineage:
         idea_id = entry.get("idea_id", "?")[:24]
         score = entry.get("score", 0)
         verdict = entry.get("verdict", "?")
         run_id = entry.get("run_id", "?")[:21]
         title = entry.get("title", "?")[:50]
-        print(f"{idea_id:<25s} {score:5.1f}  {verdict:<8s} {run_id:<22s} {title}")
+        log_summary_line(f"{idea_id:<25s} {score:5.1f}  {fmt_verdict(verdict):<18s} {run_id:<22s} {title}")
 
     # Stats
-    print()
+    log_summary_line("")
     total = len(memory.get_lineage())
     builds = sum(1 for e in memory.get_lineage() if e.get("verdict") == "BUILD")
     genes = len(memory.get_idea_genes())
-    print(f"Total ideas tracked: {total} | BUILD: {builds} | Idea genes: {genes}")
+    _log_ok("LINEAGE", f"Total ideas tracked: {total} | BUILD: {builds} | Idea genes: {genes}")
 
 
 def _cmd_export(args: argparse.Namespace) -> None:
     run_dir = Path(args.run)
     if not run_dir.is_dir():
-        print(f"ERROR: Run folder not found: {args.run}", file=sys.stderr)
+        _log_error("EXPORT", f"Run folder not found: {args.run}")
         sys.exit(1)
 
     cards_path = run_dir / "idea-cards.json"
     stress_path = run_dir / "stress-test-report.json"
 
     if not cards_path.exists():
-        print(f"ERROR: idea-cards.json not found in {run_dir}", file=sys.stderr)
+        _log_error("EXPORT", f"idea-cards.json not found in {run_dir}")
         sys.exit(1)
 
     cards = json.loads(cards_path.read_text(encoding="utf-8"))
@@ -397,7 +403,7 @@ def _cmd_export(args: argparse.Namespace) -> None:
     if not args.export_all:
         cards = [c for c in cards if c.get("stress_test_verdict") == "BUILD"]
         if not cards:
-            print("No BUILD ideas found. Use --all to export all ideas.", file=sys.stderr)
+            _log_warn("EXPORT", "No BUILD ideas found. Use --all to export all ideas.")
             sys.exit(0)
 
     from xbrain.output import export_csv, export_jira_json, export_markdown_tasks
@@ -413,13 +419,13 @@ def _cmd_export(args: argparse.Namespace) -> None:
         content = export_jira_json(cards, stress_data)
         ext = ".json"
     else:
-        print(f"ERROR: Unknown format: {fmt}", file=sys.stderr)
+        _log_error("EXPORT", f"Unknown format: {fmt}")
         sys.exit(1)
 
     if args.output:
         out_path = Path(args.output)
         out_path.write_text(content, encoding="utf-8")
-        print(f"Exported {len(cards)} idea(s) to {out_path}")
+        _log_ok("EXPORT", f"Exported {len(cards)} idea(s) to {out_path}")
     else:
         sys.stdout.buffer.write(content.encode("utf-8"))
 

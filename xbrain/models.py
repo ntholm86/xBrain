@@ -193,6 +193,8 @@ class IdeaCard(BaseModel):
     stress_test_verdict: str = ""
     kill_arguments_survived: int = 0
     phase: str = "stress_test"
+    generation: int = 1
+    evolution_rationale: str = ""
     timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
@@ -200,6 +202,7 @@ class IdeaCard(BaseModel):
 
 class IdeateRunResult(BaseModel):
     run_id: str
+    brief_text: str = ""
     timestamp: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )

@@ -4464,5 +4464,56 @@
       "data_driven_design",
       "empirical_validation"
     ]
+  },
+  {
+    "id": "evo-2-cross-001",
+    "title": "Outcome-Calibrated Constraint Satisfaction Engine",
+    "score": 6.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "execution_capability",
+      "product_validation",
+      "meta_learning",
+      "founder_operations"
+    ]
+  },
+  {
+    "id": "evo-2-cross-002",
+    "title": "Real-Time Assumption Invalidation Speedrun",
+    "score": 6.7,
+    "verdict": "BUILD",
+    "domains": [
+      "validation",
+      "experimentation",
+      "product_validation",
+      "lean_methodology",
+      "meta_learning"
+    ]
+  },
+  {
+    "id": "evo-2-mut-001",
+    "title": "xBrain Outcome Oracle 2.0: Contractual Accelerator Partnership Network",
+    "score": 5.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "product_validation",
+      "meta_learning",
+      "founder_operations",
+      "accelerator_partnerships"
+    ]
+  },
+  {
+    "id": "evo-2-mut-002",
+    "title": "Execution Risk Multiplier Engine: Capability-Adjusted Scoring",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "founder_operations",
+      "execution_capability",
+      "risk_scoring",
+      "constraint_optimization"
+    ]
   }
 ]

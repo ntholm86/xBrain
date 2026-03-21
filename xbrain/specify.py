@@ -8,7 +8,7 @@ from pathlib import Path
 
 from xbrain.config import Config
 from xbrain.llm import LLMClient
-from xbrain.log import log as _log, log_llm_call
+from xbrain.log import log as _log, log_llm_call, log_ok as _log_ok, log_detail as _log_detail
 from xbrain.prompts import SPECIFY_SYSTEM, SPECIFY_USER
 
 
@@ -93,10 +93,10 @@ class SpecifyPipeline:
         spec_path.write_text(report, encoding="utf-8")
 
         cost_info = self._compute_cost()
-        _log("SPECIFY", f"✓ Spec written to {spec_path}")
-        _log("SPECIFY", f"  JSON: {spec_json_path}")
-        _log("SPECIFY", f"  Tokens: {self.llm.total_input_tokens:,} in / {self.llm.total_output_tokens:,} out")
-        _log("SPECIFY", f"  Cost: ${cost_info:.4f}")
+        _log_ok("SPECIFY", f"Spec written to {spec_path}")
+        _log_detail("SPECIFY", f"JSON: {spec_json_path}")
+        _log_detail("SPECIFY", f"Tokens: {self.llm.total_input_tokens:,} in / {self.llm.total_output_tokens:,} out")
+        _log_detail("SPECIFY", f"Cost: ${cost_info:.4f}")
 
         return spec_path
 

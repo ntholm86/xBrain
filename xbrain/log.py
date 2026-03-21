@@ -1,4 +1,18 @@
-"""Shared logging utilities for xBrain pipeline output."""
+"""Shared logging utilities for xBrain pipeline output.
+
+Color semantics
+===============
+GREEN   success, BUILD verdict, completion messages
+YELLOW  warning, MUTATE verdict, overrides, conflicts
+RED     error, KILL verdict, fatal outcomes
+CYAN    pipeline info, phase starts, configuration
+MAGENTA refinement, evolution, transformations
+BLUE    scoring, CONVERGE data
+DIM     detail, secondary info, item listings
+WHITE   headers, separators
+
+All log functions route through ``_safe_print`` for encoding safety.
+"""
 
 from __future__ import annotations
 
@@ -47,15 +61,33 @@ class _C:
 # Map phase tags to colors
 _TAG_COLORS: dict[str, str] = {
     "IDEATE":   _C.CYAN,
-    "META":     _C.DIM,
+    "CLI":      _C.CYAN,
+    "DRY-RUN":  _C.CYAN,
+    "META":     _C.MAGENTA,
     "CONSTCHK": _C.YELLOW,
     "DIVERGE":  _C.GREEN,
-    "DEDUP":    _C.DIM,
+    "DEDUP":    _C.BLUE,
     "CONVERGE": _C.BLUE,
     "STRESS":   _C.RED,
     "REFINE":   _C.MAGENTA,
+    "EVOLVE":   _C.MAGENTA,
     "MERGE":    _C.DIM,
-    "SEARCH":   _C.DIM,
+    "SEARCH":   _C.CYAN,
+    "SPECIFY":  _C.CYAN,
+    "ESTIMATE": _C.CYAN,
+    "LINEAGE":  _C.BLUE,
+    "EXPORT":   _C.GREEN,
+    "RETRY":    _C.YELLOW,
+    "THROTTLE": _C.YELLOW,
+    "LLM":      _C.DIM,
+}
+
+# Verdict colors (consistent everywhere)
+VERDICT_COLORS: dict[str, str] = {
+    "BUILD":    _C.GREEN,
+    "MUTATE":   _C.YELLOW,
+    "KILL":     _C.RED,
+    "INCUBATE": _C.DIM,
 }
 
 
@@ -75,6 +107,48 @@ def log(tag: str, msg: str) -> None:
     line = f"{color}[{tag:<9s}]{reset} {msg}"
     _safe_print(line)
     sys.stdout.flush()
+
+
+def log_ok(tag: str, msg: str) -> None:
+    """Log a success/completion message (green OK prefix)."""
+    log(tag, f"{_C.GREEN}OK{_C.RESET} {msg}")
+
+
+def log_warn(tag: str, msg: str) -> None:
+    """Log a warning message (yellow !! prefix)."""
+    log(tag, f"{_C.YELLOW}!!{_C.RESET} {msg}")
+
+
+def log_error(tag: str, msg: str) -> None:
+    """Log an error/failure message (red FAIL prefix)."""
+    log(tag, f"{_C.RED}FAIL{_C.RESET} {msg}")
+
+
+def log_detail(tag: str, msg: str) -> None:
+    """Log a secondary/detail line (dimmed text)."""
+    log(tag, f"{_C.DIM}{msg}{_C.RESET}")
+
+
+def log_verdict(tag: str, verdict: str, msg: str) -> None:
+    """Log a line with verdict-colored prefix."""
+    vc = VERDICT_COLORS.get(verdict, "")
+    log(tag, f"{vc}[{verdict}]{_C.RESET} {msg}")
+
+
+def fmt_verdict(verdict: str) -> str:
+    """Return a verdict string with proper coloring."""
+    vc = VERDICT_COLORS.get(verdict, "")
+    return f"{vc}{verdict}{_C.RESET}"
+
+
+def fmt_verdicts(verdict_counts: dict[str, int]) -> str:
+    """Format a verdict count dict like '3 BUILD | 2 MUTATE | 0 KILL'."""
+    parts = []
+    for v in ("BUILD", "MUTATE", "KILL", "INCUBATE"):
+        count = verdict_counts.get(v, 0)
+        vc = VERDICT_COLORS.get(v, "")
+        parts.append(f"{vc}{count} {v}{_C.RESET}")
+    return "  |  ".join(parts)
 
 
 def log_phase(phase: str, description: str) -> None:
@@ -113,7 +187,7 @@ class _LLMTimer:
     def done(self, extra: str = "") -> float:
         elapsed = time.monotonic() - self._t0
         suffix = f" — {extra}" if extra else ""
-        log(self._tag, f"  {_C.GREEN}OK{_C.RESET} done in {elapsed:.1f}s{suffix}")
+        log_ok(self._tag, f"done in {elapsed:.1f}s{suffix}")
         return elapsed
 
 
