@@ -4668,5 +4668,222 @@
       "real_time_feedback",
       "workflow_integration"
     ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Assumption Stress-Test Automaton: 48-Hour Validation Sprint",
+    "score": 7.6,
+    "verdict": "INCUBATE",
+    "domains": [
+      "validation",
+      "lean_methodology",
+      "founder_operations",
+      "experimentation"
+    ]
+  },
+  {
+    "id": "xd-009",
+    "title": "Kill Criteria Inversion Engine: Hedged Execution Pathways",
+    "score": 7.1,
+    "verdict": "BUILD",
+    "domains": [
+      "founder_operations",
+      "risk_mitigation",
+      "execution_capability",
+      "organizational_design"
+    ]
+  },
+  {
+    "id": "alt-004-005-merged",
+    "title": "Purgatory Rescue Engine: Mutation + Optimization for 5.0–6.2 Ideas",
+    "score": 7.1,
+    "verdict": "INCUBATE",
+    "domains": [
+      "optimization",
+      "product_strategy",
+      "algorithm_design",
+      "decision_science"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Post-Launch Idea Autopsy System: Outcome-Driven Scoring Calibration",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "learning_systems",
+      "longitudinal_analytics",
+      "feedback_loops",
+      "machine_learning"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Report Mutation Engine: Stakeholder-Weighted Re-Scoring",
+    "score": 6.7,
+    "verdict": "BUILD",
+    "domains": [
+      "decision_science",
+      "product_operations",
+      "meta_learning",
+      "report_generation"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Source Text Ambiguity Explainer",
+    "score": 7.6,
+    "verdict": "INCUBATE",
+    "domains": [
+      "natural_language_processing",
+      "knowledge_management",
+      "productivity",
+      "translation"
+    ]
+  },
+  {
+    "id": "idea-001-merged-006",
+    "title": "Translator Conviction Calibrator with Momentum Capture",
+    "score": 7.2,
+    "verdict": "INCUBATE",
+    "domains": [
+      "translation",
+      "metacognition",
+      "quality_feedback",
+      "decision_science",
+      "behavioral_learning"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Temporal Translation Debt Tracker",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "process_optimization",
+      "quality_assurance",
+      "translation",
+      "technical_debt"
+    ]
+  },
+  {
+    "id": "xd-003",
+    "title": "Contextual Terminology Genealogy Tracer",
+    "score": 7.0,
+    "verdict": "INCUBATE",
+    "domains": [
+      "knowledge_management",
+      "translation_quality",
+      "semantic_drift",
+      "collaborative_epistemology"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Cross-Language Semantic Collision Detector",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "linguistics",
+      "artificial_intelligence",
+      "translation",
+      "disambiguation"
+    ]
+  },
+  {
+    "id": "alt-008",
+    "title": "Translator Opportunity Cost Monitor",
+    "score": 6.9,
+    "verdict": "INCUBATE",
+    "domains": [
+      "translation",
+      "pricing_strategy",
+      "labor_economics",
+      "decision_support"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Translator Fatigue Drift Detector",
+    "score": 6.8,
+    "verdict": "INCUBATE",
+    "domains": [
+      "cognitive_science",
+      "occupational_health",
+      "productivity",
+      "translation"
+    ]
+  },
+  {
+    "id": "xd-003",
+    "title": "Translation Debt Ledger (Double-Entry Accounting)",
+    "score": 7.1,
+    "verdict": "INCUBATE",
+    "domains": [
+      "translation",
+      "accounting",
+      "financial_transparency",
+      "process_optimization"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Polysemy Consensus Arbitrator",
+    "score": 6.8,
+    "verdict": "BUILD",
+    "domains": [
+      "translation",
+      "linguistics",
+      "epistemology",
+      "crowdsourcing"
+    ]
+  },
+  {
+    "id": "idea-007",
+    "title": "Source-Text Translatability Pre-Screener",
+    "score": 6.6,
+    "verdict": "INCUBATE",
+    "domains": [
+      "translation",
+      "quality_assurance",
+      "process_optimization",
+      "requirements_engineering"
+    ]
+  },
+  {
+    "id": "xd-005",
+    "title": "Unsaid-Assumption Extractor for Translation Briefs",
+    "score": 8.1,
+    "verdict": "BUILD",
+    "domains": [
+      "translation",
+      "natural_language_processing",
+      "project_management",
+      "communication"
+    ]
+  },
+  {
+    "id": "alt-003",
+    "title": "Reverse Translation Debugger",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "translation",
+      "quality_assurance",
+      "linguistics",
+      "software_engineering"
+    ]
+  },
+  {
+    "id": "alt-007",
+    "title": "Terminology Velocity Optimizer",
+    "score": 6.6,
+    "verdict": "BUILD",
+    "domains": [
+      "translation",
+      "knowledge_management",
+      "personalization",
+      "productivity"
+    ]
   }
 ]

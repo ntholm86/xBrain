@@ -1,5 +1,33 @@
 # Changelog
 
+## v1.18.0 — 2026-03-21
+
+### Changed
+
+#### Report Redesign — Compressed & Visual
+The idea-report.md output has been redesigned for scannability:
+- **Adversarial Debate**: Compressed from full multi-paragraph transcript to a compact summary table (angle + result per row). Fatal rounds are expanded below the table with full attack/defense details; survived/weakened rounds show only the one-line verdict.
+- **Emoji Verdicts**: Verdicts now display ✅ BUILD, 🧬 MUTATE, 🧪 INCUBATE, ❌ KILL throughout the report — in the summary, at-a-glance table, and per-idea headers.
+- **Feasibility Bars**: The feasibility matrix shows visual bars (█████░) alongside numeric scores, plus an average score row.
+- **Phase-Grouped Costs**: The cost breakdown table aggregates API calls by pipeline phase (DIVERGE, CONVERGE, etc.) instead of listing every individual API call.
+
+#### Removed Redundant Sections
+- **Timeline Alignment**: Removed hardcoded timeline text (was identical boilerplate based on effort level, added no insight).
+- **Meta duplication**: Removed Novelty, Estimated Effort, and Estimated Cost from the Meta section (already shown in Quick Reference).
+- **Competitive Landscape truncation**: Full defensibility notes are now shown instead of being cut at 150 characters.
+
+### Fixed
+
+#### Pydantic Validation Crash on Structured Attacks
+The LLM occasionally returns `structured_attacks` and `defenses` as lists of dicts (`[{"attack_type": "Prior art", "description": "..."}]`) instead of lists of strings. Added `field_validator` with `mode="before"` on both `AttackResponse` and `StressTestResult` that coerces dict entries to formatted strings, preventing Pydantic `ValidationError` crashes.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.18.0
+- `xbrain/output.py` — report format redesign (compressed debate, emoji verdicts, feasibility bars, phase-grouped costs, removed redundant sections)
+- `xbrain/models.py` — `field_validator` for dict→string coercion on `structured_attacks` and `defenses`
+
+---
+
 ## v1.17.0 — 2026-03-21
 
 ### New Features

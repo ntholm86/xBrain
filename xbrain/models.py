@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ScoreBreakdown(BaseModel):
@@ -59,12 +59,29 @@ class DebateExchange(BaseModel):
 # LLM response shapes (used for validation, not stored)
 # ------------------------------------------------------------------
 
+def _coerce_str_list(v: list) -> list[str]:
+    """Convert dict entries to strings (LLM sometimes returns structured objects)."""
+    out = []
+    for item in v:
+        if isinstance(item, dict):
+            parts = [f"{k}: {v2}" for k, v2 in item.items()]
+            out.append(" | ".join(parts))
+        else:
+            out.append(str(item))
+    return out
+
+
 class AttackResponse(BaseModel):
     """Shape returned by the attack-phase LLM for a single idea."""
     idea_id: str = ""
     freeform_attack: str = ""
     structured_attacks: list[str] = Field(default_factory=list)
     defenses: list[str] = Field(default_factory=list)
+
+    @field_validator("structured_attacks", "defenses", mode="before")
+    @classmethod
+    def _coerce_attacks(cls, v: list) -> list[str]:
+        return _coerce_str_list(v) if isinstance(v, list) else v
     attacks_made: int = 0
     attacks_survived: int = 0
     attacks_fatal: int = 0
@@ -128,6 +145,11 @@ class StressTestResult(BaseModel):
     freeform_attack: str = ""
     structured_attacks: list[str] = Field(default_factory=list)
     defenses: list[str] = Field(default_factory=list)
+
+    @field_validator("structured_attacks", "defenses", mode="before")
+    @classmethod
+    def _coerce_attacks(cls, v: list) -> list[str]:
+        return _coerce_str_list(v) if isinstance(v, list) else v
     debate_rounds: list[DebateExchange] = Field(default_factory=list)
     attacks_made: int = 0
     attacks_survived: int = 0

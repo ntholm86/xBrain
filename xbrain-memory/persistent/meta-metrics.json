@@ -525,5 +525,57 @@
     "pass_count": 6,
     "tokens_in": 47544,
     "tokens_out": 48223
+  },
+  {
+    "run_id": "20260321-064323-xbrain-is-an-ai-powered-idea-generation",
+    "timestamp": "2026-03-21T06:43:23.303232+00:00",
+    "ideas_generated": 20,
+    "candidates": 5,
+    "build_count": 2,
+    "pass_count": 3,
+    "tokens_in": 47113,
+    "tokens_out": 30243,
+    "cost_usd": 0.1983,
+    "verdict_overrides": 2,
+    "api_crashes": 2
+  },
+  {
+    "run_id": "20260321-070135-ai-tools-that-help-freelance",
+    "timestamp": "2026-03-21T07:01:35.989739+00:00",
+    "ideas_generated": 14,
+    "candidates": 3,
+    "build_count": 0,
+    "pass_count": 2,
+    "tokens_in": 47685,
+    "tokens_out": 34660,
+    "cost_usd": 0.221,
+    "verdict_overrides": 0,
+    "api_crashes": 5
+  },
+  {
+    "run_id": "20260321-073643-test-translators",
+    "timestamp": "2026-03-21T07:36:43.884920+00:00",
+    "ideas_generated": 16,
+    "candidates": 3,
+    "build_count": 1,
+    "pass_count": 1,
+    "tokens_in": 27541,
+    "tokens_out": 19485,
+    "cost_usd": 0.125,
+    "verdict_overrides": 1,
+    "api_crashes": 2
+  },
+  {
+    "run_id": "20260321-074029-ai-tools-that-help-freelance",
+    "timestamp": "2026-03-21T07:40:29.662095+00:00",
+    "ideas_generated": 15,
+    "candidates": 3,
+    "build_count": 2,
+    "pass_count": 3,
+    "tokens_in": 34501,
+    "tokens_out": 21875,
+    "cost_usd": 0.1439,
+    "verdict_overrides": 2,
+    "api_crashes": 0
   }
 ]

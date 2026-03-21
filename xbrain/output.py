@@ -37,7 +37,7 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
     lines.append("## Summary")
     lines.append(f"- **Ideas Generated:** {len(result.raw_ideas)}")
     lines.append(f"- **After Scoring:** {len(result.candidates)}")
-    verdict_str = ", ".join(f"{v} {k}" for k, v in sorted(verdicts.items()))
+    verdict_str = ", ".join(f"{_verdict_emoji(k)} {v} {k}" for k, v in sorted(verdicts.items()))
     lines.append(f"- **Verdicts:** {verdict_str}")
     # Determine calibration status from candidates
     cal_statuses = {c.scoring_calibration_status for c in result.survivors if c.scoring_calibration_status}
@@ -55,14 +55,24 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
     if cost_info and cost_info.get("phases"):
         lines.append("### Cost Breakdown")
         lines.append("")
-        lines.append("| Phase | Model | Input | Output | Cost |")
-        lines.append("|-------|-------|------:|-------:|-----:|")
+        # Aggregate by phase
+        phase_agg: dict[str, dict] = {}
         for p in cost_info["phases"]:
+            key = p["phase"]
             model_short = p["model"].split("-")[1] if "-" in p["model"] else p["model"]
+            if key not in phase_agg:
+                phase_agg[key] = {"calls": 0, "model": model_short, "input": 0, "output": 0, "cost": 0.0}
+            phase_agg[key]["calls"] += 1
+            phase_agg[key]["input"] += p["input_tokens"]
+            phase_agg[key]["output"] += p["output_tokens"]
+            phase_agg[key]["cost"] += p["cost_usd"]
+        lines.append("| Phase | Calls | Model | Input | Output | Cost |")
+        lines.append("|-------|------:|-------|------:|-------:|-----:|")
+        for phase_name, agg in phase_agg.items():
             lines.append(
-                f"| {p['phase']} | {model_short} | "
-                f"{p['input_tokens']:,} | {p['output_tokens']:,} | "
-                f"${p['cost_usd']:.4f} |"
+                f"| {phase_name} | {agg['calls']} | {agg['model']} | "
+                f"{agg['input']:,} | {agg['output']:,} | "
+                f"${agg['cost']:.4f} |"
             )
         lines.append("")
 
@@ -141,11 +151,12 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         verdict = card.stress_test_verdict or (stress_entry.verdict if stress_entry else "?")
         if stress_entry and stress_entry.error_source:
             verdict = f"{verdict} (! {stress_entry.error_source})"
+        verdict_display = f"{_verdict_emoji(verdict.split()[0])} {verdict}"
         title_cell = f"{card.title[:50]}{'...' if len(card.title) > 50 else ''}"
         if has_evolution:
-            lines.append(f"| {i+1} | {title_cell} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict} | {card.generation} |")
+            lines.append(f"| {i+1} | {title_cell} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict_display} | {card.generation} |")
         else:
-            lines.append(f"| {i+1} | {title_cell} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict} |")
+            lines.append(f"| {i+1} | {title_cell} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict_display} |")
     lines.append("")
     lines.append("---")
     lines.append("")
@@ -159,10 +170,10 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         verdict = card.stress_test_verdict or (stress.verdict if stress else "?")
         if stress and stress.error_source:
             verdict = f"{verdict} (! {stress.error_source})"
-        emoji = _verdict_emoji(verdict)
+        emoji = _verdict_emoji(verdict.split()[0])
 
         lines.append(f"### {emoji} #{i+1}: {card.title}  (Score: {card.composite_score:.1f})")
-        lines.append(f"**Verdict: {verdict}**")
+        lines.append(f"**Verdict: {emoji} {verdict}**")
         lines.append("")
         lines.append(f"> {card.elevator_pitch or card.rationale}")
         lines.append("")
@@ -241,24 +252,10 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         # Competitive Landscape
         if card.defensibility_notes:
             lines.append("**Competitive Landscape:**")
-            defense_snippet = (card.defensibility_notes[:150] + "...") if len(card.defensibility_notes) > 150 else card.defensibility_notes
-            lines.append(f"- {defense_snippet}")
+            lines.append(f"- {card.defensibility_notes}")
             lines.append("")
 
-        # Timeline Alignment
-        lines.append("**Timeline Alignment:**")
-        if "high" in card.estimated_effort.lower():
-            lines.append("- **Status:** \"Build in 18+ months\" -- strategic play, significant R&D required")
-            lines.append("- **Trigger:** Wait for market consolidation or customer pressure to validate")
-        elif "medium" in card.estimated_effort.lower():
-            lines.append("- **Status:** \"Build in 12-18 months\" -- moderate scope, prove MVP first")
-            lines.append("- **Trigger:** Validate customer fit with 2-3 pilot interviews")
-        else:
-            lines.append("- **Status:** \"Quick prototype in 4-8 weeks\" -- low-risk validation possible")
-            lines.append("- **Trigger:** Run spike immediately if strategic fit is high")
-        lines.append("")
-
-        # Meta
+        # Meta (trimmed — effort/cost/novelty already in Quick Reference)
         lines.append(f"**Domains:** {', '.join(card.domain_tags)}")
         lines.append(f"**Source:** {card.source_technique}")
         if card.generation > 1:
@@ -267,10 +264,6 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
                 lines.append(f"**Evolution Operator:** {card.evolution_rationale}")
             if card.parent_ideas:
                 lines.append(f"**Parent Ideas:** {', '.join(card.parent_ideas)}")
-        lines.append(f"**Novelty:** {card.novelty_score:.2f}")
-        lines.append(f"**Estimated Effort:** {card.estimated_effort}")
-        cost_label = card.cost_context if card.cost_context else "monthly"
-        lines.append(f"**Estimated Cost:** ${card.estimated_cost_usd_month:.0f} ({cost_label})")
         if card.sustainability_model:
             lines.append(f"**Sustainability:** {card.sustainability_model}")
         lines.append("")
@@ -289,11 +282,11 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
 
 def _verdict_emoji(verdict: str) -> str:
     return {
-        "BUILD": "[BUILD]",
-        "INCUBATE": "[INCUBATE]",
-        "MUTATE": "[MUTATE]",
-        "KILL": "[KILL]",
-    }.get(verdict, "[?]")
+        "BUILD": "\u2705",
+        "INCUBATE": "\U0001f9ea",
+        "MUTATE": "\U0001f9ec",
+        "KILL": "\u274c",
+    }.get(verdict, "\u2753")
 
 
 def _append_score_table(lines: list[str], card: IdeaCard) -> None:
@@ -355,42 +348,61 @@ def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
         lines.append(f"- **Suggested Mutation:** {stress.suggested_mutation}")
     lines.append("")
 
-    # Adversarial Debate
+    # Adversarial Debate (compact table + fatal expansions)
     if stress.debate_rounds:
         lines.append("#### Adversarial Debate")
         lines.append("")
-
-        for rnd in stress.debate_rounds:
-            outcome_label = rnd.outcome.upper() if rnd.outcome else ""
-            if outcome_label:
-                lines.append(f"**{rnd.angle}** -- *{outcome_label}*")
+        lines.append("| # | Angle | Result |")
+        lines.append("|---|-------|--------|")
+        fatal_rounds = []
+        for idx, rnd in enumerate(stress.debate_rounds, 1):
+            outcome_raw = (rnd.outcome or "").upper()
+            if "FATAL" in outcome_raw:
+                result_badge = "\u274c FATAL"
+                fatal_rounds.append(rnd)
+            elif "SURVIVED" in outcome_raw:
+                result_badge = "\u2705 survived"
+            elif "WEAKENED" in outcome_raw:
+                result_badge = "\u26a0\ufe0f weakened"
             else:
-                lines.append(f"**{rnd.angle}**")
-            if rnd.attack:
-                lines.append(f"> **Attacker:** {rnd.attack}")
-            if rnd.defense:
-                lines.append(f"> **Defender:** {rnd.defense}")
-            if rnd.attacker_rebuttal:
-                lines.append(f"> **Attacker (rebuttal):** {rnd.attacker_rebuttal}")
-            if rnd.defender_rebuttal:
-                lines.append(f"> **Defender (rebuttal):** {rnd.defender_rebuttal}")
-            lines.append("")
+                result_badge = outcome_raw or "—"
+            lines.append(f"| {idx} | {rnd.angle} | {result_badge} |")
         lines.append("")
 
-    # Feasibility matrix
+        # Expand fatal angles with full attack/defense
+        if fatal_rounds:
+            for rnd in fatal_rounds:
+                lines.append(f"**\u274c {rnd.angle}** (fatal)")
+                if rnd.attack:
+                    lines.append(f"> **Attack:** {rnd.attack}")
+                if rnd.defense:
+                    lines.append(f"> **Defense:** {rnd.defense}")
+                if rnd.attacker_rebuttal:
+                    lines.append(f"> **Rebuttal:** {rnd.attacker_rebuttal}")
+                lines.append("")
+        lines.append("")
+
+    # Feasibility matrix with visual bars
     fm = stress.feasibility_matrix
+    fm_dims = [
+        ("Technical Risk", fm.technical_risk),
+        ("Data Availability", fm.data_availability),
+        ("Regulatory Risk", fm.regulatory_risk),
+        ("Cost (infra/month)", fm.cost_infra_month),
+        ("Time to Prototype", fm.time_to_prototype),
+        ("Maintenance Burden", fm.maintenance_burden),
+        ("LLM Capability Fit", fm.llm_capability_fit),
+        ("Defensibility", fm.defensibility),
+        ("Market Timing", fm.market_timing),
+    ]
+    fm_avg = sum(v for _, v in fm_dims) / len(fm_dims)
     lines.append("**Feasibility Matrix** (1-5, higher = better):")
-    lines.append("| Dimension | Score |")
-    lines.append("|-----------|-------|")
-    lines.append(f"| Technical Risk | {fm.technical_risk} |")
-    lines.append(f"| Data Availability | {fm.data_availability} |")
-    lines.append(f"| Regulatory Risk | {fm.regulatory_risk} |")
-    lines.append(f"| Cost (infra/month) | {fm.cost_infra_month} |")
-    lines.append(f"| Time to Prototype | {fm.time_to_prototype} |")
-    lines.append(f"| Maintenance Burden | {fm.maintenance_burden} |")
-    lines.append(f"| LLM Capability Fit | {fm.llm_capability_fit} |")
-    lines.append(f"| Defensibility | {fm.defensibility} |")
-    lines.append(f"| Market Timing | {fm.market_timing} |")
+    lines.append("| Dimension | Score | |")
+    lines.append("|-----------|------:|---|")
+    for label, val in fm_dims:
+        bar = "\u2588" * val + "\u2591" * (5 - val)
+        lines.append(f"| {label} | {val} | {bar} |")
+    lines.append(f"| **Average** | **{fm_avg:.1f}** | |")
     lines.append("")
 
     if stress.kill_criteria:
