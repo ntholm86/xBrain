@@ -164,6 +164,7 @@ class IdeaCard(BaseModel):
     id: str
     title: str
     rationale: str
+    elevator_pitch: str = ""  # Plain-language summary for non-experts
     hypotheses: list = Field(default_factory=list)  # Populated by Pipeline 2
     composite_score: float = 0.0
     score_breakdown: ScoreBreakdown = Field(default_factory=ScoreBreakdown)

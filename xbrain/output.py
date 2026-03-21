@@ -129,7 +129,7 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         stress_entry = stress_map.get(card.id)
         verdict = card.stress_test_verdict or (stress_entry.verdict if stress_entry else "?")
         if stress_entry and stress_entry.error_source:
-            verdict = f"{verdict} (⚠ {stress_entry.error_source})"
+            verdict = f"{verdict} (! {stress_entry.error_source})"
         lines.append(f"| {i+1} | {card.title[:50]}{'...' if len(card.title) > 50 else ''} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict} |")
     lines.append("")
     lines.append("---")
@@ -143,13 +143,13 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         stress = stress_map.get(card.id)
         verdict = card.stress_test_verdict or (stress.verdict if stress else "?")
         if stress and stress.error_source:
-            verdict = f"{verdict} (⚠ {stress.error_source})"
+            verdict = f"{verdict} (! {stress.error_source})"
         emoji = _verdict_emoji(verdict)
 
         lines.append(f"### {emoji} #{i+1}: {card.title}  (Score: {card.composite_score:.1f})")
         lines.append(f"**Verdict: {verdict}**")
         lines.append("")
-        lines.append(f"> {card.rationale}")
+        lines.append(f"> {card.elevator_pitch or card.rationale}")
         lines.append("")
 
         # Quick Reference Card
@@ -201,9 +201,9 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
                     cost = assumption.get("validation_cost", "")
                     method = assumption.get("validation_method", "")
                     cost_badge = f" `[{cost}]`" if cost else ""
-                    method_suffix = f" — *{method}*" if method else ""
+                    method_suffix = f" -- *{method}*" if method else ""
                     fragility = assumption.get("fragility_flag", "")
-                    frag_badge = f" {'🔴' if fragility == 'fragile' else '🟢'}" if fragility else ""
+                    frag_badge = f" {'[!]' if fragility == 'fragile' else '[ok]'}" if fragility else ""
                     lines.append(f"{j}. {claim}{cost_badge}{frag_badge}{method_suffix}")
                     inverse = assumption.get("inverse_claim", "")
                     if inverse:
@@ -233,13 +233,13 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         # Timeline Alignment
         lines.append("**Timeline Alignment:**")
         if "high" in card.estimated_effort.lower():
-            lines.append("- **Status:** \"Build in 18+ months\" — strategic play, significant R&D required")
+            lines.append("- **Status:** \"Build in 18+ months\" -- strategic play, significant R&D required")
             lines.append("- **Trigger:** Wait for market consolidation or customer pressure to validate")
         elif "medium" in card.estimated_effort.lower():
-            lines.append("- **Status:** \"Build in 12-18 months\" — moderate scope, prove MVP first")
+            lines.append("- **Status:** \"Build in 12-18 months\" -- moderate scope, prove MVP first")
             lines.append("- **Trigger:** Validate customer fit with 2-3 pilot interviews")
         else:
-            lines.append("- **Status:** \"Quick prototype in 4-8 weeks\" — low-risk validation possible")
+            lines.append("- **Status:** \"Quick prototype in 4-8 weeks\" -- low-risk validation possible")
             lines.append("- **Trigger:** Run spike immediately if strategic fit is high")
         lines.append("")
 
@@ -268,11 +268,11 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
 
 def _verdict_emoji(verdict: str) -> str:
     return {
-        "BUILD": "\U0001f3c6",      # 🏆
-        "INCUBATE": "\U0001f504",    # 🔄
-        "MUTATE": "\u26a1",          # ⚡
-        "KILL": "\u274c",            # ❌
-    }.get(verdict, "❓")
+        "BUILD": "[BUILD]",
+        "INCUBATE": "[INCUBATE]",
+        "MUTATE": "[MUTATE]",
+        "KILL": "[KILL]",
+    }.get(verdict, "[?]")
 
 
 def _append_score_table(lines: list[str], card: IdeaCard) -> None:
@@ -303,7 +303,7 @@ def _append_score_table(lines: list[str], card: IdeaCard) -> None:
         if has_reasoning and reason:
             lines.append(f"| {label} | {val:.1f} | {direction} | {reason} |")
         elif has_reasoning:
-            lines.append(f"| {label} | {val:.1f} | {direction} | — |")
+            lines.append(f"| {label} | {val:.1f} | {direction} | - |")
         else:
             lines.append(f"| {label} | {val:.1f} | {direction} |")
 
@@ -317,7 +317,7 @@ def _append_score_table(lines: list[str], card: IdeaCard) -> None:
         lines.append(f"**Inverse Score (Fragility Check):** {card.inverse_confidence:.1f}/10")
         lines.append("")
         for cond in card.inverse_terrible_conditions:
-            lines.append(f"- ⚠ {cond}")
+            lines.append(f"- [!] {cond}")
 
 
 def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
@@ -340,22 +340,19 @@ def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
         lines.append("")
 
         for rnd in stress.debate_rounds:
-            outcome_emoji = {
-                "SURVIVED": "\u2705", "FATAL": "\u274c", "WEAKENED": "\u26a0\ufe0f",
-            }.get(rnd.outcome.upper() if rnd.outcome else "", "\u2753")
             outcome_label = rnd.outcome.upper() if rnd.outcome else ""
             if outcome_label:
-                lines.append(f"**{rnd.angle}** {outcome_emoji} *{outcome_label}*")
+                lines.append(f"**{rnd.angle}** -- *{outcome_label}*")
             else:
                 lines.append(f"**{rnd.angle}**")
             if rnd.attack:
-                lines.append(f"> **\U0001f525 Attacker:** {rnd.attack}")
+                lines.append(f"> **Attacker:** {rnd.attack}")
             if rnd.defense:
-                lines.append(f"> **\U0001f6e1\ufe0f Defender:** {rnd.defense}")
+                lines.append(f"> **Defender:** {rnd.defense}")
             if rnd.attacker_rebuttal:
-                lines.append(f"> **\U0001f525 Attacker (rebuttal):** {rnd.attacker_rebuttal}")
+                lines.append(f"> **Attacker (rebuttal):** {rnd.attacker_rebuttal}")
             if rnd.defender_rebuttal:
-                lines.append(f"> **\U0001f6e1\ufe0f Defender (rebuttal):** {rnd.defender_rebuttal}")
+                lines.append(f"> **Defender (rebuttal):** {rnd.defender_rebuttal}")
             lines.append("")
         lines.append("")
 
@@ -440,7 +437,7 @@ def export_csv(cards: list[dict], stress_data: list[dict]) -> str:
         writer.writerow([
             sid,
             card.get("title", ""),
-            card.get("rationale", ""),
+            card.get("elevator_pitch") or card.get("rationale", ""),
             f"{score:.1f}",
             card.get("stress_test_verdict", ""),
             card.get("estimated_effort", ""),
@@ -474,7 +471,7 @@ def export_markdown_tasks(cards: list[dict], stress_data: list[dict]) -> str:
 
         lines.append(f"## [{verdict}] {title} (Score: {score:.1f})")
         lines.append("")
-        lines.append(f"> {card.get('rationale', '')}")
+        lines.append(f"> {card.get('elevator_pitch') or card.get('rationale', '')}")
         lines.append("")
         lines.append(f"- **Effort:** {effort}")
         lines.append(f"- **Est. Cost:** ${card.get('estimated_cost_usd_month', 0):.0f}/mo")
@@ -521,7 +518,7 @@ def export_jira_json(cards: list[dict], stress_data: list[dict]) -> str:
         priority = "Critical" if score >= 7.5 else "High" if score >= 6.5 else "Medium" if score >= 5.5 else "Low"
 
         description_parts = [
-            card.get("rationale", ""),
+            card.get("elevator_pitch") or card.get("rationale", ""),
             "",
             f"*Score:* {score:.1f} | *Effort:* {card.get('estimated_effort', '')} | *Verdict:* {card.get('stress_test_verdict', '')}",
             "",

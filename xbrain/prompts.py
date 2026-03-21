@@ -266,7 +266,9 @@ Respond with ONLY this JSON structure:
 {{
   "clustering_summary": "...",
   "candidates": [{{
-    "id": "idea-001", "title": "...", "rationale": "one paragraph",
+    "id": "idea-001", "title": "...",
+    "elevator_pitch": "Plain-language summary anyone can understand — no jargon, no buzzwords. Explain WHAT it is and WHY someone would want it, like you're telling a friend over coffee. 1-2 sentences.",
+    "rationale": "Technical details: defensibility, confidence drivers, key risks. Dense and specific.",
     "source_technique": "...", "domain_tags": ["..."],
     "novelty_score": 0.78,
     "score_breakdown": {{"impact": 9, "confidence": 7, "effort": 6, "cost": 3, \
@@ -278,7 +280,8 @@ Respond with ONLY this JSON structure:
   }}]
 }}
 
-LENGTH LIMIT: Keep rationale under 200 characters. Be dense.
+LENGTH LIMIT: Keep elevator_pitch under 200 characters — plain language only, \
+no technical jargon. Keep rationale under 200 characters — dense and technical.
 
 Return EXACTLY {top_n} candidates, best first. Be critical, not generous.
 """

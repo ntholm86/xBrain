@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.12.0 — 2026-03-20
+
+### Added
+
+#### Plain-Language Elevator Pitch
+Idea descriptions were dense technical jargon that nobody could understand. Each idea now gets an `elevator_pitch` field — a 1-2 sentence plain-language summary explaining WHAT the idea is and WHY someone would want it, like you're telling a friend over coffee. The existing `rationale` field is preserved for technical details. Reports and CSV exports now display the elevator pitch by default.
+
+#### ANSI Terminal Colors
+Pipeline output now uses color-coded tags for each phase: IDEATE (cyan), DIVERGE (green), CONVERGE (blue), STRESS (red), REFINE (magenta). Verdict counts are colored (BUILD=green, MUTATE=yellow, KILL=red). Score brackets show green/yellow/red based on value. Respects `NO_COLOR` environment variable. No new dependencies — uses raw ANSI escape codes with Windows 10+ auto-detection.
+
+### Changed
+
+#### CONVERGE Prompt Split
+The `rationale` field instruction changed from "one paragraph" (which produced dense jargon) to "Technical details: defensibility, confidence drivers, key risks" — keeping it useful for experts while the new `elevator_pitch` handles human readability.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.12.0
+- `xbrain/models.py` — added `elevator_pitch` field to IdeaCard
+- `xbrain/prompts.py` — CONVERGE_USER prompt updated with elevator_pitch instructions
+- `xbrain/ideate.py` — `_parse_candidate()` reads elevator_pitch; summary block + verdict lines colorized
+- `xbrain/output.py` — reports/CSV prefer elevator_pitch over rationale
+- `xbrain/log.py` — full ANSI color infrastructure (_C class, _TAG_COLORS, color detection, Windows support)
+
 ## v1.11.0 — 2026-03-20
 
 ### Removed

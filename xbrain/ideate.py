@@ -12,7 +12,7 @@ from pathlib import Path
 
 from xbrain.config import Config
 from xbrain.llm import LLMClient
-from xbrain.log import log as _log, log_phase as _log_phase_header, log_llm_call, log_progress, log_summary_block
+from xbrain.log import log as _log, log_phase as _log_phase_header, log_llm_call, log_progress, log_summary_block, _C
 from xbrain.memory import MemoryStore
 from xbrain.models import (
     AttackResponse,
@@ -62,6 +62,26 @@ from xbrain.prompts import (
     CANONICAL_FAILURE_TYPES,
 )
 
+
+
+# ------------------------------------------------------------------
+# Text helpers
+# ------------------------------------------------------------------
+
+def _sanitize_text(text: str) -> str:
+    """Replace common Unicode characters with ASCII-safe equivalents."""
+    return (text
+        .replace("\u2014", "--")   # em dash
+        .replace("\u2013", "-")    # en dash
+        .replace("\u2018", "'")    # left single quote
+        .replace("\u2019", "'")    # right single quote
+        .replace("\u201c", '"')    # left double quote
+        .replace("\u201d", '"')    # right double quote
+        .replace("\u2026", "...")   # ellipsis
+        .replace("\u2192", "->")   # right arrow
+        .replace("\u2190", "<-")   # left arrow
+        .replace("\u2248", "~")    # approximately equal
+    )
 
 
 # ------------------------------------------------------------------
@@ -280,10 +300,10 @@ class IdeatePipeline:
                 _log("IDEATE", f"  Refinement round {refinement_round} results: {pass_count} passed, {kill_count} KILL")
                 
                 if pass_count > 0:
-                    _log("IDEATE", f"  ✓ SUCCESS: {pass_count} idea(s) passed stress test!")
+                    _log("IDEATE", f"  OK: {pass_count} idea(s) passed stress test!")
                     break
                 elif refinement_round < max_refinement_rounds:
-                    _log("IDEATE", f"  → Will continue refining ({refinement_round}/{max_refinement_rounds})")
+                    _log("IDEATE", f"  -> Will continue refining ({refinement_round}/{max_refinement_rounds})")
             
             if pass_count == 0 and refinement_round >= max_refinement_rounds:
                 _log("IDEATE", f"")
@@ -292,7 +312,7 @@ class IdeatePipeline:
         except Exception as e:
             refinement_error = e
             _log("IDEATE", f"")
-            _log("IDEATE", f"⚠ Refinement error after round {refinement_round}: {str(e)}")
+            _log("IDEATE", f"!! Refinement error after round {refinement_round}: {str(e)}")
             _log("IDEATE", f"Proceeding with round {refinement_round} results.")
 
         # Token totals
@@ -312,9 +332,9 @@ class IdeatePipeline:
         # Write outputs (do this BEFORE any other processing to ensure files exist)
         try:
             self._write_outputs(run_dir, result)
-            _log("IDEATE", f"✓ Outputs written to {run_dir}/")
+            _log("IDEATE", f"OK Outputs written to {run_dir}/")
         except Exception as write_error:
-            _log("IDEATE", f"✗ Failed to write outputs: {write_error}")
+            _log("IDEATE", f"FAIL Failed to write outputs: {write_error}")
             if refinement_error:
                 raise refinement_error  # Raise refinement error if outputs failed
             else:
@@ -334,13 +354,13 @@ class IdeatePipeline:
 
         lines = [
             "",
-            "=" * 60,
-            "  xBrain Pipeline Complete",
-            "=" * 60,
+            f"{_C.BOLD}{_C.WHITE}{'=' * 60}{_C.RESET}",
+            f"{_C.BOLD}{_C.WHITE}  xBrain Pipeline Complete{_C.RESET}",
+            f"{_C.BOLD}{_C.WHITE}{'=' * 60}{_C.RESET}",
             "",
             f"  Ideas generated:  {len(result.raw_ideas)}",
             f"  After scoring:    {len(result.candidates)}",
-            f"  Verdicts:         {final_build} BUILD  |  {final_mutate} MUTATE  |  {final_kill} KILL  |  {final_incubate} INCUBATE",
+            f"  Verdicts:         {_C.GREEN}{final_build} BUILD{_C.RESET}  |  {_C.YELLOW}{final_mutate} MUTATE{_C.RESET}  |  {_C.RED}{final_kill} KILL{_C.RESET}  |  {_C.DIM}{final_incubate} INCUBATE{_C.RESET}",
         ]
         if refinement_round > 0:
             lines.append(f"  Refinement:       {refinement_round} round(s)")
@@ -349,24 +369,26 @@ class IdeatePipeline:
         final_pass = final_build + final_mutate
         if sorted_survivors:
             lines.append("  Top ideas:")
+            _verdict_color = {"BUILD": _C.GREEN, "MUTATE": _C.YELLOW, "KILL": _C.RED, "INCUBATE": _C.DIM}
             for i, c in enumerate(sorted_survivors[:5]):
                 verdict = c.stress_test_verdict or "?"
                 emoji = {"BUILD": "+", "MUTATE": "~", "KILL": "x", "INCUBATE": "?"}.get(verdict, " ")
-                lines.append(f"    [{emoji}] #{i+1}  {c.composite_score:.1f}  {c.title}")
+                vc = _verdict_color.get(verdict, "")
+                lines.append(f"    {vc}[{emoji}]{_C.RESET} #{i+1}  {c.composite_score:.1f}  {c.title}")
             lines.append("")
 
         elapsed = time.monotonic() - t0
         mins, secs = divmod(int(elapsed), 60)
         lines += [
-            f"  Output directory: {run_dir}",
-            f"    idea-report.md           Human-readable ranked report",
-            f"    idea-cards.json          Machine-readable Idea Cards",
-            f"    idea-log.json            Full pipeline trace",
-            f"    stress-test-report.json  Adversarial debate results",
+            f"  {_C.DIM}Output directory: {run_dir}{_C.RESET}",
+            f"    {_C.DIM}idea-report.md           Human-readable ranked report{_C.RESET}",
+            f"    {_C.DIM}idea-cards.json          Machine-readable Idea Cards{_C.RESET}",
+            f"    {_C.DIM}idea-log.json            Full pipeline trace{_C.RESET}",
+            f"    {_C.DIM}stress-test-report.json  Adversarial debate results{_C.RESET}",
             "",
-            f"  Elapsed: {mins}m {secs}s",
-            f"  Tokens:  {result.total_input_tokens:,} in / {result.total_output_tokens:,} out",
-            f"  Cost:    ${cost_info['total_cost_usd']:.4f}",
+            f"  {_C.DIM}Elapsed: {mins}m {secs}s{_C.RESET}",
+            f"  {_C.DIM}Tokens:  {result.total_input_tokens:,} in / {result.total_output_tokens:,} out{_C.RESET}",
+            f"  {_C.DIM}Cost:    ${cost_info['total_cost_usd']:.4f}{_C.RESET}",
             "",
         ]
 
@@ -470,7 +492,7 @@ class IdeatePipeline:
 
             conflicts = data.get("conflicts", [])
             if conflicts:
-                _log("CONSTCHK", f"  ⚠ {len(conflicts)} conflict(s) detected:")
+                _log("CONSTCHK", f"  !! {len(conflicts)} conflict(s) detected:")
                 for conflict in conflicts:
                     pair = conflict.get("constraints", [])
                     reason = conflict.get("reason", "")
@@ -479,9 +501,9 @@ class IdeatePipeline:
                     _log("CONSTCHK", f"      Why: {reason}")
                     if suggestion:
                         _log("CONSTCHK", f"      Fix: {suggestion}")
-                _log("CONSTCHK", "  Proceeding anyway — constraints will be applied as-is.")
+                _log("CONSTCHK", "  Proceeding anyway -- constraints will be applied as-is.")
             else:
-                _log("CONSTCHK", "  ✓ No conflicts detected.")
+                _log("CONSTCHK", "  OK No conflicts detected.")
         except Exception as e:
             _log("CONSTCHK", f"  Skipped (error: {e})")
 
@@ -490,7 +512,7 @@ class IdeatePipeline:
         constraints: list[str] | None,
         brief_text: str | None = None,
     ) -> list[RawIdea]:
-        _log("DIVERGE", f"Round 1/{self.cfg.diverge_rounds} — generating raw idea seeds...")
+        _log("DIVERGE", f"Round 1/{self.cfg.diverge_rounds} -- generating raw idea seeds...")
 
         domain_ctx = build_domain_context()
         constraint_ctx = build_constraint_context(constraints)
@@ -538,6 +560,10 @@ class IdeatePipeline:
         _log("DIVERGE", f"  {len(ideas)} raw idea seeds generated.")
         _log("DIVERGE", f"  Techniques: {tech_str}")
 
+        # List all raw ideas so user can follow the pipeline
+        for idx, idea in enumerate(ideas, 1):
+            _log("DIVERGE", f"  {_C.DIM}  {idx:>2}. [{idea.source_technique}] {idea.concept[:80]}{_C.RESET}")
+
         return ideas
 
     def _phase_dedup(
@@ -576,7 +602,7 @@ class IdeatePipeline:
         if removed:
             _log("DEDUP", f"  Removed {len(removed)} duplicates:")
             for r in removed[:3]:
-                _log("DEDUP", f"    - {r.get('id', '?')} ≈ {r.get('duplicate_of', '?')}: {r.get('reason', '')[:60]}")
+                _log("DEDUP", f"    - {r.get('id', '?')} ~ {r.get('duplicate_of', '?')}: {r.get('reason', '')[:60]}")
 
         if overrepresented:
             _log("DEDUP", f"  Over-represented: {'; '.join(overrepresented[:3])}")
@@ -585,7 +611,12 @@ class IdeatePipeline:
             _log("DEDUP", f"  Gaps found: {'; '.join(gaps[:3])}")
 
         filtered = [i for i in raw_ideas if i.id in keep_ids]
-        _log("DEDUP", f"  {len(raw_ideas)} → {len(filtered)} unique ideas")
+        _log("DEDUP", f"  {len(raw_ideas)} -> {len(filtered)} unique ideas")
+
+        # List surviving ideas after dedup
+        if removed:
+            for idx, idea in enumerate(filtered, 1):
+                _log("DEDUP", f"  {_C.DIM}  {idx:>2}. {idea.concept[:80]}{_C.RESET}")
 
         return filtered, gaps, overrepresented
 
@@ -599,7 +630,7 @@ class IdeatePipeline:
         """Multi-turn divergence: generate new ideas to fill gaps from round 1."""
         # Cap at half of original idea count to keep total manageable
         gap_count = min(len(gaps) + 2, max(3, self.cfg.ideas_per_round // 2))
-        _log("DIVERGE", f"Round 2 — gap-filling {len(gaps)} gaps with {gap_count} new ideas...")
+        _log("DIVERGE", f"Round 2 -- gap-filling {len(gaps)} gaps with {gap_count} new ideas...")
 
         prompt = DIVERGE_GAPFILL_USER.format(
             idea_count=gap_count,
@@ -628,6 +659,10 @@ class IdeatePipeline:
             for idea in gap_ideas:
                 techniques[idea.source_technique] = techniques.get(idea.source_technique, 0) + 1
             _log("DIVERGE", f"  Techniques: {', '.join(f'{k} ({v})' for k, v in techniques.items())}")
+
+            # List gap-fill ideas
+            for idx, idea in enumerate(gap_ideas, 1):
+                _log("DIVERGE", f"  {_C.DIM}  {idx:>2}. [gap] {idea.concept[:80]}{_C.RESET}")
 
         return gap_ideas
 
@@ -674,6 +709,12 @@ class IdeatePipeline:
         candidates.sort(key=lambda c: c.composite_score, reverse=True)
         _log("CONVERGE", f"  [2A] {len(candidates)} candidates with initial scores.")
 
+        # Show which ideas were selected vs dropped
+        selected_ids = {c.id for c in candidates}
+        dropped = [i for i in raw_ideas if i.id not in selected_ids]
+        if dropped:
+            _log("CONVERGE", f"  {_C.DIM}Dropped {len(dropped)}: {', '.join(i.concept[:30] for i in dropped[:6])}{'...' if len(dropped) > 6 else ''}{_C.RESET}")
+
         if not candidates:
             return candidates
 
@@ -717,7 +758,7 @@ class IdeatePipeline:
         if final_ranking:
             rank_map = {id_: idx for idx, id_ in enumerate(final_ranking)}
             candidates.sort(key=lambda c: rank_map.get(c.id, 999))
-            _log("CONVERGE", f"  [2B] Final ranking: {' → '.join(c.title[:25] for c in candidates[:4])}...")
+            _log("CONVERGE", f"  [2B] Final ranking: {' -> '.join(c.title[:25] for c in candidates[:4])}...")
         else:
             candidates.sort(key=lambda c: c.composite_score, reverse=True)
 
@@ -823,12 +864,14 @@ class IdeatePipeline:
 
         _log("CONVERGE", f"  {len(candidates)} candidates scored.  ({cal_status})")
         for i, c in enumerate(candidates[:5]):
-            _log("CONVERGE", f"  #{i+1} [{c.composite_score:.1f}] \"{c.title}\"")
-            _log("CONVERGE", f"       Domains: {', '.join(c.domain_tags)}")
+            sc = c.composite_score
+            _sc_color = _C.GREEN if sc >= 7.5 else (_C.YELLOW if sc >= 5.0 else _C.RED)
+            _log("CONVERGE", f"  #{i+1} {_sc_color}[{sc:.1f}]{_C.RESET} \"{c.title}\"")
+            _log("CONVERGE", f"       {_C.DIM}Domains: {', '.join(c.domain_tags)}{_C.RESET}")
             if c.primary_persona.who:
-                _log("CONVERGE", f"       Persona: {c.primary_persona.who}")
+                _log("CONVERGE", f"       {_C.DIM}Persona: {c.primary_persona.who}{_C.RESET}")
             if c.primary_persona.pain:
-                _log("CONVERGE", f"       Pain: {c.primary_persona.pain[:80]}")
+                _log("CONVERGE", f"       {_C.DIM}Pain: {c.primary_persona.pain[:80]}{_C.RESET}")
 
         return candidates
 
@@ -869,7 +912,7 @@ class IdeatePipeline:
 
         async def _attack_one(c: IdeaCard) -> AttackResponse:
             nonlocal _attack_done
-            _log("STRESS", f"  ⏳ [{_attack_done}/{_attack_total}] Attacking: {c.title[:50]}...")
+            _log("STRESS", f"  ... [{_attack_done}/{_attack_total}] Attacking: {c.title[:50]}...")
             cj = json.dumps([compact_by_id[c.id]], ensure_ascii=False)
             prior_art_ctx = ""
             if c.id in prior_art_by_id:
@@ -891,11 +934,11 @@ class IdeatePipeline:
                 )
                 raw = _unwrap_single(data, "results", c.id, "attack")
                 _attack_done += 1
-                _log("STRESS", f"  ✓ [{_attack_done}/{_attack_total}] {c.title[:50]} — attack received")
+                _log("STRESS", f"  OK [{_attack_done}/{_attack_total}] {c.title[:50]} - attack received")
                 return AttackResponse.model_validate(raw)
             except (ValueError, Exception) as e:
                 _attack_done += 1
-                _log("STRESS", f"  [WARN] Attack failed for {c.id} (API crash → INCUBATE): {e}")
+                _log("STRESS", f"  [WARN] Attack failed for {c.id} (API crash -> INCUBATE): {e}")
                 return AttackResponse(idea_id=c.id, freeform_attack="(attack failed — API crash, not a genuine verdict)", structured_attacks=[], verdict="INCUBATE", error_source="api_crash")
 
         attack_results = self._run_parallel([_attack_one(c) for c in candidates])
@@ -964,9 +1007,10 @@ class IdeatePipeline:
             survived = st.attacks_survived
             fatal = st.attacks_fatal
             if st.error_source:
-                _log("STRESS", f"    → ⚠ CRASH-INCUBATE (API error, not a genuine verdict)")
+                _log("STRESS", f"    -> {_C.YELLOW}!! CRASH-INCUBATE{_C.RESET} (API error, not a genuine verdict)")
             else:
-                _log("STRESS", f"    → {survived} survived, {fatal} fatal → {st.verdict}")
+                _vc = {"BUILD": _C.GREEN, "MUTATE": _C.YELLOW, "KILL": _C.RED}.get(st.verdict, "")
+                _log("STRESS", f"    -> {survived} survived, {fatal} fatal -> {_vc}{st.verdict}{_C.RESET}")
 
         # ── Programmatic verdict enforcement ────────────────────
         # The LLM tends to hedge with MUTATE even when its own numbers
@@ -977,7 +1021,7 @@ class IdeatePipeline:
             if (r.verdict == "MUTATE"
                     and r.attacks_survived >= 5
                     and r.attacks_fatal <= 1):
-                _log("STRESS", f"  ⚑ Override {r.idea_id}: MUTATE→BUILD "
+                _log("STRESS", f"  >> Override {r.idea_id}: MUTATE->BUILD "
                      f"(survived={r.attacks_survived}, fatal={r.attacks_fatal})")
                 r.verdict = "BUILD"
                 overrides += 1
@@ -1161,7 +1205,7 @@ class IdeatePipeline:
         for idea in refined_raw_ideas:
             techniques[idea.source_technique] = techniques.get(idea.source_technique, 0) + 1
         tech_str = ", ".join(f"{k} ({v})" for k, v in techniques.items())
-        _log("REFINE", f"  DIVERGE result: {len(refined_raw_ideas)} ideas — {tech_str}")
+        _log("REFINE", f"  DIVERGE result: {len(refined_raw_ideas)} ideas -- {tech_str}")
 
         # Converge on refined ideas
         ideas_json = json.dumps(
@@ -1242,6 +1286,7 @@ class IdeatePipeline:
             id=c.get("id", ""),
             title=c.get("title", ""),
             rationale=c.get("rationale", ""),
+            elevator_pitch=c.get("elevator_pitch", ""),
             composite_score=composite,
             score_breakdown=sb,
             novelty_score=c.get("novelty_score", 0.0),
@@ -1318,6 +1363,7 @@ class IdeatePipeline:
         # idea-report.md
         cost_info = self.actual_cost()
         report = generate_idea_report(result, cost_info=cost_info)
+        report = _sanitize_text(report)
         (run_dir / "idea-report.md").write_text(report, encoding="utf-8")
 
         # idea-cards.json — only survivors with BUILD or INCUBATE

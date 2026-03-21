@@ -3860,5 +3860,550 @@
       "audio_production",
       "psychology"
     ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Regulatory Moat Builder: AI-Resistant Compliance Validator",
+    "score": 7.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "finance",
+      "healthcare",
+      "law",
+      "compliance",
+      "regulatory_affairs"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Fractional Expert QA Network: License Domain Veto Power",
+    "score": 7.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "qa",
+      "fintech",
+      "ai_augmentation",
+      "labor_market"
+    ]
+  },
+  {
+    "id": "gap-011",
+    "title": "Algorithmic Blind Spot Bounty Network",
+    "score": 6.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "ai_safety",
+      "qa",
+      "bias_detection",
+      "regulatory_compliance",
+      "bounty_economy"
+    ]
+  },
+  {
+    "id": "gap-010",
+    "title": "Niche Industry Authority Building Program",
+    "score": 6.5,
+    "verdict": "BUILD",
+    "domains": [
+      "authority_building",
+      "thought_leadership",
+      "specialization",
+      "public_profile"
+    ]
+  },
+  {
+    "id": "idea-007",
+    "title": "Cohort-Based Mini-Consulting: Peer Problem-Solving Sprints",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "education",
+      "consulting",
+      "community"
+    ]
+  },
+  {
+    "id": "gap-006",
+    "title": "Professional Guild Co-operative: Member-Owned Mutual Aid",
+    "score": 6.3,
+    "verdict": "BUILD",
+    "domains": [
+      "cooperative_economy",
+      "guild_model",
+      "mutual_aid",
+      "community_ownership"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Automated Career Pivot Audit: AI-Powered Repositioning",
+    "score": 6.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "career_transition",
+      "data_analytics",
+      "ai_augmentation"
+    ]
+  },
+  {
+    "id": "gap-007",
+    "title": "Sabbatical Syndication Fund: Collective Income Protection",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "financial_safety_net",
+      "risk_pooling",
+      "sabbatical",
+      "downside_protection"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Kill-Reason Pattern Pre-Filter (Zero-Cost Scoring)",
+    "score": 8.1,
+    "verdict": "BUILD",
+    "domains": [
+      "ideation_architecture",
+      "cost_optimization",
+      "meta_learning"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Idea Portfolio Optimizer (Multi-Objective Roadmap)",
+    "score": 7.6,
+    "verdict": "BUILD",
+    "domains": [
+      "portfolio_management",
+      "strategy",
+      "optimization"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Parallel Multi-Prompt Diverge (Same Cost, Higher Diversity)",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "ideation_architecture",
+      "parallelization",
+      "prompt_engineering"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "Micro-GTM Validator (Rapid Experiment Specs)",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "go_to_market",
+      "validation",
+      "entrepreneurship"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Confidence-Weighted Scoring (Uncertainty Quantification)",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "ideation_architecture",
+      "uncertainty_quantification",
+      "scoring"
+    ]
+  },
+  {
+    "id": "gap-007",
+    "title": "Domain Template Marketplace (15+ Industry Starter Packs)",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "domain_specific",
+      "templates",
+      "knowledge_base"
+    ]
+  },
+  {
+    "id": "gap-009",
+    "title": "Adversarial Mutation Engine (Pre-Stress-Test Fragility Check)",
+    "score": 6.5,
+    "verdict": "BUILD",
+    "domains": [
+      "stress_testing",
+      "robustness",
+      "risk_management"
+    ]
+  },
+  {
+    "id": "idea-011",
+    "title": "Heuristic Idea-Gene Extractor (No LLM Decomposition)",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "ideation_architecture",
+      "pattern_extraction",
+      "cost_optimization"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Paleontological Flight Pathway Reconstruction",
+    "score": 7.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "paleontology",
+      "evolutionary_biology",
+      "comparative_anatomy"
+    ]
+  },
+  {
+    "id": "idea-006",
+    "title": "Aerodynamic Fur Simulation Suite",
+    "score": 7.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "fluid_dynamics",
+      "cfd",
+      "simulation_engineering"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Flying Rabbit Bioethics Framework",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "bioethics",
+      "animal_welfare",
+      "environmental_justice"
+    ]
+  },
+  {
+    "id": "idea-017",
+    "title": "Bunny Flight Mythology Engine",
+    "score": 6.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "creative_writing",
+      "worldbuilding",
+      "generative_ai"
+    ]
+  },
+  {
+    "id": "gap-008",
+    "title": "Ecosystem Impact Conflict Resolution Platform",
+    "score": 6.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "conflict_resolution",
+      "environmental_justice",
+      "civic_infrastructure"
+    ]
+  },
+  {
+    "id": "idea-021",
+    "title": "Bunny Flight Ontology Builder",
+    "score": 6.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "knowledge_engineering",
+      "philosophy",
+      "semantics"
+    ]
+  },
+  {
+    "id": "gap-007",
+    "title": "Rabbit Cognition Adaptation Research Program",
+    "score": 6.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "behavioral_psychology",
+      "neuroscience",
+      "ethology"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Flying Rabbit Veterinary Pathology Atlas",
+    "score": 5.1,
+    "verdict": "KILL",
+    "domains": [
+      "veterinary_medicine",
+      "clinical_diagnosis",
+      "decision_support"
+    ]
+  },
+  {
+    "id": "gap-007",
+    "title": "Adaptation Decay & Reversibility Monitoring Dashboard",
+    "score": 6.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "bioinformatics",
+      "health_monitoring",
+      "decision_support"
+    ]
+  },
+  {
+    "id": "idea-020",
+    "title": "Hypoxic Training Load Periodization Algorithm",
+    "score": 6.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "sports_science",
+      "ai_optimization",
+      "training_algorithms"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "Mitochondrial Fuel-Substrate Optimization Protocol",
+    "score": 6.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "nutrition",
+      "metabolic_biochemistry",
+      "sports_medicine"
+    ]
+  },
+  {
+    "id": "idea-022",
+    "title": "Vagal Tone Optimization for Breath-Hold",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "neurostimulation",
+      "psychophysiology",
+      "biohacking"
+    ]
+  },
+  {
+    "id": "idea-016",
+    "title": "Anoxia Tolerance Gene Therapy Vector Library",
+    "score": 5.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "gene_therapy",
+      "crispr",
+      "personalized_medicine"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Vasomotor Priming Pharmacology Stack",
+    "score": 4.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "pharmacology",
+      "cardiology",
+      "performance_medicine"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Symbiotic Gill-Bacteria Engineering",
+    "score": 4.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "bioengineering",
+      "synthetic_biology",
+      "medical_devices"
+    ]
+  },
+  {
+    "id": "idea-007",
+    "title": "Reverse-Osmosis Lung Membrane Scaffolding",
+    "score": 4.6,
+    "verdict": "KILL",
+    "domains": [
+      "tissue_engineering",
+      "regenerative_medicine",
+      "3d_printing"
+    ]
+  },
+  {
+    "id": "idea-007",
+    "title": "Neighborhood Meal-Prep Co-op with Rotational Cooking",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "cooperative_economics",
+      "civic_infrastructure",
+      "food_systems",
+      "social_cohesion"
+    ]
+  },
+  {
+    "id": "idea-010",
+    "title": "AI Meal Planner for Constraint Cooking",
+    "score": 6.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "optimization",
+      "food_systems",
+      "consumer_software"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Reverse-Logistics Meal Sourcing from Institutional Kitchens",
+    "score": 6.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "food_systems",
+      "logistics",
+      "waste_management",
+      "cooperative_economics"
+    ]
+  },
+  {
+    "id": "idea-012",
+    "title": "Reciprocal Childcare + Meal-Prep Hybrid Network",
+    "score": 5.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "cooperative_economics",
+      "civic_infrastructure",
+      "labor_anthropology",
+      "childcare"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "Multilingual Visual Meal-Planning System for Neurodivergent & Immigrant Families",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "accessibility_design",
+      "neurodiversity",
+      "multilingual_UX",
+      "cognitive_load_reduction"
+    ]
+  },
+  {
+    "id": "idea-007",
+    "title": "Circadian-Optimized Meal Planning & Cognitive Autopilot Framework",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "neuroscience",
+      "chronobiology",
+      "behavioral_design",
+      "cognitive_load_reduction"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "Ingredient-Agnostic Cooking Equations with AI Fridge Scanning",
+    "score": 6.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "artificial_intelligence",
+      "food_science",
+      "cognitive_load_reduction"
+    ]
+  },
+  {
+    "id": "gap-005",
+    "title": "Reverse-Logistics Meal-Timing Coordination Hub with SMS Interface",
+    "score": 6.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "logistics",
+      "civic_infrastructure",
+      "low_income_access",
+      "labor_anthropology"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Guilt-Reframing Data Dashboard: Takeout Legitimization via Behavioral Psychology",
+    "score": 5.5,
+    "verdict": "MUTATE",
+    "domains": [
+      "behavioral_psychology",
+      "behavioral_economics",
+      "data_visualization"
+    ]
+  },
+  {
+    "id": "idea-010",
+    "title": "Neighborhood Kitchen-Sharing Cooperative with Batch Cooking Sessions",
+    "score": 5.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "civic_infrastructure",
+      "cooperative_economics",
+      "real_estate",
+      "social_cohesion"
+    ]
+  },
+  {
+    "id": "idea-006",
+    "title": "Neurodivergent Barista Apprenticeship (Wage Subsidy Model)",
+    "score": 7.4,
+    "verdict": "BUILD",
+    "domains": [
+      "disability_justice",
+      "labor_anthropology",
+      "education"
+    ]
+  },
+  {
+    "id": "idea-012",
+    "title": "Reverse Happy Hour (5am–7am Shift-Worker Pricing)",
+    "score": 6.9,
+    "verdict": "BUILD",
+    "domains": [
+      "chronobiology",
+      "labor_anthropology",
+      "demand_management"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Reverse Subscription + Discord Community (Study Hours Bundle)",
+    "score": 6.6,
+    "verdict": "BUILD",
+    "domains": [
+      "civic_infrastructure",
+      "behavioral_design",
+      "community_economics"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "SMS Coffee Concierge (Pre-Order Habit Lock)",
+    "score": 6.5,
+    "verdict": "BUILD",
+    "domains": [
+      "retention_and_churn_reduction",
+      "behavioral_psychology",
+      "low_tech_automation"
+    ]
+  },
+  {
+    "id": "gap-006",
+    "title": "Coffee Origin Transparency Ledger (Supply Chain Storytelling)",
+    "score": 6.3,
+    "verdict": "BUILD",
+    "domains": [
+      "supply_chain_resilience",
+      "transparency",
+      "competitive_differentiation",
+      "ethical_sourcing"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Micro-Roaster B2B (Tabletop Roasting + Corporate Wholesale)",
+    "score": 5.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "supply_chain",
+      "manufacturing",
+      "B2B_sales"
+    ]
   }
 ]

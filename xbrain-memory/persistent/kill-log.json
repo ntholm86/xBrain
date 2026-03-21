@@ -13,5 +13,15 @@
     "id": "idea-012",
     "title": "Peer-to-Peer Lån Gennem Lokale Sociale Netværk",
     "reason": "Hvis låntager ikke betaler tilbage, ødelægger det venskabet og långiver mister penge uden sikkerhed. Regulering som bank er dyrt og komplekst. Danske banker er allerede villige til at give små lån."
+  },
+  {
+    "id": "gap-001",
+    "title": "Flying Rabbit Veterinary Pathology Atlas",
+    "reason": "Flying rabbits do not exist and no credible engineering pathway to create them has been demonstrated; building a diagnostic atlas for a non-existent species is solving a problem that may never materialize, wasting resources on a solution with zero addressable market today and speculative market 20+ years from now."
+  },
+  {
+    "id": "idea-007",
+    "title": "Reverse-Osmosis Lung Membrane Scaffolding",
+    "reason": "Dissolved oxygen in water (8ppm) is 2,600x lower than oxygen in air (21%); extracting enough O₂ for human metabolism requires membrane area and perfusion rates that would cause fatal pulmonary edema—this is not an engineering problem, it's a physics wall that no scaffold design can overcome."
   }
 ]
