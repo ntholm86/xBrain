@@ -77,6 +77,7 @@ class AttackResponse(BaseModel):
     kill_criteria: list[str] = Field(default_factory=list)
     verdict: str = ""
     error_source: str = ""         # "" = genuine, "api_crash" = exception fallback
+    attack_confidence: float = 0.0  # 0.0-1.0 self-assessed confidence
 
 
 class DefenseExchangeItem(BaseModel):
@@ -140,7 +141,7 @@ class StressTestResult(BaseModel):
     kill_criteria: list[str] = Field(default_factory=list)
     verdict: str = ""              # BUILD / KILL / MUTATE / INCUBATE
     error_source: str = ""         # "" = genuine verdict, "api_crash" = exception fallback
-
+    attack_confidence: float = 0.0  # 0.0-1.0 self-assessed confidence in the attack
 
 class RawIdea(BaseModel):
     id: str

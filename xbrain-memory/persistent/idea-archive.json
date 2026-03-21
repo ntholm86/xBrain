@@ -4515,5 +4515,158 @@
       "risk_scoring",
       "constraint_optimization"
     ]
+  },
+  {
+    "id": "evo-2-cross-002",
+    "title": "Founder Conviction Calibrator: Outcome-Tracked Decision Backtesting",
+    "score": 7.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_science",
+      "founder_operations",
+      "outcome_tracking",
+      "behavioral_economics",
+      "data_literacy"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "Pricing Elasticity Lab",
+    "score": 7.2,
+    "verdict": "BUILD",
+    "domains": [
+      "pricing_strategy",
+      "revenue_optimization",
+      "behavioral_economics",
+      "A/B_testing"
+    ]
+  },
+  {
+    "id": "evo-2-mut-003",
+    "title": "Pricing Scenario Modeler with Cannibalization Predictor",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "pricing_strategy",
+      "revenue_optimization",
+      "behavioral_economics",
+      "scenario_modeling",
+      "early_stage"
+    ]
+  },
+  {
+    "id": "evo-2-novel-003",
+    "title": "Founder Decision Bias Inoculation Engine: Adversarial Sparring",
+    "score": 6.4,
+    "verdict": "BUILD",
+    "domains": [
+      "decision_science",
+      "behavioral_economics",
+      "critical_thinking",
+      "founder_operations",
+      "accountability"
+    ]
+  },
+  {
+    "id": "evo-2-mut-001",
+    "title": "SaaS Assumption Validator with Micro-Experiment Speedrunner",
+    "score": 6.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_science",
+      "validation",
+      "critical_thinking",
+      "lean_methodology",
+      "SaaS_vertical"
+    ]
+  },
+  {
+    "id": "evo-2-novel-001",
+    "title": "Founder Skill-Gap Resolver: Decision Framework Matcher + Outsource-or-Build Recommender",
+    "score": 4.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "founder_operations",
+      "execution_capability",
+      "talent_strategy",
+      "resource_allocation",
+      "make_vs_buy"
+    ]
+  },
+  {
+    "id": "evo-2-mut-002",
+    "title": "Pre-Mortem Facilitator (Slack-Integrated)",
+    "score": 7.6,
+    "verdict": "BUILD",
+    "domains": [
+      "risk_analysis",
+      "scenario_planning",
+      "startup_operations",
+      "behavioral_psychology",
+      "conversational_ai"
+    ]
+  },
+  {
+    "id": "evo-2-mut-003",
+    "title": "Pivot-or-Persevere Real-Time Advisor",
+    "score": 7.0,
+    "verdict": "BUILD",
+    "domains": [
+      "strategy",
+      "decision_making",
+      "startup_operations",
+      "real_time_analytics",
+      "data_integration"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Scenario Stress-Test Engine",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "risk_analysis",
+      "scenario_planning",
+      "startup_operations"
+    ]
+  },
+  {
+    "id": "evo-2-mut-005",
+    "title": "Validation Accountability Coach + Founder Cohorts",
+    "score": 6.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "validation",
+      "lean_methodology",
+      "experimentation",
+      "community",
+      "behavioral_psychology"
+    ]
+  },
+  {
+    "id": "evo-2-mut-004",
+    "title": "Annual Pricing Audit + Re-Pricing Advisor",
+    "score": 5.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "pricing_strategy",
+      "economics",
+      "SaaS",
+      "data_integration",
+      "experimentation"
+    ]
+  },
+  {
+    "id": "evo-2-mut-001",
+    "title": "Decision Capture + Outcome Feedback Loop (Slack-Native)",
+    "score": 5.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "decision_making",
+      "behavioral_psychology",
+      "meta_learning",
+      "real_time_feedback",
+      "workflow_integration"
+    ]
   }
 ]

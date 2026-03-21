@@ -67,6 +67,7 @@ define what's in scope — don't pre-filter by format.
 {playbook_context}
 {winner_repulsion_context}
 {failure_taxonomy_context}
+{kill_reason_context}
 {gene_context}
 {technique_weight_context}
 
@@ -489,6 +490,12 @@ exist yet (regulation, technology, market shift). Name the dependency.
 LENGTH LIMIT: Keep each field under 150 characters. Each structured_attack \
 and defense entry must be ONE sentence. freeform_attack max 2 sentences. Be dense.
 
+ATTACK CONFIDENCE: Rate your overall confidence in your attack assessment \
+(attack_confidence: 0.0-1.0). 1.0 = iron-clad evidence, concrete prior art, \
+proven failure pattern. 0.5 = speculative attack based on general reasoning. \
+0.0 = you're guessing. Be honest — a hedged attack with low confidence is \
+more useful than a confident-sounding attack that's actually speculative.
+
 Respond with ONLY valid JSON:
 {{
   "results": [
@@ -531,6 +538,7 @@ Respond with ONLY valid JSON:
         "Abort if ...",
         "Abort if ..."
       ],
+      "attack_confidence": 0.8,
       "verdict": "BUILD"
     }}
   ]
@@ -598,6 +606,33 @@ def build_winner_repulsion_context(previous_winners: list[dict]) -> str:
     for w in previous_winners:
         domains = ", ".join(w.get("domains", [])[:3])
         lines.append(f"- [{w.get('score', 0):.1f}] {w['title']} ({domains})")
+    return "\n".join(lines)
+
+
+def build_kill_reason_context(kill_log: list[dict]) -> str:
+    """Build negative constraints from kill reasons — inject WHY ideas died, not just titles."""
+    if not kill_log:
+        return ""
+    # Deduplicate reasons by first 60 chars to collapse similar kill reasons
+    seen: set[str] = set()
+    unique_reasons: list[str] = []
+    for k in kill_log[-20:]:  # Recent 20 kills
+        reason = (k.get("reason", "") or "").strip()
+        if not reason or len(reason) < 15:
+            continue
+        key = reason[:60].lower()
+        if key not in seen:
+            seen.add(key)
+            unique_reasons.append(reason[:150])
+    if not unique_reasons:
+        return ""
+    lines = [
+        "KILL-REASON PRE-FILTER — These are the specific reasons ideas were "
+        "KILLED in previous runs. DO NOT generate ideas vulnerable to these "
+        "attack vectors:"
+    ]
+    for reason in unique_reasons[:8]:
+        lines.append(f"- AVOID: {reason}")
     return "\n".join(lines)
 
 
@@ -762,6 +797,8 @@ SURVIVORS FROM PREVIOUS GENERATION (with stress test results):
 {gene_context}
 
 {mutation_archive_context}
+
+{attack_pattern_context}
 
 EVOLUTIONARY OPERATORS — apply ALL of these:
 

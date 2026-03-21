@@ -1,5 +1,53 @@
 # Changelog
 
+## v1.17.0 — 2026-03-21
+
+### New Features
+
+#### Kill-Reason Pre-Filter
+The kill-log previously only injected killed idea *titles* into DIVERGE as context. Now `build_kill_reason_context()` extracts the actual *reasons* ideas were killed (deduplicated, capped at 8) and injects them as explicit "AVOID" constraints. Ideas that died because of "no moat against incumbents" will now steer future generation away from moat-less ideas, rather than just avoiding the same title.
+
+#### Attack Pattern Recycling into Evolve
+The EVOLVE phase now receives attack pattern context from the cross-run memory. Previously only STRESS TEST used adaptive attack weights. Now evolved ideas (mutations, crossovers, novelty explorers) are informed about historically lethal attack angles, allowing them to pre-emptively defend against the most common kill vectors during evolution — not just during stress testing.
+
+#### Cost Tracking in Memory
+Per-run cost (USD) is now persisted in `meta-metrics.json` alongside token counts. META-LEARN can now reason about cost efficiency across runs: which strategies produce BUILD verdicts per dollar, whether cost is trending up/down, and whether refinement rounds justify their cost.
+
+#### Confidence-Weighted Scoring
+The STRESS TEST prompt now requests `attack_confidence` (0.0–1.0) — the devil's advocate's self-assessed confidence in its attack. High confidence (0.8+) means iron-clad evidence; low confidence (<0.4) means speculative reasoning. This field is stored on both `AttackResponse` and `StressTestResult` models. Low-confidence KILLs (confidence < 0.4) are automatically overridden to MUTATE, preventing speculative attacks from permanently destroying ideas.
+
+#### Parallel Multi-Prompt Diverge
+DIVERGE now runs 3 parallel async LLM calls instead of 1 sequential call. Each stream requests `ideas_per_round / 3` ideas with a different creative emphasis:
+- **Stream 1**: Balanced (all 6 techniques equally)
+- **Stream 2**: Contrarian emphasis (techniques 3 + 6: contrarian inversion + mechanism stealing)
+- **Stream 3**: Cross-domain emphasis (techniques 2 + 4: cross-domain collision + contextual constraints)
+
+Total idea count and token cost remain the same. Diversity increases because the 3 streams don't influence each other — each LLM call generates ideas independently, preventing single-context anchoring.
+
+#### Stress Test Fidelity Monitor (Enhanced)
+The completion summary now surfaces API crash counts directly. Override and crash stats are persisted in `meta-metrics.json` (`verdict_overrides`, `api_crashes`), enabling META-LEARN to track stress test reliability over time.
+
+### Changed
+
+#### Strengthened Effort Diversity Enforcement
+Previously only triggered when ALL ideas had identical effort levels (all "medium"). Now triggers whenever at least one of "small" or "large" is missing from the candidate set. The idea with the lowest effort score gets remapped to "small"; the highest to "large". This ensures every run produces a quick-win and a strategic option.
+
+#### README: Key Concepts Section
+Added a comprehensive "Key Concepts" section to the README documenting 15 named methodologies: Evolutionary Computation Framework, Self-Improving Loop, Mechanism Stealing, Moat Archaeology, Assumption Inversion, Calibration Enforcement, Diversity Ratchet, Failure Taxonomy & Blocklist, Adaptive Stress Weighting, Dynamic CONVERGE, Programmatic Enforcement Rules, Web Search Grounding, Structured Key Assumptions, Memory Pruning, and the new features from this release.
+
+### New Files
+- `PARKED-IDEAS.md` — Tier 2 and Tier 3 improvement ideas parked for future reference (8 items)
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.17.0
+- `xbrain/ideate.py` — kill-reason pre-filter in DIVERGE + REFINE, attack patterns in EVOLVE, cost in memory metrics, strengthened effort diversity, parallel 3-stream DIVERGE, confidence-weighted verdict override, fidelity stats in metrics + summary
+- `xbrain/prompts.py` — `build_kill_reason_context()`, `{kill_reason_context}` in DIVERGE_USER, `{attack_pattern_context}` in EVOLVE_USER, `attack_confidence` field + instructions in STRESS_TEST
+- `xbrain/models.py` — `attack_confidence` field on `AttackResponse` and `StressTestResult`
+- `README.md` — added Key Concepts section (15 named methodologies)
+- `PARKED-IDEAS.md` — NEW, parked improvement ideas for future reference
+
+---
+
 ## v1.16.0 — 2026-03-21
 
 ### Refactored — DRY Extraction & Phase Constants

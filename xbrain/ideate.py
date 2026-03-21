@@ -81,6 +81,7 @@ from xbrain.prompts import (
     build_adaptive_stress_context,
     build_novelty_context,
     build_technique_weight_context,
+    build_kill_reason_context,
     CANONICAL_FAILURE_TYPES,
 )
 
@@ -434,6 +435,10 @@ class IdeatePipeline:
             lines.append(f"  Refinement:       {refinement_round} round(s)")
         if self.cfg.generations > 1:
             lines.append(f"  Generations:      {self.cfg.generations}")
+        # Fidelity monitor: surface overrides and crashes
+        crash_count = sum(1 for s in result.stress_test_results if s.error_source == "api_crash")
+        if crash_count:
+            lines.append(f"  {_C.YELLOW}API crashes:    {crash_count} (verdicts are INCUBATE, not genuine){_C.RESET}")
         lines.append("")
 
         final_pass = final_build + final_mutate
@@ -590,7 +595,7 @@ class IdeatePipeline:
         constraints: list[str] | None,
         brief_text: str | None = None,
     ) -> list[RawIdea]:
-        _log("DIVERGE", "Generating raw idea seeds...")
+        _log("DIVERGE", "Generating raw idea seeds (3 parallel streams)...")
 
         domain_ctx = build_domain_context()
         constraint_ctx = build_constraint_context(constraints)
@@ -605,33 +610,65 @@ class IdeatePipeline:
         winner_ctx = build_winner_repulsion_context(self.memory.get_previous_winners())
         failure_ctx = build_failure_taxonomy_context(self.memory.get_failure_taxonomy())
         gene_ctx = build_gene_context(self.memory.get_idea_genes())
+        kill_reason_ctx = build_kill_reason_context(self.memory.get_kill_log())
+        playbook_ctx = build_playbook_context(self.memory.get_playbook())
+        tech_weight_ctx = build_technique_weight_context(self.memory.get_technique_weights())
 
-        prompt = DIVERGE_USER.format(
-            idea_count=self.cfg.ideas_per_round,
-            domain_context=domain_ctx,
-            constraint_context=constraint_ctx,
-            memory_context=memory_ctx,
-            immersion_context=immersion_ctx,
-            brief_context=brief_ctx,
-            playbook_context=build_playbook_context(self.memory.get_playbook()),
-            winner_repulsion_context=winner_ctx,
-            failure_taxonomy_context=failure_ctx,
-            gene_context=gene_ctx,
-            technique_weight_context=build_technique_weight_context(self.memory.get_technique_weights()),
-        )
+        total = self.cfg.ideas_per_round
+        # Split into 3 streams with different emphasis
+        counts = [total // 3, total // 3, total - 2 * (total // 3)]
+        emphases = [
+            "",  # Stream 1: balanced (all 6 techniques equally)
+            ("\n\nEMPHASIS: Focus this batch on techniques 3 (CONTRARIAN INVERSION) "
+             "and 6 (MECHANISM STEALING). Prioritize surprising, non-obvious ideas "
+             "that challenge conventional wisdom."),
+            ("\n\nEMPHASIS: Focus this batch on techniques 2 (CROSS-DOMAIN COLLISION) "
+             "and 4 (CONTEXTUAL CONSTRAINTS). Prioritize ideas that combine unlikely "
+             "domains and apply real-world constraints for practicality."),
+        ]
+        id_prefixes = ["idea", "alt", "xd"]
 
-        timer = log_llm_call("DIVERGE", f"Generating {self.cfg.ideas_per_round} idea seeds")
-        data = self.llm.generate_json(
-            self._sys(DIVERGE_SYSTEM), prompt, temperature=0.9,
-            model_override=self._model_for_phase(PHASE_DIVERGE), phase=PHASE_DIVERGE,
-            max_tokens=self._max_tokens_for_phase(PHASE_DIVERGE),
+        diverge_model = self._model_for_phase(PHASE_DIVERGE)
+        sys_prompt = self._sys(DIVERGE_SYSTEM)
+        max_tok = self._max_tokens_for_phase(PHASE_DIVERGE)
+
+        async def _diverge_stream(idx: int) -> list[dict]:
+            prompt = DIVERGE_USER.format(
+                idea_count=counts[idx],
+                domain_context=domain_ctx,
+                constraint_context=constraint_ctx,
+                memory_context=memory_ctx,
+                immersion_context=immersion_ctx,
+                brief_context=brief_ctx,
+                playbook_context=playbook_ctx,
+                winner_repulsion_context=winner_ctx,
+                failure_taxonomy_context=failure_ctx,
+                kill_reason_context=kill_reason_ctx,
+                gene_context=gene_ctx,
+                technique_weight_context=tech_weight_ctx,
+            ) + emphases[idx]
+            data = await self.llm.generate_json_async(
+                sys_prompt, prompt, temperature=0.9,
+                model_override=diverge_model, phase=PHASE_DIVERGE,
+                max_tokens=max_tok,
+            )
+            raw = data.get("ideas", [])
+            # Prefix IDs to avoid collisions across streams
+            for item in raw:
+                if "id" in item:
+                    item["id"] = item["id"].replace("idea-", f"{id_prefixes[idx]}-")
+            return raw
+
+        timer = log_llm_call("DIVERGE", f"Generating {total} idea seeds (3 parallel streams: {counts})")
+        stream_results = self._run_parallel(
+            [_diverge_stream(i) for i in range(3)], max_concurrent=3,
         )
         timer.done()
-        ideas_raw = data.get("ideas", [])
 
         ideas = []
-        for item in ideas_raw:
-            ideas.append(RawIdea(**item))
+        for items in stream_results:
+            for item in items:
+                ideas.append(RawIdea(**item))
 
         # Summarise techniques used
         techniques = {}
@@ -918,13 +955,18 @@ class IdeatePipeline:
         # ── Enforce effort diversity ──────────────────────────────
         if len(candidates) >= 3:
             efforts = [c.estimated_effort for c in candidates]
-            if len(set(efforts)) == 1:
-                by_effort_score = sorted(candidates, key=lambda c: c.score_breakdown.effort)
+            has_small = "small" in efforts
+            has_large = "large" in efforts
+            by_effort_score = sorted(candidates, key=lambda c: c.score_breakdown.effort)
+            changed = []
+            if not has_small:
                 by_effort_score[0].estimated_effort = "small"
+                changed.append(f"{by_effort_score[0].title[:30]}->small")
+            if not has_large:
                 by_effort_score[-1].estimated_effort = "large"
-                _log_warn("CONVERGE", f"Effort diversity enforced: "
-                     f"{by_effort_score[0].title[:30]}→small, "
-                     f"{by_effort_score[-1].title[:30]}→large")
+                changed.append(f"{by_effort_score[-1].title[:30]}->large")
+            if changed:
+                _log_warn("CONVERGE", f"Effort diversity enforced: {', '.join(changed)}")
 
         # ── Apply mathematical calibration from META-LEARN ────────
         cal_status = apply_calibration(candidates, self.memory.get_score_stats(), tag="CONVERGE")
@@ -1072,6 +1114,7 @@ class IdeatePipeline:
                 kill_criteria=ar.kill_criteria,
                 verdict=ar.verdict,
                 error_source=getattr(ar, "error_source", ""),
+                attack_confidence=getattr(ar, "attack_confidence", 0.0),
             )
             results.append(st)
 
@@ -1086,6 +1129,7 @@ class IdeatePipeline:
         # The LLM tends to hedge with MUTATE even when its own numbers
         # say BUILD.  Enforce the quantitative rule from the prompt:
         # attacks_survived >= 5  AND  attacks_fatal <= 1  →  BUILD
+        # Also: low-confidence KILLs (< 0.4) get downgraded to MUTATE
         overrides = 0
         for r in results:
             if (r.verdict == "MUTATE"
@@ -1094,6 +1138,14 @@ class IdeatePipeline:
                 _log_warn("STRESS", f">> Override {r.idea_id}: MUTATE->BUILD "
                      f"(survived={r.attacks_survived}, fatal={r.attacks_fatal})")
                 r.verdict = "BUILD"
+                overrides += 1
+            elif (r.verdict == "KILL"
+                    and r.attack_confidence > 0
+                    and r.attack_confidence < 0.4
+                    and not r.error_source):
+                _log_warn("STRESS", f">> Override {r.idea_id}: KILL->MUTATE "
+                     f"(low confidence={r.attack_confidence:.2f})")
+                r.verdict = "MUTATE"
                 overrides += 1
 
         _log("STRESS", "")
@@ -1158,6 +1210,9 @@ class IdeatePipeline:
         survivors_json = json.dumps(survivors_data, indent=2, ensure_ascii=False)
         gene_ctx = build_gene_context(self.memory.get_idea_genes())
         mutation_ctx = build_mutation_archive_context(self.memory.get_mutation_archive())
+        attack_ctx = build_adaptive_stress_context(
+            self.memory.get_attack_patterns(), self.memory.get_kill_log()
+        )
         brief_ctx = build_brief_context(brief_text)
         evolve_count = max(4, self.cfg.converge_top_n)
 
@@ -1168,6 +1223,7 @@ class IdeatePipeline:
             survivors_json=survivors_json,
             gene_context=gene_ctx,
             mutation_archive_context=mutation_ctx,
+            attack_pattern_context=attack_ctx,
             elite_count=elite_count,
             evolve_count=evolve_count,
         )
@@ -1343,6 +1399,7 @@ class IdeatePipeline:
             playbook_context=build_playbook_context(self.memory.get_playbook()),
             winner_repulsion_context=build_winner_repulsion_context(self.memory.get_previous_winners()),
             failure_taxonomy_context=build_failure_taxonomy_context(self.memory.get_failure_taxonomy()),
+            kill_reason_context=build_kill_reason_context(self.memory.get_kill_log()),
             gene_context=build_gene_context(self.memory.get_idea_genes()),
             technique_weight_context=build_technique_weight_context(self.memory.get_technique_weights()),
         )
@@ -1588,6 +1645,7 @@ class IdeatePipeline:
 
         build_count = sum(1 for c in result.survivors if c.stress_test_verdict == "BUILD")
         pass_count = sum(1 for c in result.survivors if c.stress_test_verdict in ("BUILD", "MUTATE"))
+        cost_info = self.actual_cost()
         metrics = {
             "run_id": result.run_id,
             "timestamp": result.timestamp,
@@ -1597,6 +1655,14 @@ class IdeatePipeline:
             "pass_count": pass_count,
             "tokens_in": result.total_input_tokens,
             "tokens_out": result.total_output_tokens,
+            "cost_usd": cost_info["total_cost_usd"],
+            "verdict_overrides": sum(
+                1 for s in result.stress_test_results
+                if s.attacks_survived >= 5 and s.attacks_fatal <= 1 and s.verdict == "BUILD"
+            ),
+            "api_crashes": sum(
+                1 for s in result.stress_test_results if s.error_source == "api_crash"
+            ),
         }
 
         self.memory.save_run(ideas_for_archive, list(domains_used), killed, metrics)

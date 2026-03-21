@@ -313,6 +313,70 @@ With `--generations N`, the pipeline becomes an evolutionary engine: after stres
 
 The system also learns across runs. Meta-learning distills patterns from previous results (what scores well, what gets killed, which generation techniques work), injecting that accumulated knowledge into future runs. Idea "genes" — reusable solution patterns extracted from high-scoring ideas — are recombined into new contexts. Technique weights are adjusted based on which generation methods produce the most survivors.
 
+### Key Concepts
+
+The pipeline combines several named techniques from evolutionary computation, adversarial testing, and adaptive learning. This section explains each concept so you know exactly what the engine is doing and why.
+
+#### Evolutionary Computation Framework
+The core architecture is an evolutionary algorithm applied to ideas instead of code. Ideas are the "organisms." Each generation goes through **selection** (CONVERGE scoring), **environmental pressure** (STRESS TEST adversarial attack), and **reproduction** (EVOLVE). The evolutionary operators are:
+
+- **Mutation** — MUTATE-verdict ideas get their identified weakness fixed, producing a modified offspring.
+- **Crossover** — The mechanism from one high-scoring idea is combined with the audience of another, producing hybrid offspring.
+- **Elite Carry-Forward** — Top BUILD ideas pass unchanged into the next generation as anchors, preventing regression.
+- **Novelty Explorer** — Generates ideas maximally different from all survivors, preventing the population from collapsing to a single niche (local optimum avoidance).
+- **Gene Recombination** — Reusable solution patterns ("idea genes") extracted from high-scoring ideas in past runs are transplanted into new contexts during crossover and novelty exploration.
+
+#### Self-Improving Loop (Meta-Learning)
+xBrain learns from its own output. Every 3 runs, the META-LEARN phase reads all accumulated data (scores, kills, attack patterns, technique performance) and distills it into:
+
+- **Playbook** — A compact (~200 token) summary of what works, what fails, and what to avoid.
+- **Score calibration multipliers** (0.5–1.5 per dimension) — Correct systematic LLM scoring biases. Applied mathematically post-LLM, not by asking the LLM to adjust.
+- **Technique weights** — Which DIVERGE techniques (Domain Scan, Cross-Domain Collision, etc.) historically produce the most BUILD verdicts. Weights bias future DIVERGE allocation toward high-performing methods.
+
+This creates a feedback loop: run → learn → adjust → run better. The engine genuinely improves over time as its memory accumulates.
+
+#### Mechanism Stealing (Inverse Ideation)
+DIVERGE technique #6. Extracts the core working mechanism from a successful product in one field and transplants it into a completely different domain. Example: Duolingo's streak mechanic → applied to compliance training. Forces cross-pollination beyond simple "what if X met Y" collisions, focusing on the transferable *mechanism* rather than the surface-level product.
+
+#### Moat Archaeology & Defensibility Gate
+Defensibility is a first-class scoring constraint, not an afterthought. During CONVERGE, any idea scoring below 4 on defensibility triggers a mandatory **moat check** — the LLM must suggest a concrete mutation that would strengthen the moat (network effects, data flywheel, switching costs, regulatory capture, etc.). A **defensibility gate** applies score adjustments: ideas with defensibility < 3 receive a penalty, while defensibility ≥ 7 receives a bonus. This prevents "good idea, zero moat" outcomes from ranking highly.
+
+#### Assumption Inversion & Fragility Flags
+During CONVERGE enrichment (Phase 2C), each key assumption is tested by inverting it. The LLM generates an `inverse_claim` (what if the opposite were true?), rates how easy the inverse is to defend (`inverse_defense_quality`, 1–5), and assigns a fragility flag. If the inverse is easy to defend (score ≥ 4/5), the assumption is flagged 🔴 **fragile** — meaning the idea rests on a shaky foundation. Solid assumptions get 🟢. This surfaces critical vulnerabilities before stress testing.
+
+#### Calibration Enforcement Layer
+LLMs have systematic scoring biases (e.g., consistently overrating impact, underrating ethical risk). META-LEARN detects these biases and outputs per-dimension calibration multipliers (0.5–1.5). After the LLM scores ideas in CONVERGE, xBrain applies these multipliers mathematically to each dimension score and recomputes the composite. This is **programmatic enforcement** — the scores are corrected in code, not by asking the LLM to be more careful.
+
+#### Diversity Ratchet (Winner Repulsion)
+Previous high-scoring ideas (BUILD/MUTATE with score ≥ 5.0) are tracked across runs and injected into DIVERGE as an exclusion list. This pushes the engine toward unexplored territory instead of regenerating the same winning patterns. Without this, consecutive runs on similar briefs would converge on the same handful of ideas.
+
+#### Failure Taxonomy & Blocklist
+Attacks from stress tests are classified into 6 canonical categories: **prior_art**, **adoption**, **technical**, **timing**, **defensibility**, **economics**. These are persisted across runs and injected into future DIVERGE and REFINE prompts, steering generation away from idea shapes that repeatedly die to the same attack type. During refinement, a hard blocklist uses imperative language ("DO NOT generate ideas that...") — stronger than soft context.
+
+#### Adaptive Stress Weighting
+Not all attack angles are equally lethal. xBrain tracks which of the 9 attack angles historically kill the most ideas across all runs. In future stress tests, high-kill-rate angles are weighted more heavily — the devil's advocate focuses its strongest arguments where ideas are most likely to be vulnerable. This means the stress test gets harder over time as the system learns where ideas actually break.
+
+#### Dynamic CONVERGE (Brief-Adaptive Output)
+The CONVERGE phase detects the brief type and adapts its output accordingly. Product/startup briefs get personas, ICPs, and go-to-market analysis. Internal tool briefs get user roles, workflow fit, and integration surfaces. Process briefs get current state, proposed change, and success metrics. This prevents nonsensical outputs like a solo-dev tool getting a "Series B startup" ICP.
+
+#### Programmatic Enforcement Rules
+Several rules that the LLM consistently ignores are enforced in code after the LLM responds:
+
+- **BUILD Verdict Override** — If an idea survives ≥5 of 9 attacks with ≤1 fatal, the verdict is forced to BUILD regardless of LLM hedging.
+- **Score Spread Enforcement** — If CONVERGE score spread < 3.0 points, scores are linearly stretched around the midpoint to achieve minimum spread while preserving rank order.
+- **Effort Diversity Enforcement** — If all ideas get the same effort level (typically "medium"), the easiest is remapped to "small" and hardest to "large".
+- **Score Value Clamping** — LLM occasionally returns dollar amounts instead of 0–10 scores; all values are clamped to [0, 10].
+- **ICP Grounding** — First customer profile must match the brief's scale (solo-dev tool → solo developer, not "Series B startup").
+
+#### Web Search Grounding
+The STRESS TEST phase queries DuckDuckGo and HackerNews for real prior art per idea before attacking (`"{title} existing product competitor"`). This grounds the prior art attack angle in actual competitors rather than hallucinated ones. Search is best-effort: if search providers are unavailable, the pipeline runs without it.
+
+#### Structured Key Assumptions
+Each key assumption is a structured object with `claim`, `validation_cost` (low/medium/high), and `validation_method`. Assumptions are auto-sorted cheapest-to-validate first, so founders know which bets to test immediately. The report renders cost badges and validation methods inline.
+
+#### Memory Pruning
+Memory files have retention caps to prevent unbounded growth over hundreds of runs: idea archive (500), kill log (200), meta-metrics (100), lineage (500), idea genes (100). Older entries are pruned automatically.
+
 <details>
 <summary><strong>Pipeline Architecture (click to expand)</strong></summary>
 
