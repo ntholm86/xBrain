@@ -307,75 +307,74 @@ XBRAIN_BEST_MODEL=claude-sonnet-4-20250514     # Model for critical phases (bala
 
 ## How It Works
 
-xBrain runs a multi-phase pipeline inspired by evolutionary computation. Most ideation tools generate ideas and stop. xBrain generates ideas, then actively tries to destroy them — and optionally evolves survivors through multiple generations of mutation, crossover, and selection pressure. Ideas that survive are battle-hardened.
-
-With `--generations N`, the pipeline becomes an evolutionary engine: after stress testing, surviving ideas are mutated (fixing weaknesses), crossed over (combining best traits from multiple ideas), and novelty-explored (maximally different new ideas). Each generation runs through scoring and stress testing again. The ideas that come out of 5 or 10 generations have been pressure-tested repeatedly — the weak mutations die, the strong ones compound.
-
-The system also learns across runs. Meta-learning distills patterns from previous results (what scores well, what gets killed, which generation techniques work), injecting that accumulated knowledge into future runs. Idea "genes" — reusable solution patterns extracted from high-scoring ideas — are recombined into new contexts. Technique weights are adjusted based on which generation methods produce the most survivors.
+xBrain runs a multi-phase pipeline inspired by evolutionary computation. Most ideation tools generate ideas and stop. xBrain generates ideas, then actively tries to destroy them — and optionally evolves survivors through multiple generations of mutation, crossover, and selection pressure. Ideas that survive are battle-hardened. The system learns across runs: meta-learning distills patterns from past results, idea "genes" are recombined into new contexts, and technique weights adapt. The engine genuinely improves over time.
 
 ### Key Concepts
 
-The pipeline combines several named techniques from evolutionary computation, adversarial testing, and adaptive learning. This section explains each concept so you know exactly what the engine is doing and why.
+Organized by pipeline phase. Each technique is annotated with `«concept»` in the architecture diagram below.
 
-#### Evolutionary Computation Framework
-The core architecture is an evolutionary algorithm applied to ideas instead of code. Ideas are the "organisms." Each generation goes through **selection** (CONVERGE scoring), **environmental pressure** (STRESS TEST adversarial attack), and **reproduction** (EVOLVE). The evolutionary operators are:
+**DIVERGE** — idea generation
+- **6 Techniques** — each approaches ideation from a different angle, weighted by meta-learned survival rates:
+  - **Domain Scan** — systematically sweep every domain (health, finance, education, agriculture…) for unsolved problems that are programmable.
+  - **Cross-Domain Collision** — force unexpected intersections between two unrelated domains (e.g., "epidemiology × misinformation = contagion modeling for fake news").
+  - **Contrarian Inversion** — take a widely held assumption and flip it: "what if the opposite were true?" Produces ideas that challenge conventional wisdom.
+  - **Contextual Constraints** — apply harsh real-world limits ("must work offline", "must cost $0", "must work on 2G") to force practical creativity.
+  - **Mechanism Stealing** — extract the core working mechanism from a successful product (e.g., Duolingo's streak mechanic) and transplant it to a completely different domain.
+  - **Gap Fill** — after dedup identifies under-represented themes, generate ideas specifically targeting those gaps at maximum creativity (temp=0.95).
+- **3 Parallel Streams** — DIVERGE fires three async prompts simultaneously, each with different technique emphasis (balanced / contrarian+mechanism / cross-domain+constraints). Triples creative surface area without tripling cost, since each stream generates ⅓ of the ideas.
+- **Kill-Reason Pre-Filter** — specific reasons ideas died in past runs (e.g., "no moat against incumbents", "requires regulatory approval") injected as AVOID constraints. Prevents regenerating known-dead patterns.
+- **Winner Repulsion** — previous high-scorers (≥ 5.0) fed as an exclusion list, pushing the engine toward unexplored territory instead of re-discovering the same winning ideas.
+- **Failure Taxonomy Blocklist** — past failures classified into 6 categories (prior_art, adoption, technical, timing, defensibility, economics) and injected as hard DO-NOT-GENERATE prohibitions during refinement.
 
-- **Mutation** — MUTATE-verdict ideas get their identified weakness fixed, producing a modified offspring.
-- **Crossover** — The mechanism from one high-scoring idea is combined with the audience of another, producing hybrid offspring.
-- **Elite Carry-Forward** — Top BUILD ideas pass unchanged into the next generation as anchors, preventing regression.
-- **Novelty Explorer** — Generates ideas maximally different from all survivors, preventing the population from collapsing to a single niche (local optimum avoidance).
-- **Gene Recombination** — Reusable solution patterns ("idea genes") extracted from high-scoring ideas in past runs are transplanted into new contexts during crossover and novelty exploration.
+**CONVERGE** — scoring & ranking (3 sub-phases: Cluster → Compare → Enrich)
+- **8-Dimension Scoring** — each idea scored 0–10 on eight dimensions with explicit weights: Impact (+25%), Confidence (+20%), Sustainability (+10%), Defensibility (+10%), Market Timing (+5%), Effort (−10%), Cost (−10%), Ethical Risk (−10%). Composite = weighted sum normalized to 0–10.
+- **Calibration Enforcement** — LLMs have systematic scoring biases (e.g., always rating impact 8+). META-LEARN detects these and outputs per-dimension correction multipliers (0.5–1.5). Applied mathematically in code after the LLM scores — not by asking the LLM to be more careful.
+- **Moat Gate** — defensibility is a first-class constraint. Score < 3 penalized, ≥ 7 bonus'd. Low-moat ideas get mandatory mutation suggestions (network effects, data flywheel, switching costs, regulatory capture).
+- **Assumption Inversion** — each key assumption is inverted ("what if the opposite were true?") and the inverse evaluated for defensibility (1–5). If the inverse is easy to defend (≥ 4), the assumption is flagged 🔴 fragile — the idea rests on shaky ground. Solid assumptions get 🟢.
+- **Dynamic Output** — detects brief type and adapts format: product briefs get personas + ICPs + GTM analysis, internal tools get workflow fit + integration surfaces, process briefs get change impact analysis.
 
-#### Self-Improving Loop (Meta-Learning)
-xBrain learns from its own output. Every 3 runs, the META-LEARN phase reads all accumulated data (scores, kills, attack patterns, technique performance) and distills it into:
+**STRESS TEST** — adversarial attack (all ideas tested in parallel)
+- **9 Attack Angles** — each idea is attacked from nine structured angles, plus one freeform "most devastating argument you can construct":
+  1. Prior art — does this already exist?
+  2. Adoption failure — why would users not switch?
+  3. Technical blocker — what makes this hard to build?
+  4. Problem reframe — is the problem actually different than assumed?
+  5. Negative externalities — what harm could this cause?
+  6. Obsolescence — what kills this in 2 years?
+  7. Timing — is the market too early or too late?
+  8. Defensibility — can a big player copy this trivially?
+  9. Expertise gap — does the team lack critical skills?
+- **Adaptive Weights** — angles that historically kill more ideas (learned across all runs) are weighted more heavily. The stress test gets harder over time as the system learns where ideas actually break.
+- **Web Search Grounding** — queries DuckDuckGo + HackerNews for real prior art per idea before attacking. Grounds the prior-art angle in actual competitors, not hallucinated ones. Best-effort: pipeline runs without it if search is unavailable.
+- **Confidence Scoring** — LLM self-rates attack certainty (0.0–1.0). Low-confidence KILLs (< 0.4) are speculative, so they're downgraded to MUTATE — giving the idea a chance to be fixed rather than killed on weak evidence.
+- **Fidelity Monitor** — API crashes produce INCUBATE with `error_source="api_crash"` so crash verdicts aren't confused with genuine assessments. Crash count surfaced in the final summary.
 
-- **Playbook** — A compact (~200 token) summary of what works, what fails, and what to avoid.
-- **Score calibration multipliers** (0.5–1.5 per dimension) — Correct systematic LLM scoring biases. Applied mathematically post-LLM, not by asking the LLM to adjust.
-- **Technique weights** — Which DIVERGE techniques (Domain Scan, Cross-Domain Collision, etc.) historically produce the most BUILD verdicts. Weights bias future DIVERGE allocation toward high-performing methods.
+**EVOLVE** — multi-generation evolution (`--generations N`)
+- **4 Evolutionary Operators** — after stress testing, survivors are evolved through four mechanisms:
+  - **Elite Carry-Forward** — top BUILD ideas pass unchanged into the next generation as stable anchors, preventing regression.
+  - **Mutation** — each MUTATE-verdict idea gets its specific identified weakness fixed (the suggested_mutation from stress testing), producing a modified offspring.
+  - **Crossover** — the mechanism from one high-scoring idea is combined with the audience of another, producing hybrid offspring (e.g., idea A's gamification mechanic applied to idea B's healthcare audience).
+  - **Novelty Explorer** — generates ideas maximally different from all survivors, preventing the population from collapsing to a single niche (local optimum avoidance).
+- **Gene Recombination** — reusable solution patterns ("idea genes") extracted from high-scoring ideas in past runs are transplanted into new contexts during crossover and novelty generation. The engine builds institutional memory of what works.
+- **Attack Pattern Recycling** — the most lethal attack patterns from the just-completed stress test are injected into EVOLVE as mutation priorities, so the evolutionary process targets the actual vulnerabilities that killed ideas.
 
-This creates a feedback loop: run → learn → adjust → run better. The engine genuinely improves over time as its memory accumulates.
+**META-LEARN** — self-improving loop (every 3 runs)
+- **Playbook** — reads all accumulated data (scores, kills, attack patterns, technique stats) across all previous runs and distills a compact ~200-token playbook injected into every future run. Contains what works, what fails, and what to avoid.
+- **Score Calibration** — detects systematic LLM scoring biases per dimension (e.g., "impact scores consistently 1.5 points too high") and outputs correction multipliers applied in code.
+- **Technique Weights** — tracks which of the 6 generation techniques historically produce the most BUILD verdicts. Biases future DIVERGE allocation toward high-performing methods, dampening poor performers.
 
-#### Mechanism Stealing (Inverse Ideation)
-DIVERGE technique #6. Extracts the core working mechanism from a successful product in one field and transplants it into a completely different domain. Example: Duolingo's streak mechanic → applied to compliance training. Forces cross-pollination beyond simple "what if X met Y" collisions, focusing on the transferable *mechanism* rather than the surface-level product.
+**REFINE** — recovery when all ideas KILL (up to 3 rounds)
+- Extracts mutations, attack patterns, failure blocklist, and problem reframes from the failed round. Re-generates with progressively lower temperature (0.9 → 0.75 → 0.60) and fewer ideas (50% → 33% → 25%), getting more focused each round. Stops when a BUILD verdict is found or 3 rounds are exhausted.
 
-#### Moat Archaeology & Defensibility Gate
-Defensibility is a first-class scoring constraint, not an afterthought. During CONVERGE, any idea scoring below 4 on defensibility triggers a mandatory **moat check** — the LLM must suggest a concrete mutation that would strengthen the moat (network effects, data flywheel, switching costs, regulatory capture, etc.). A **defensibility gate** applies score adjustments: ideas with defensibility < 3 receive a penalty, while defensibility ≥ 7 receives a bonus. This prevents "good idea, zero moat" outcomes from ranking highly.
-
-#### Assumption Inversion & Fragility Flags
-During CONVERGE enrichment (Phase 2C), each key assumption is tested by inverting it. The LLM generates an `inverse_claim` (what if the opposite were true?), rates how easy the inverse is to defend (`inverse_defense_quality`, 1–5), and assigns a fragility flag. If the inverse is easy to defend (score ≥ 4/5), the assumption is flagged 🔴 **fragile** — meaning the idea rests on a shaky foundation. Solid assumptions get 🟢. This surfaces critical vulnerabilities before stress testing.
-
-#### Calibration Enforcement Layer
-LLMs have systematic scoring biases (e.g., consistently overrating impact, underrating ethical risk). META-LEARN detects these biases and outputs per-dimension calibration multipliers (0.5–1.5). After the LLM scores ideas in CONVERGE, xBrain applies these multipliers mathematically to each dimension score and recomputes the composite. This is **programmatic enforcement** — the scores are corrected in code, not by asking the LLM to be more careful.
-
-#### Diversity Ratchet (Winner Repulsion)
-Previous high-scoring ideas (BUILD/MUTATE with score ≥ 5.0) are tracked across runs and injected into DIVERGE as an exclusion list. This pushes the engine toward unexplored territory instead of regenerating the same winning patterns. Without this, consecutive runs on similar briefs would converge on the same handful of ideas.
-
-#### Failure Taxonomy & Blocklist
-Attacks from stress tests are classified into 6 canonical categories: **prior_art**, **adoption**, **technical**, **timing**, **defensibility**, **economics**. These are persisted across runs and injected into future DIVERGE and REFINE prompts, steering generation away from idea shapes that repeatedly die to the same attack type. During refinement, a hard blocklist uses imperative language ("DO NOT generate ideas that...") — stronger than soft context.
-
-#### Adaptive Stress Weighting
-Not all attack angles are equally lethal. xBrain tracks which of the 9 attack angles historically kill the most ideas across all runs. In future stress tests, high-kill-rate angles are weighted more heavily — the devil's advocate focuses its strongest arguments where ideas are most likely to be vulnerable. This means the stress test gets harder over time as the system learns where ideas actually break.
-
-#### Dynamic CONVERGE (Brief-Adaptive Output)
-The CONVERGE phase detects the brief type and adapts its output accordingly. Product/startup briefs get personas, ICPs, and go-to-market analysis. Internal tool briefs get user roles, workflow fit, and integration surfaces. Process briefs get current state, proposed change, and success metrics. This prevents nonsensical outputs like a solo-dev tool getting a "Series B startup" ICP.
-
-#### Programmatic Enforcement Rules
-Several rules that the LLM consistently ignores are enforced in code after the LLM responds:
-
-- **BUILD Verdict Override** — If an idea survives ≥5 of 9 attacks with ≤1 fatal, the verdict is forced to BUILD regardless of LLM hedging.
-- **Score Spread Enforcement** — If CONVERGE score spread < 3.0 points, scores are linearly stretched around the midpoint to achieve minimum spread while preserving rank order.
-- **Effort Diversity Enforcement** — If all ideas get the same effort level (typically "medium"), the easiest is remapped to "small" and hardest to "large".
-- **Score Value Clamping** — LLM occasionally returns dollar amounts instead of 0–10 scores; all values are clamped to [0, 10].
-- **ICP Grounding** — First customer profile must match the brief's scale (solo-dev tool → solo developer, not "Series B startup").
-
-#### Web Search Grounding
-The STRESS TEST phase queries DuckDuckGo and HackerNews for real prior art per idea before attacking (`"{title} existing product competitor"`). This grounds the prior art attack angle in actual competitors rather than hallucinated ones. Search is best-effort: if search providers are unavailable, the pipeline runs without it.
-
-#### Structured Key Assumptions
-Each key assumption is a structured object with `claim`, `validation_cost` (low/medium/high), and `validation_method`. Assumptions are auto-sorted cheapest-to-validate first, so founders know which bets to test immediately. The report renders cost badges and validation methods inline.
-
-#### Memory Pruning
-Memory files have retention caps to prevent unbounded growth over hundreds of runs: idea archive (500), kill log (200), meta-metrics (100), lineage (500), idea genes (100). Older entries are pruned automatically.
+**PROGRAMMATIC ENFORCEMENT** — code overrides LLM output where the LLM consistently gets it wrong
+- **BUILD Override** — if an idea survived ≥ 5/9 attacks with ≤ 1 fatal, the verdict is forced to BUILD regardless of LLM hedging. LLMs tend to say MUTATE even when the numbers say BUILD.
+- **KILL Downgrade** — low-confidence attacks (< 0.4) → KILL overridden to MUTATE. Speculative kills shouldn't be final.
+- **Score Spread** — if all CONVERGE scores land within 3.0 points of each other, they're linearly stretched to enforce meaningful differentiation while preserving rank order.
+- **Effort Diversity** — if the LLM marks every idea "medium" effort (which it usually does), the lowest-effort idea is remapped to "small" and the highest to "large".
+- **Score Clamping** — values outside [0, 10] are clamped. Catches when the LLM returns dollar amounts or percentages instead of 0–10 scores.
+- **ICP Grounding** — first customer profile must match the brief's scale (solo-dev tool → solo developer, not "Series B startup").
+- **Structured Assumptions** — each assumption is a structured object (`claim`, `validation_cost`, `validation_method`), auto-sorted cheapest-to-validate first so founders know which bets to test immediately.
+- **Memory Pruning** — retention caps prevent unbounded growth: ideas (500), kills (200), genes (100), metrics (100), lineage (500). Older entries pruned automatically.
 
 <details>
 <summary><strong>Pipeline Architecture (click to expand)</strong></summary>
@@ -429,21 +428,23 @@ Memory files have retention caps to prevent unbounded growth over hundreds of ru
                      v
   +========================================+       +==========================+
   | PHASE 1: DIVERGE                       |       | Injected Context:        |
-  | temp=0.9                               |<------| - Playbook (meta-learn)  |
-  |                                        |       | - Idea genes (reusable   |
-  |  Generate N raw idea seeds using       |       |   patterns from past     |
-  |  6 simultaneous techniques:            |       |   high-scorers)          |
-  |                                        |       | - Technique weights      |
-  |  1. Domain Scan                        |       | - Memory (past ideas,    |
-  |  2. Cross-Domain Collision             |       |   killed titles, domain  |
-  |  3. Contrarian Inversion              |       |   heat map)              |
-  |  4. Contextual Constraints             |       | - Brief text             |
-  |  5. AI-Augmentable Gap Detection       |       | - Constraints            |
-  |  6. Mechanism Stealing                 |       | - Winner repulsion list  |
-  |                                        |       | - Failure taxonomy       |
-  |  Output: RawIdea[] (id, concept,       |       +==========================+
-  |    source_technique, domain_tags,      |
-  |    novelty_signal)                     |
+  | «3 Parallel Streams» temp=0.9          |<------| - Playbook (meta-learn)  |
+  |                                        |       | - Idea genes             |
+  |  3 async streams, each with different  |       | - Technique weights      |
+  |  technique emphasis:                   |       | - Kill-reason pre-filter |
+  |    Stream A: balanced (all 6)          |       | - Winner repulsion list  |
+  |    Stream B: contrarian + mechanism    |       | - Failure taxonomy       |
+  |    Stream C: cross-domain + contextual |       | - Memory (past ideas,    |
+  |                                        |       |   domain heat map)       |
+  |  6 techniques per stream:              |       | - Brief + constraints    |
+  |  1. Domain Scan                        |       +==========================+
+  |  2. Cross-Domain Collision             |
+  |  3. Contrarian Inversion               |
+  |  4. Contextual Constraints             |
+  |  5. AI-Augmentable Gap Detection       |
+  |  6. Mechanism Stealing                 |
+  |                                        |
+  |  Output: RawIdea[] (merged from all 3) |
   +==================+=====================+
                      |
                      v
@@ -475,25 +476,25 @@ Memory files have retention caps to prevent unbounded growth over hundreds of ru
                      |
                      v
   +========================================+       +==========================+
-  | PHASE 2: CONVERGE                      |       | Novelty Scoring:         |
-  | temp=0.5                               |       | When generations > 1,    |
-  |                                        |<------| CONVERGE adds a novelty  |
-  |  Cluster, score, rank. Select top N.   |       | dimension that rewards   |
-  |                                        |       | ideas solving problems   |
-  |  Per idea:                             |       | in genuinely new ways.   |
-  |    - Target persona (who/pain/context) |       | Prevents evolutionary    |
-  |    - 8-dim scoring (0-10 each):        |       | convergence to a local   |
-  |      (+) impact, confidence,           |       | optimum.                 |
-  |          sustainability, defensibility,|       +==========================+
-  |          market_timing                 |
-  |      (-) effort, cost, ethical_risk    |
-  |    - Score reasoning per dimension     |
-  |    - Inverse scoring (fragility check) |
-  |    - Composite = weighted sum + 3.0    |
-  |      clamped to [0, 10]               |
-  |    - Post-LLM: score spread stretch,  |
-  |      effort diversity enforcement,     |
-  |      calibration multipliers applied   |
+  | PHASE 2: CONVERGE (3 sub-phases)       |       | «Calibration»            |
+  |                                        |       | Post-LLM score           |
+  |  2A. CLUSTER + SCORE  (temp=0.5)       |<------| correction via meta-     |
+  |    - 8-dim scoring (0-10 each)         |       | learned multipliers      |
+  |    - Composite = weighted sum + 3.0    |       | (0.5-1.5 per dimension)  |
+  |    - Select top N                      |       |                          |
+  |                                        |       | «Novelty Scoring»        |
+  |  2B. COMPARATIVE RE-RANK              |       | When generations > 1,    |
+  |    - Pairwise comparison of top N      |       | adds novelty dimension   |
+  |    - Correct rank-order biases         |       | to prevent convergence   |
+  |                                        |       +==========================+
+  |  2C. ENRICH                            |
+  |    - Target persona (who/pain/context) |
+  |    - «Assumption Inversion» per claim  |
+  |    - «Moat Gate» + defensibility check |
+  |    - ICP (first customer profile)      |
+  |    - Post-LLM: «score spread stretch», |
+  |      «effort diversity enforcement»,   |
+  |      «calibration multipliers»         |
   |                                        |
   |  Output: IdeaCard[] (top N, ranked)    |
   +==================+=====================+
@@ -515,17 +516,20 @@ Memory files have retention caps to prevent unbounded growth over hundreds of ru
   |  |  Timing, Defensibility, Expertise gap                      | |
   |  |  + 1 freeform devastating attack                           | |
   |  |                                                            | |
-  |  |  +--- Adaptive Weights ----------------------+             | |
-  |  |  | Attack angles that historically kill more |             | |
-  |  |  | ideas are weighted MORE heavily. Learned  |             | |
-  |  |  | from cross-run kill patterns.             |             | |
-  |  |  +------------------------------------------+             | |
+  |  |  «Adaptive Weights» — high-kill-rate angles                | |
+  |  |  weighted more heavily (learned cross-run)                 | |
+  |  |                                                            | |
+  |  |  «Confidence Scoring» — LLM rates attack                  | |
+  |  |  certainty 0.0-1.0. Low-confidence KILLs                  | |
+  |  |  downgraded to MUTATE.                                     | |
   |  |                                                            | |
   |  |  Judge renders per-idea:                                   | |
   |  |    - Feasibility matrix (9 dims, 1-5 scale)               | |
   |  |    - Kill criteria (abort conditions)                      | |
   |  |    - Verdict: BUILD / MUTATE / KILL / INCUBATE             | |
-  |  |  On API crash: INCUBATE + error_source="api_crash"         | |
+  |  |                                                            | |
+  |  |  «Fidelity Monitor» — API crash → INCUBATE +              | |
+  |  |    error_source="api_crash" (not a genuine verdict)        | |
   |  +-----------------------------------------------------------+ |
   +=========================+=======================================+
                             |
@@ -551,23 +555,21 @@ Memory files have retention caps to prevent unbounded growth over hundreds of ru
   |  |                                  |  from cross-run archive   |
   |  |  3. CROSSOVER                    |  inform the process.      |
   |  |     Combine mechanism from A     |                           |
-  |  |     with audience from B         |                           |
-  |  |     (2-3 hybrid offspring)       |                           |
-  |  |                                  |                           |
-  |  |  4. NOVELTY EXPLORER             |  Maximally different from |
-  |  |     Generate ideas unlike ALL    |  all survivors to prevent |
-  |  |     survivors (2-3 new ideas)    |  convergence to a local   |
-  |  |                                  |  optimum.                 |
-  |  |                                  |                           |
-  |  |  5. GENE RECOMBINATION           |  If idea genes exist from |
-  |  |     Transplant proven patterns   |  previous runs, inject    |
-  |  |     into new contexts            |  them into crossovers.    |
+  |  |     with audience from B         |  «Gene Recombination»     |
+  |  |     (2-3 hybrid offspring)       |  Proven patterns from     |
+  |  |                                  |  past runs transplanted   |
+  |  |  4. NOVELTY EXPLORER             |  into crossover + novelty |
+  |  |     Generate ideas unlike ALL    |  offspring.               |
+  |  |     survivors (2-3 new ideas)    |                           |
   |  +----------------------------------+                           |
+  |                                                                 |
+  |  «Attack Pattern Recycling» — most lethal attack patterns       |
+  |  from stress tests injected as mutation priorities.             |
   |                                                                 |
   |  Evolved ideas → CONVERGE → STRESS TEST → next generation      |
   |                                                                 |
-  |  Verdict override: MUTATE ideas that survive 5+ attacks with    |
-  |  ≤1 fatal get promoted to BUILD (battle-hardened).              |
+  |  «BUILD Override» — MUTATE ideas surviving 5+ attacks with     |
+  |  ≤1 fatal promoted to BUILD (battle-hardened).                  |
   +=================================================================+
                             |
                             | (loops back to CONVERGE + STRESS TEST
@@ -621,7 +623,10 @@ Memory files have retention caps to prevent unbounded growth over hundreds of ru
   |    - Technique weights                 |  |
   |    - Failure taxonomy                  |  |
   |    - Refinement history                |  |
-  |    - Run metrics                       +--+
+  |    - Run metrics + cost_usd            +--+
+  |                                        |
+  |  «Memory Pruning» — retention caps:    |
+  |  ideas(500) kills(200) genes(100)      |
   +==================+=====================+
                      |
                      v
@@ -677,7 +682,7 @@ Cross-session learning. Reads accumulated data from all previous runs: score dis
 Analyzes constraints for logical contradictions. Warns about conflicts and suggests resolutions. Non-blocking.
 
 **Phase 1 — DIVERGE**
-Raw idea generation using six techniques: Domain Scan, Cross-Domain Collision, Contrarian Inversion, Contextual Constraints, AI-Augmentable Gap Detection, and Mechanism Stealing. Each technique is weighted by meta-learning: techniques that historically produce more BUILD ideas are emphasized, while poor-performing techniques are dampened. Idea genes from high-scoring past ideas are injected as recombination material — proven solution patterns transplanted into new domains.
+Raw idea generation using six techniques: Domain Scan, Cross-Domain Collision, Contrarian Inversion, Contextual Constraints, AI-Augmentable Gap Detection, and Mechanism Stealing. Runs as 3 parallel async streams with different technique emphasis for broader creative coverage. Each technique is weighted by meta-learning: techniques that historically produce more BUILD ideas are emphasized. Kill reasons from past runs are injected as AVOID constraints. Idea genes from high-scoring past ideas are injected as recombination material.
 
 **Phase 1b — DEDUP** (Semantic Deduplication)
 Collapses near-identical ideas and identifies over-represented themes and gap areas.
@@ -685,22 +690,22 @@ Collapses near-identical ideas and identifies over-represented themes and gap ar
 **Phase 1c — DIVERGE GAP-FILL**
 Generates new ideas specifically for gap areas at higher creativity (temperature=0.95), avoiding over-represented themes.
 
-**Phase 2 — CONVERGE**
-Clusters, scores, and ranks. Output format adapts to brief type (product, internal tool, process). Each idea gets a target persona, ICP, 8-dimension scoring with reasoning, inverse fragility check, and moat check. When running multi-generation evolution, a novelty dimension is added that rewards ideas solving problems in genuinely new ways — preventing evolutionary convergence to a local optimum. Scores are calibrated post-LLM using meta-learning multipliers.
+**Phase 2 — CONVERGE** (3 sub-phases: Cluster+Score → Compare → Enrich)
+Clusters, scores, and ranks. Output format adapts to brief type (product, internal tool, process). Sub-phase 2A clusters and scores with 8 dimensions. Sub-phase 2B does pairwise comparative re-ranking. Sub-phase 2C enriches with personas, ICPs, assumption inversion (fragility flags), and moat checks. When running multi-generation evolution, a novelty dimension is added to prevent convergence. Scores are calibrated post-LLM using meta-learning multipliers.
 
 Scoring dimensions: Impact (25%), Confidence (20%), Sustainability (10%), Defensibility (10%), Market Timing (5%), Effort (-10%), Cost (-10%), Ethical Risk (-10%). Composite = weighted sum + 3.0, clamped to [0, 10].
 
 **Phase 3 — STRESS TEST**
-Adversarial attack with adaptive weights. Each idea tested in parallel via async API calls. Web search finds real prior art per idea before attacking. 9 structured attack angles + 1 freeform. Attack angles that historically kill more ideas (learned from cross-run patterns) are weighted more heavily. Produces feasibility matrix (9 dims, 1-5), kill criteria, and verdict (BUILD/MUTATE/KILL/INCUBATE).
+Adversarial attack with adaptive weights. Each idea tested in parallel via async API calls. Web search finds real prior art per idea before attacking. 9 structured attack angles + 1 freeform. Attack angles that historically kill more ideas are weighted more heavily. LLM self-rates attack confidence (0.0–1.0); low-confidence KILLs are downgraded to MUTATE. API crashes produce INCUBATE with fidelity tracking. Produces feasibility matrix (9 dims, 1-5), kill criteria, and verdict (BUILD/MUTATE/KILL/INCUBATE).
 
 **Phase 3.5 — EVOLVE** (when `--generations > 1`)
-The evolutionary engine. For each generation after the first, applies four operators to survivors: (1) **Elite carry-forward** — top BUILD ideas survive unchanged as anchors. (2) **Mutation** — each MUTATE idea gets its suggested fix applied, informed by the cross-run mutation archive. (3) **Crossover** — combines the mechanism of one high-scorer with the audience of another, producing hybrid offspring. (4) **Novelty explorer** — generates ideas maximally different from all survivors, preventing the population from collapsing to a single niche. Idea genes from past runs are recombined into crossover and novelty ideas. Each generation's offspring go through CONVERGE and STRESS TEST again. MUTATE ideas that survive 5+ attacks with ≤1 fatal get promoted to BUILD (battle-hardened through evolutionary pressure).
+The evolutionary engine. For each generation after the first, applies four operators to survivors: (1) **Elite carry-forward** — top BUILD ideas survive unchanged as anchors. (2) **Mutation** — each MUTATE idea gets its suggested fix applied, informed by the cross-run mutation archive. (3) **Crossover** — combines the mechanism of one high-scorer with the audience of another, producing hybrid offspring. (4) **Novelty explorer** — generates ideas maximally different from all survivors. Idea genes from past runs are recombined. Most lethal attack patterns from stress tests are recycled as mutation priorities. Each generation's offspring go through CONVERGE and STRESS TEST again. MUTATE ideas that survive 5+ attacks with ≤1 fatal get promoted to BUILD.
 
 **Phase 4 — REFINE** (automatic, if no BUILD verdicts)
 Up to 3 refinement rounds. Extracts mutations, attack patterns, failure blocklist, and problem reframes from previous round. Re-generates with progressively lower creativity and fewer ideas. Stops when BUILD found or 3 rounds exhausted.
 
 **Phase 5 — MEMORY UPDATE** (automatic, end of every run)
-Persists idea archive, kill log, mutation archive (for cross-run mutation learning), attack patterns, failure taxonomy, domain heat map, lineage, idea genes (score ≥ 6.5), technique weights, refinement history, and run metrics. All data feeds back into future runs via META-LEARN.
+Persists idea archive, kill log, mutation archive (for cross-run mutation learning), attack patterns, failure taxonomy, domain heat map, lineage, idea genes (score ≥ 6.5), technique weights, refinement history, run metrics, and per-run cost. All data feeds back into future runs via META-LEARN. Memory files have retention caps to prevent unbounded growth.
 
 </details>
 
