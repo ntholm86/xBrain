@@ -8,7 +8,7 @@ from pathlib import Path
 
 from xbrain.config import Config
 from xbrain.llm import LLMClient
-from xbrain.log import log as _log, log_llm_call, log_ok as _log_ok, log_detail as _log_detail
+from xbrain.log import log as _log, log_llm_call, log_ok as _log_ok, log_detail as _log_detail, escape as _esc
 from xbrain.prompts import SPECIFY_SYSTEM, SPECIFY_USER
 
 
@@ -38,7 +38,7 @@ class SpecifyPipeline:
                 f"Idea '{idea_id}' not found. Available: {', '.join(available)}"
             )
 
-        _log("SPECIFY", f"Generating spec for: {card.get('title', idea_id)}")
+        _log("SPECIFY", f"Generating spec for: [accent]{_esc(card.get('title', idea_id))}[/accent]")
 
         # Load stress test results if available
         stress_data = {}

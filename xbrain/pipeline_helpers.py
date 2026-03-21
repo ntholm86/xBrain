@@ -47,7 +47,7 @@ def apply_calibration(
         c.composite_score = compute_composite_score(sb)
         c.scoring_calibration_status = "calibrated"
     candidates.sort(key=lambda c: c.composite_score, reverse=True)
-    _log_detail(tag, f"Calibration applied: {multipliers}")
+    _log_detail(tag, f"Calibration applied: [score]{multipliers}[/score]")
     return "CALIBRATED"
 
 

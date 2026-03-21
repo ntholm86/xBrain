@@ -4885,5 +4885,142 @@
       "personalization",
       "productivity"
     ]
+  },
+  {
+    "id": "alt-004",
+    "title": "Silence Certification Standard (ISO-style for Spaces)",
+    "score": 7.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "certification",
+      "luxury_branding",
+      "accessibility_as_premium",
+      "disability_employment"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Silence Disruption Insurance & Breach Prediction",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "insurance",
+      "IoT",
+      "predictive_analytics",
+      "accessibility"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Quiet Commons: Subsidized Silence Access Program",
+    "score": 6.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "social_impact",
+      "economics",
+      "universal_access",
+      "nonprofit_partnerships"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "SilenceRx: Clinical Silence Outcomes Platform",
+    "score": 5.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "healthcare",
+      "clinical_outcomes",
+      "sensory_medicine",
+      "accessibility"
+    ]
+  },
+  {
+    "id": "xd-004",
+    "title": "Silence-Responsive Emergency Alert System for Deaf Communities",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "emergency_services",
+      "civic_infrastructure",
+      "accessibility",
+      "IoT",
+      "disability_employment"
+    ]
+  },
+  {
+    "id": "xd-003",
+    "title": "Disability-Centered Silence Certification Body: ISO-Like Standards for Authentic Quiet",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "standards_certification",
+      "disability_justice",
+      "architecture",
+      "governance"
+    ]
+  },
+  {
+    "id": "idea-001",
+    "title": "Sensory Deprivation Marketplace: Crowdsourced Silence Locations + B2B Infrastructure",
+    "score": 6.3,
+    "verdict": "BUILD",
+    "domains": [
+      "real_estate",
+      "accessibility",
+      "sensory_commerce",
+      "disability_employment",
+      "marketplace_infrastructure"
+    ]
+  },
+  {
+    "id": "gap-004",
+    "title": "Deaf Worker Organizing Toolkit: Collective Bargaining for Silence Accommodations",
+    "score": 5.6,
+    "verdict": "BUILD",
+    "domains": [
+      "labor_organizing",
+      "collective_action",
+      "workplace_justice",
+      "nonprofit_partnership",
+      "participatory_design"
+    ]
+  },
+  {
+    "id": "xd-486",
+    "title": "Royalty Forensics Audit Layer",
+    "score": 7.2,
+    "verdict": "MUTATE",
+    "domains": [
+      "music_economics",
+      "transparency",
+      "auditing",
+      "labor_rights",
+      "blockchain_verification"
+    ]
+  },
+  {
+    "id": "gap-003",
+    "title": "Decentralized Sampling Rights Clearance Engine",
+    "score": 6.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "rights_management",
+      "blockchain",
+      "legal_automation",
+      "sampling_clearance",
+      "web3"
+    ]
+  },
+  {
+    "id": "alt-002",
+    "title": "Collaborative Stem Matcher (Clash Finder)",
+    "score": 6.0,
+    "verdict": "BUILD",
+    "domains": [
+      "music",
+      "collaboration",
+      "recommendation_systems",
+      "network_effects"
+    ]
   }
 ]

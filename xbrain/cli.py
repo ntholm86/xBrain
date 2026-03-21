@@ -17,6 +17,8 @@ from xbrain.log import (
     log_detail as _log_detail,
     log_summary_line,
     fmt_verdict,
+    escape as _esc,
+    console,
 )
 
 
@@ -226,7 +228,7 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
             cheap_model=cfg.cheap_model,
             generations=cfg.generations,
         )
-        _log("DRY-RUN", "Pipeline 1: IDEATE")
+        _log("DRY-RUN", f"Pipeline 1: [accent]IDEATE[/accent]")
         _log_detail("DRY-RUN", f"Model:       {cfg.model}")
         _log_detail("DRY-RUN", f"Strategy:    {cfg.model_strategy}")
         _log_detail("DRY-RUN", f"Max tokens:  {cfg.max_tokens}")
@@ -237,14 +239,14 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
         _log_detail("DRY-RUN", f"Language:    {language or 'english'}")
         if brief_text:
             preview = brief_text[:200] + ("..." if len(brief_text) > 200 else "")
-            _log_detail("DRY-RUN", f"Brief:       {preview}")
+            _log_detail("DRY-RUN", f"Brief:       {_esc(preview)}")
         else:
             _log_detail("DRY-RUN", f"Brief:       (none — open-ended ideation)")
         _log_detail("DRY-RUN", f"Runs dir:    {cfg.runs_dir}")
         _log_detail("DRY-RUN", f"Memory dir:  {cfg.memory_dir}")
         _log_ok("DRY-RUN", f"Est. cost:   ${estimate['total_est_cost_usd']:.4f}")
         _log("DRY-RUN", "")
-        _log("DRY-RUN", "Phase breakdown:")
+        _log("DRY-RUN", f"[header]Phase breakdown:[/header]")
         for p in estimate["phases"]:
             _log_detail("DRY-RUN", f"  {p['phase']:<12s} {p['model']:<35s} ~${p['est_cost_usd']:.4f}")
         _log("DRY-RUN", "")
@@ -308,21 +310,21 @@ def _cmd_estimate(args: argparse.Namespace) -> None:
         generations=args.generations,
     )
 
-    _log("ESTIMATE", "xBrain Cost Estimate")
-    _log("ESTIMATE", "=" * 50)
+    _log("ESTIMATE", f"[header]xBrain Cost Estimate[/header]")
+    _log("ESTIMATE", f"[detail]{'=' * 50}[/detail]")
     _log_detail("ESTIMATE", f"Model:       {cfg.model}")
     _log_detail("ESTIMATE", f"Strategy:    {args.strategy}")
     _log_detail("ESTIMATE", f"Ideas:       {args.ideas}")
     _log_detail("ESTIMATE", f"Top N:       {args.top}")
     _log("ESTIMATE", "")
-    _log("ESTIMATE", "Phase breakdown:")
+    _log("ESTIMATE", f"[header]Phase breakdown:[/header]")
     for p in estimate["phases"]:
         _log_detail("ESTIMATE", f"  {p['phase']:<12s} {p['model']:<35s} ~${p['est_cost_usd']:.6f}")
     _log("ESTIMATE", "")
     _log_ok("ESTIMATE", f"TOTAL ESTIMATED COST: ${estimate['total_est_cost_usd']:.4f}")
     _log("ESTIMATE", "")
     # Compare strategies
-    _log("ESTIMATE", "Compare strategies:")
+    _log("ESTIMATE", f"[header]Compare strategies:[/header]")
     for strat in ["cheapest", "balanced", "best"]:
         est = IdeatePipeline.estimate_cost(
             model=cfg.model,
@@ -365,15 +367,21 @@ def _cmd_lineage(args: argparse.Namespace) -> None:
         return
 
     # Print table
-    log_summary_line(f"{'ID':<25s} {'Score':>5s}  {'Verdict':<8s} {'Run':<22s} {'Title'}")
-    log_summary_line("-" * 100)
+    from rich.table import Table
+    table = Table(show_header=True, header_style="bold", show_lines=False, pad_edge=False)
+    table.add_column("ID", style="dim", width=25)
+    table.add_column("Score", justify="right", width=5)
+    table.add_column("Verdict", width=8)
+    table.add_column("Run", style="dim", width=22)
+    table.add_column("Title")
     for entry in lineage:
         idea_id = entry.get("idea_id", "?")[:24]
         score = entry.get("score", 0)
         verdict = entry.get("verdict", "?")
         run_id = entry.get("run_id", "?")[:21]
         title = entry.get("title", "?")[:50]
-        log_summary_line(f"{idea_id:<25s} {score:5.1f}  {fmt_verdict(verdict):<18s} {run_id:<22s} {title}")
+        table.add_row(idea_id, f"{score:.1f}", fmt_verdict(verdict), run_id, _esc(title))
+    console.print(table)
 
     # Stats
     log_summary_line("")

@@ -465,6 +465,11 @@ assess whether that expertise is obtainable"
 strongest possible counter-argument in one sentence. Be fair — if the \
 idea has a genuine strength that neutralizes the attack, say so.
 
+3b. ATTACK OUTCOMES: For each attack angle, judge the result: \
+"survived" (defense neutralises attack), "fatal" (attack stands — idea \
+cannot survive this), or "weakened" (idea damaged but not destroyed). \
+Return as attack_outcomes array, one entry per structured attack, same order.
+
 4. FEASIBILITY (score each 1-5, where 5 is best/lowest risk):
    - technical_risk, data_availability, regulatory_risk, cost_infra_month
    - time_to_prototype, maintenance_burden, llm_capability_fit
@@ -516,6 +521,11 @@ Respond with ONLY valid JSON:
         "Prior art defense: ...",
         "Adoption defense: ...",
         "Technical defense: ..."
+      ],
+      "attack_outcomes": [
+        "survived",
+        "fatal",
+        "survived"
       ],
       "attacks_made": 9,
       "attacks_survived": 6,

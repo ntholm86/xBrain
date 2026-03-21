@@ -24,8 +24,7 @@ from xbrain.log import (
     log_summary_block,
     fmt_verdict,
     fmt_verdicts,
-    VERDICT_COLORS,
-    _C,
+    escape as _esc,
 )
 from xbrain.memory import MemoryStore
 from xbrain.models import (
@@ -179,12 +178,12 @@ class IdeatePipeline:
         run_dir.mkdir(parents=True, exist_ok=True)
 
         t0 = time.monotonic()
-        _log("IDEATE", f"Pipeline 1 started.  Run ID: {run_id}")
+        _log("IDEATE", f"Pipeline 1 started.  Run ID: [bold]{_esc(run_id)}[/bold]")
         if brief_text:
             preview = brief_text[:120] + ("..." if len(brief_text) > 120 else "")
-            _log_detail("IDEATE", f"Brief: {preview}")
+            _log_detail("IDEATE", f"Brief: {_esc(preview)}")
         if constraints:
-            _log_detail("IDEATE", f"Constraints: {', '.join(constraints)}")
+            _log_detail("IDEATE", f"Constraints: {_esc(', '.join(constraints))}")
         if language:
             _log_detail("IDEATE", f"Language: {language}")
         if self.cfg.model_strategy != "single":
@@ -421,60 +420,68 @@ class IdeatePipeline:
 
         sorted_survivors = sorted(result.survivors, key=lambda c: c.composite_score, reverse=True)
 
+        # ── Build verdict-labeled top ideas for the summary ────────
+        _verdict_style_map = {
+            "BUILD": "verdict.build",
+            "MUTATE": "verdict.mutate",
+            "KILL": "verdict.kill",
+            "INCUBATE": "verdict.incubate",
+        }
+
         lines = [
             "",
-            f"{_C.BOLD}{_C.WHITE}{'=' * 60}{_C.RESET}",
-            f"{_C.BOLD}{_C.WHITE}  xBrain Pipeline Complete{_C.RESET}",
-            f"{_C.BOLD}{_C.WHITE}{'=' * 60}{_C.RESET}",
+            f"[header]{'=' * 60}[/header]",
+            f"[header]  xBrain Pipeline Complete[/header]",
+            f"[header]{'=' * 60}[/header]",
             "",
-            f"  Ideas generated:  {len(result.raw_ideas)}",
-            f"  After scoring:    {len(result.candidates)}",
-            f"  Verdicts:         {fmt_verdicts(final_counts)}",
+            f"  [detail]Ideas generated:[/detail]  [bold]{len(result.raw_ideas)}[/bold]",
+            f"  [detail]After scoring:[/detail]    [bold]{len(result.candidates)}[/bold]",
+            f"  [detail]Verdicts:[/detail]         {fmt_verdicts(final_counts)}",
         ]
         if refinement_round > 0:
-            lines.append(f"  Refinement:       {refinement_round} round(s)")
+            lines.append(f"  [detail]Refinement:[/detail]       [evolve]{refinement_round} round(s)[/evolve]")
         if self.cfg.generations > 1:
-            lines.append(f"  Generations:      {self.cfg.generations}")
+            lines.append(f"  [detail]Generations:[/detail]      [evolve]{self.cfg.generations}[/evolve]")
         # Fidelity monitor: surface overrides and crashes
         crash_count = sum(1 for s in result.stress_test_results if s.error_source == "api_crash")
         if crash_count:
-            lines.append(f"  {_C.YELLOW}API crashes:    {crash_count} (verdicts are INCUBATE, not genuine){_C.RESET}")
+            lines.append(f"  [warn]API crashes:    {crash_count} (verdicts are INCUBATE, not genuine)[/warn]")
         lines.append("")
 
         final_pass = final_build + final_mutate
         if sorted_survivors:
-            lines.append("  Top ideas:")
+            lines.append(f"  [bold]Top ideas:[/bold]")
             for i, c in enumerate(sorted_survivors[:5]):
                 verdict = c.stress_test_verdict or "?"
                 emoji = {"BUILD": "+", "MUTATE": "~", "KILL": "x", "INCUBATE": "?"}.get(verdict, " ")
-                vc = VERDICT_COLORS.get(verdict, "")
-                lines.append(f"    {vc}[{emoji}]{_C.RESET} #{i+1}  {c.composite_score:.1f}  {c.title}")
+                vs = _verdict_style_map.get(verdict, "")
+                if vs:
+                    lines.append(f"    [{vs}]\\[{emoji}][/{vs}] #{i+1}  {c.composite_score:.1f}  {_esc(c.title)}")
+                else:
+                    lines.append(f"    \\[{emoji}] #{i+1}  {c.composite_score:.1f}  {_esc(c.title)}")
             lines.append("")
 
         elapsed = time.monotonic() - t0
         mins, secs = divmod(int(elapsed), 60)
         lines += [
-            f"  {_C.DIM}Output directory: {run_dir}{_C.RESET}",
-            f"    {_C.DIM}idea-report.md           Human-readable ranked report{_C.RESET}",
-            f"    {_C.DIM}idea-cards.json          Machine-readable Idea Cards{_C.RESET}",
-            f"    {_C.DIM}idea-log.json            Full pipeline trace{_C.RESET}",
-            f"    {_C.DIM}stress-test-report.json  Adversarial debate results{_C.RESET}",
+            f"  [detail]Output directory: {run_dir}[/detail]",
+            f"    [detail]idea-report.md           Human-readable ranked report[/detail]",
+            f"    [detail]idea-cards.json          Machine-readable Idea Cards[/detail]",
+            f"    [detail]idea-log.json            Full pipeline trace[/detail]",
+            f"    [detail]stress-test-report.json  Adversarial debate results[/detail]",
             "",
-            f"  {_C.DIM}Elapsed: {mins}m {secs}s{_C.RESET}",
-            f"  {_C.DIM}Tokens:  {result.total_input_tokens:,} in / {result.total_output_tokens:,} out{_C.RESET}",
-            f"  {_C.DIM}Cost:    ${cost_info['total_cost_usd']:.4f}{_C.RESET}",
+            f"  [detail]Elapsed:[/detail] {mins}m {secs}s",
+            f"  [detail]Tokens:[/detail]  {result.total_input_tokens:,} in / {result.total_output_tokens:,} out",
+            f"  [detail]Cost:[/detail]    [ok]${cost_info['total_cost_usd']:.4f}[/ok]",
             "",
         ]
 
         if final_pass > 0:
             best = next((c for c in sorted_survivors if c.stress_test_verdict in ("BUILD", "MUTATE")), sorted_survivors[0])
-            lines.append(f"  Next step:")
-            lines.append(f"    python -m xbrain specify --idea {run_dir}/idea-cards.json --select {best.id}")
+            lines.append(f"  [bold]Next step:[/bold]")
+            lines.append(f"    [accent]python -m xbrain specify --idea {run_dir}/idea-cards.json --select {best.id}[/accent]")
         else:
-            if final_pass > 0:
-                lines.append(f"  {final_pass} idea(s) passed stress testing. Review report for details.")
-            else:
-                lines.append(f"  No passing verdicts. Review ideas or re-run with different constraints.")
+            lines.append(f"  [warn]No passing verdicts.[/warn] Review ideas or re-run with different constraints.")
 
         lines.append("")
         log_summary_block(lines)
@@ -491,7 +498,7 @@ class IdeatePipeline:
         if runs_since < 3:
             return  # Not enough new data to justify distillation
 
-        _log("META", f"Distilling playbook from {runs_since} new runs...")
+        _log("META", f"Distilling playbook from [evolve]{runs_since}[/evolve] new runs...")
 
         # Gather compact data for distillation
         score_history = self.memory.get_score_history_compact()
@@ -557,7 +564,7 @@ class IdeatePipeline:
 
     def _phase_check_constraints(self, constraints: list[str]) -> None:
         """Detect contradictions in user-specified constraints before running the pipeline."""
-        _log("CONSTCHK", f"Checking {len(constraints)} constraints for conflicts...")
+        _log("CONSTCHK", f"Checking [warn]{len(constraints)}[/warn] constraints for conflicts...")
 
         prompt = CONSTRAINT_CHECK_USER.format(
             constraint_count=len(constraints),
@@ -595,7 +602,7 @@ class IdeatePipeline:
         constraints: list[str] | None,
         brief_text: str | None = None,
     ) -> list[RawIdea]:
-        _log("DIVERGE", "Generating raw idea seeds (3 parallel streams)...")
+        _log("DIVERGE", f"Generating raw idea seeds ([ok]3 parallel streams[/ok])...")
 
         domain_ctx = build_domain_context()
         constraint_ctx = build_constraint_context(constraints)
@@ -691,7 +698,7 @@ class IdeatePipeline:
         if len(raw_ideas) < 4:
             return raw_ideas, [], []
 
-        _log("DEDUP", f"Analyzing {len(raw_ideas)} ideas for duplicates...")
+        _log("DEDUP", f"Analyzing [score]{len(raw_ideas)}[/score] ideas for duplicates...")
 
         ideas_json = json.dumps(
             [{"id": i.id, "concept": i.concept, "domain_tags": i.domain_tags}
@@ -748,7 +755,7 @@ class IdeatePipeline:
         """Multi-turn divergence: generate new ideas to fill gaps from round 1."""
         # Cap at half of original idea count to keep total manageable
         gap_count = min(len(gaps) + 2, max(3, self.cfg.ideas_per_round // 2))
-        _log("DIVERGE", f"Round 2 -- gap-filling {len(gaps)} gaps with {gap_count} new ideas...")
+        _log("DIVERGE", f"Round 2 -- gap-filling [ok]{len(gaps)}[/ok] gaps with [ok]{gap_count}[/ok] new ideas...")
 
         prompt = DIVERGE_GAPFILL_USER.format(
             idea_count=gap_count,
@@ -785,7 +792,7 @@ class IdeatePipeline:
         return gap_ideas
 
     def _phase_converge(self, raw_ideas: list[RawIdea]) -> list[IdeaCard]:
-        _log("CONVERGE", f"Decomposed scoring pipeline for {len(raw_ideas)} ideas...")
+        _log("CONVERGE", f"Decomposed scoring pipeline for [score]{len(raw_ideas)}[/score] ideas...")
 
         # ── Sub-phase 2A: CLUSTER + INITIAL SCORE ────────────────
         _log_detail("CONVERGE", "[2A] Clustering and initial scoring...")
@@ -974,8 +981,8 @@ class IdeatePipeline:
         _log_ok("CONVERGE", f"{len(candidates)} candidates scored.  ({cal_status})")
         for i, c in enumerate(candidates[:5]):
             sc = c.composite_score
-            _sc_color = _C.GREEN if sc >= 7.5 else (_C.YELLOW if sc >= 5.0 else _C.RED)
-            _log("CONVERGE", f"  #{i+1} {_sc_color}[{sc:.1f}]{_C.RESET} \"{c.title}\"")
+            _sc_style = "ok" if sc >= 7.5 else ("warn" if sc >= 5.0 else "error")
+            _log("CONVERGE", f"  #{i+1} [{_sc_style}]\\[{sc:.1f}][/{_sc_style}] \"{_esc(c.title)}\"")
             _log_detail("CONVERGE", f"       Domains: {', '.join(c.domain_tags)}")
             if c.primary_persona.who:
                 _log_detail("CONVERGE", f"       Persona: {c.primary_persona.who}")
@@ -985,7 +992,7 @@ class IdeatePipeline:
         return candidates
 
     def _phase_stress_test(self, candidates: list[IdeaCard]) -> list[StressTestResult]:
-        _log("STRESS", f"Adversarial stress test for {len(candidates)} candidates (parallel)...")
+        _log("STRESS", f"Adversarial stress test for [error]{len(candidates)}[/error] candidates (parallel)...")
         _log("STRESS", "")
 
         # Build per-idea compact dicts once (slim: no persona/score_breakdown to save tokens)
@@ -1017,7 +1024,7 @@ class IdeatePipeline:
                     _log_detail("STRESS", f"  {c.title[:40]}: {len(results)} results")
 
         # ── Single round: Attack + Feasibility + Verdict (parallel across ideas) ──
-        _log("STRESS", f"Attacking {len(candidates)} candidates ({len(candidates)} parallel calls)...")
+        _log("STRESS", f"Attacking [bold red]{len(candidates)}[/bold red] candidates ({len(candidates)} parallel calls)...")
         _attack_total = len(candidates)
         _attack_done = 0
         _attack_t0 = time.monotonic()
@@ -1080,17 +1087,16 @@ class IdeatePipeline:
             # Build debate rounds from attack + defense pairs
             debate_rounds: list[DebateExchange] = []
             defenses = ar.defenses or []
+            outcomes = getattr(ar, "attack_outcomes", None) or []
             for i, attack_text in enumerate(ar.structured_attacks):
                 angle = angles[i] if i < len(angles) else f"Attack {i+1}"
                 defense_text = defenses[i] if i < len(defenses) else ""
-
-                # Determine outcome based on whether this attack is fatal
-                # Use survived/fatal counts from the LLM's own assessment
+                outcome = outcomes[i] if i < len(outcomes) else ""
                 debate_rounds.append(DebateExchange(
                     angle=angle,
                     attack=attack_text,
                     defense=defense_text,
-                    outcome="",  # No separate outcome per angle in single-round mode
+                    outcome=outcome,
                 ))
 
             fm_raw = ar.feasibility_matrix or {}
@@ -1274,7 +1280,7 @@ class IdeatePipeline:
         - Iteration 1: Extract top mutations + attack patterns
         - Iteration 2+: Extract more patterns, tighter constraints, lower creativity
         """
-        _log("REFINE", f"Refinement Iteration {iteration}: Analyzing failures and learning patterns...")
+        _log("REFINE", f"Refinement Iteration [evolve]{iteration}[/evolve]: Analyzing failures and learning patterns...")
 
         # Extract mutations from MUTATE ideas (suggest specific improvements)
         mutations = []

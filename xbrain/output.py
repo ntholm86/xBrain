@@ -15,18 +15,11 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
 
     # Header
     lines.append("# xBrain Idea Report")
-    lines.append("")
-    lines.append(f"**Run ID:** `{result.run_id}`")
-    lines.append(f"**Date:** {result.timestamp[:10]}")
+    lines.append(f"**Run ID:** `{result.run_id}` | **Date:** {result.timestamp[:10]}")
     if result.brief_text:
-        lines.append("")
-        lines.append("**Original Brief:**")
         lines.append(f"> {result.brief_text}")
-        lines.append("")
     if result.constraints:
         lines.append(f"**Constraints:** {', '.join(result.constraints)}")
-    lines.append("")
-    lines.append("---")
     lines.append("")
 
     # Summary
@@ -35,26 +28,22 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         verdicts[s.verdict] = verdicts.get(s.verdict, 0) + 1
 
     lines.append("## Summary")
-    lines.append(f"- **Ideas Generated:** {len(result.raw_ideas)}")
-    lines.append(f"- **After Scoring:** {len(result.candidates)}")
+    lines.append(f"- **Generated:** {len(result.raw_ideas)} | **Scored:** {len(result.candidates)}")
     verdict_str = ", ".join(f"{_verdict_emoji(k)} {v} {k}" for k, v in sorted(verdicts.items()))
     lines.append(f"- **Verdicts:** {verdict_str}")
     # Determine calibration status from candidates
     cal_statuses = {c.scoring_calibration_status for c in result.survivors if c.scoring_calibration_status}
     cal_status = "CALIBRATED" if "calibrated" in cal_statuses else "UNCALIBRATED"
     lines.append(f"- **Scoring Status:** {cal_status}")
-    lines.append(
-        f"- **Tokens Used:** {result.total_input_tokens:,} in / "
-        f"{result.total_output_tokens:,} out"
-    )
+    tokens_line = f"- **Tokens:** {result.total_input_tokens:,} in / {result.total_output_tokens:,} out"
     if cost_info:
-        lines.append(f"- **Actual Cost:** ${cost_info['total_cost_usd']:.4f}")
-    lines.append("")
+        tokens_line += f" | **Cost:** ${cost_info['total_cost_usd']:.4f}"
+    lines.append(tokens_line)
 
     # Per-phase cost breakdown table
     if cost_info and cost_info.get("phases"):
-        lines.append("### Cost Breakdown")
         lines.append("")
+        lines.append("### Cost Breakdown")
         # Aggregate by phase
         phase_agg: dict[str, dict] = {}
         for p in cost_info["phases"]:
@@ -74,7 +63,6 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
                 f"{agg['input']:,} | {agg['output']:,} | "
                 f"${agg['cost']:.4f} |"
             )
-        lines.append("")
 
     # Sort survivors for comparative summary
     sorted_survivors = sorted(result.survivors, key=lambda c: c.composite_score, reverse=True)
@@ -100,7 +88,6 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
             lines.append(f"- **Highest Confidence:** {highest_conf.title} ({best_confidence:.1f})")
         
         # Effort-Impact Quadrant
-        lines.append("")
         lines.append("### Effort-Impact Quadrant")
         effort_threshold = 5.0  # Low effort threshold
         impact_threshold = 7.5  # High impact threshold
@@ -117,27 +104,23 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
             lines.append(f"- **Blue Sky** (Interesting but lower priority): {', '.join(c.title for c in low_impact[:2])}")
         
     lines.append("")
-    lines.append("---")
-    lines.append("")
 
     # Domain briefs summary (if immerse ran)
     if result.domain_briefs:
+        lines.append("---")
         lines.append("## Domain Briefs")
         for brief in result.domain_briefs:
             lines.append(f"### {brief.domain.title()}")
             lines.append(f"{brief.summary}")
             if brief.pressure_points:
-                lines.append("")
                 lines.append("**Pressure Points:**")
                 for pp in brief.pressure_points:
                     lines.append(f"- {pp}")
             lines.append("")
-        lines.append("---")
-        lines.append("")
 
     # Ideas at a Glance
+    lines.append("---")
     lines.append("## Ideas at a Glance")
-    lines.append("")
     # Add Gen column only when multi-generation run
     has_evolution = any(c.generation > 1 for c in sorted_survivors)
     if has_evolution:
@@ -157,13 +140,11 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
             lines.append(f"| {i+1} | {title_cell} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict_display} | {card.generation} |")
         else:
             lines.append(f"| {i+1} | {title_cell} | {card.composite_score:.1f} | {card.estimated_effort} | {verdict_display} |")
-    lines.append("")
-    lines.append("---")
-    lines.append("")
 
     # Detailed cards
-    lines.append("## Ideas")
     lines.append("")
+    lines.append("---")
+    lines.append("## Ideas")
 
     for i, card in enumerate(sorted_survivors):
         stress = stress_map.get(card.id)
@@ -174,18 +155,13 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
 
         lines.append(f"### {emoji} #{i+1}: {card.title}  (Score: {card.composite_score:.1f})")
         lines.append(f"**Verdict: {emoji} {verdict}**")
-        lines.append("")
         lines.append(f"> {card.elevator_pitch or card.rationale}")
-        lines.append("")
 
         # Quick Reference Card
         sb = card.score_breakdown
-        lines.append("**Quick Reference:**")
         cost_label = card.cost_context if card.cost_context else "monthly"
-        lines.append(f"- **Composite Score:** {card.composite_score:.1f} | **Effort:** {card.estimated_effort} | **Cost:** ${card.estimated_cost_usd_month:.0f} ({cost_label})")
         market_snippet = (card.market_timing_notes[:60] + "...") if card.market_timing_notes and len(card.market_timing_notes) > 60 else (card.market_timing_notes or "TBD")
-        lines.append(f"- **Novelty:** {card.novelty_score:.2f} | **Confidence:** {sb.confidence:.1f}/10 | **Timing:** {market_snippet}")
-        lines.append("")
+        lines.append(f"**Score:** {card.composite_score:.1f} | **Effort:** {card.estimated_effort} | **Cost:** ${card.estimated_cost_usd_month:.0f} ({cost_label}) | **Novelty:** {card.novelty_score:.2f} | **Confidence:** {sb.confidence:.1f}/10 | **Timing:** {market_snippet}")
 
         # Persona
         p = card.primary_persona
@@ -196,27 +172,18 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
             lines.append(f"- **Context:** {p.context}")
         if p.motivation:
             lines.append(f"- **Motivation:** {p.motivation}")
-        lines.append("")
 
         # First Customer Profile (ICP)
         icp = card.first_customer_profile
         if icp:
-            lines.append("**First Customer Profile (ICP):**")
-            lines.append(f"- **Type:** {icp.get('type', 'Early adopter with acute pain point')}")
-            lines.append(f"- **Size:** {icp.get('size', 'Varies')}")
-            lines.append(f"- **Readiness:** {icp.get('readiness', 'High technical literacy')}")
+            lines.append(f"**ICP:** {icp.get('type', 'Early adopter')} | Size: {icp.get('size', 'Varies')} | Readiness: {icp.get('readiness', 'High')}")
             if icp.get("why_first"):
                 lines.append(f"- **Why First:** {icp['why_first']}")
         else:
-            lines.append("**First Customer Profile (ICP):**")
-            lines.append("- **Type:** Early adopter with acute pain point in domain")
-            lines.append("- **Size:** Varies")
-            lines.append("- **Readiness:** High technical literacy, willing to pilot new tools")
-        lines.append("")
+            lines.append("**ICP:** Early adopter with acute pain point | Size: Varies | Readiness: High")
 
         # Score table
         _append_score_table(lines, card)
-        lines.append("")
 
         # Key Assumptions
         lines.append("**Key Assumptions (Critical Unknowns):**")
@@ -242,33 +209,28 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
             lines.append("1. Core value proposition resonates with target persona")
             lines.append("2. Technical approach is feasible within stated effort")
             lines.append("3. No blocking regulatory or legal constraints")
-        lines.append("")
 
         # Stress test details
         if stress:
             _append_stress_details(lines, stress)
-            lines.append("")
 
         # Competitive Landscape
         if card.defensibility_notes:
-            lines.append("**Competitive Landscape:**")
-            lines.append(f"- {card.defensibility_notes}")
-            lines.append("")
+            lines.append(f"**Competitive Landscape:** {card.defensibility_notes}")
 
         # Meta (trimmed — effort/cost/novelty already in Quick Reference)
-        lines.append(f"**Domains:** {', '.join(card.domain_tags)}")
-        lines.append(f"**Source:** {card.source_technique}")
+        meta_parts = [f"Domains: {', '.join(card.domain_tags)}", f"Source: {card.source_technique}"]
         if card.generation > 1:
-            lines.append(f"**Generation:** {card.generation}")
+            meta_parts.append(f"Gen: {card.generation}")
             if card.evolution_rationale:
-                lines.append(f"**Evolution Operator:** {card.evolution_rationale}")
+                meta_parts.append(f"Evolution: {card.evolution_rationale}")
             if card.parent_ideas:
-                lines.append(f"**Parent Ideas:** {', '.join(card.parent_ideas)}")
+                meta_parts.append(f"Parents: {', '.join(card.parent_ideas)}")
+        lines.append(f"**{' | '.join(meta_parts)}**")
         if card.sustainability_model:
             lines.append(f"**Sustainability:** {card.sustainability_model}")
         lines.append("")
         lines.append("---")
-        lines.append("")
 
     # Next steps
     _append_next_steps(lines, result)
@@ -327,18 +289,15 @@ def _append_score_table(lines: list[str], card: IdeaCard) -> None:
         lines.append(f"| **Composite** | **{card.composite_score:.1f}** | |")
 
     if card.inverse_terrible_conditions:
-        lines.append("")
         lines.append(f"**Inverse Score (Fragility Check):** {card.inverse_confidence:.1f}/10")
-        lines.append("")
         for cond in card.inverse_terrible_conditions:
             lines.append(f"- [!] {cond}")
 
 
 def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
-    lines.append("**Stress Test:**")
     lines.append(
-        f"- Attacks: {stress.attacks_made} | Survived: {stress.attacks_survived} "
-        f"| Fatal: {stress.attacks_fatal}"
+        f"**Stress Test:** Attacks: {stress.attacks_made} | "
+        f"Survived: {stress.attacks_survived} | Fatal: {stress.attacks_fatal}"
     )
     if stress.strongest_argument:
         lines.append(f"- **Strongest Attack:** {stress.strongest_argument}")
@@ -346,12 +305,10 @@ def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
         lines.append(f"- **Strongest Defense:** {stress.strongest_defense}")
     if stress.suggested_mutation:
         lines.append(f"- **Suggested Mutation:** {stress.suggested_mutation}")
-    lines.append("")
 
     # Adversarial Debate (compact table + fatal expansions)
     if stress.debate_rounds:
         lines.append("#### Adversarial Debate")
-        lines.append("")
         lines.append("| # | Angle | Result |")
         lines.append("|---|-------|--------|")
         fatal_rounds = []
@@ -367,7 +324,6 @@ def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
             else:
                 result_badge = outcome_raw or "—"
             lines.append(f"| {idx} | {rnd.angle} | {result_badge} |")
-        lines.append("")
 
         # Expand fatal angles with full attack/defense
         if fatal_rounds:
@@ -379,8 +335,6 @@ def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
                     lines.append(f"> **Defense:** {rnd.defense}")
                 if rnd.attacker_rebuttal:
                     lines.append(f"> **Rebuttal:** {rnd.attacker_rebuttal}")
-                lines.append("")
-        lines.append("")
 
     # Feasibility matrix with visual bars
     fm = stress.feasibility_matrix
@@ -396,25 +350,21 @@ def _append_stress_details(lines: list[str], stress: StressTestResult) -> None:
         ("Market Timing", fm.market_timing),
     ]
     fm_avg = sum(v for _, v in fm_dims) / len(fm_dims)
-    lines.append("**Feasibility Matrix** (1-5, higher = better):")
+    lines.append("**Feasibility Matrix** (1-5):")
     lines.append("| Dimension | Score | |")
     lines.append("|-----------|------:|---|")
     for label, val in fm_dims:
         bar = "\u2588" * val + "\u2591" * (5 - val)
         lines.append(f"| {label} | {val} | {bar} |")
     lines.append(f"| **Average** | **{fm_avg:.1f}** | |")
-    lines.append("")
-
     if stress.kill_criteria:
-        lines.append("**Build-Phase Kill Criteria:**")
+        lines.append("**Kill Criteria:**")
         for kc in stress.kill_criteria:
             lines.append(f"- {kc}")
 
 
 def _append_next_steps(lines: list[str], result: IdeateRunResult) -> None:
     lines.append("## Next Steps")
-    lines.append("")
-
     build_ideas = [
         c for c in result.survivors if c.stress_test_verdict == "BUILD"
     ]

@@ -1,5 +1,8 @@
 """Shared logging utilities for xBrain pipeline output.
 
+Uses Rich for high-quality terminal rendering: themed colors, panels,
+spinners, and tables — all routed through a shared ``console`` instance.
+
 Color semantics
 ===============
 GREEN   success, BUILD verdict, completion messages
@@ -10,135 +13,144 @@ MAGENTA refinement, evolution, transformations
 BLUE    scoring, CONVERGE data
 DIM     detail, secondary info, item listings
 WHITE   headers, separators
-
-All log functions route through ``_safe_print`` for encoding safety.
 """
 
 from __future__ import annotations
 
 import os
-import sys
 import time
 
-# ── ANSI color codes ──────────────────────────────────────────────────────
+from rich.console import Console
+from rich.markup import escape as _escape
+from rich.panel import Panel
+from rich.theme import Theme
+
+# ── Shared Rich Console ──────────────────────────────────────────────────
 
 _NO_COLOR = os.environ.get("NO_COLOR") is not None  # https://no-color.org/
 
-def _supports_color() -> bool:
-    if _NO_COLOR:
-        return False
-    if not hasattr(sys.stdout, "isatty"):
-        return False
-    if sys.stdout.isatty():
-        return True
-    # VS Code integrated terminal sets TERM_PROGRAM
-    return os.environ.get("TERM_PROGRAM") == "vscode"
+XBRAIN_THEME = Theme({
+    # Phase tag styles
+    "tag.ideate":   "cyan",
+    "tag.cli":      "cyan",
+    "tag.dryrun":   "cyan",
+    "tag.meta":     "magenta",
+    "tag.constchk": "yellow",
+    "tag.diverge":  "green",
+    "tag.dedup":    "blue",
+    "tag.converge": "blue",
+    "tag.stress":   "red",
+    "tag.refine":   "magenta",
+    "tag.evolve":   "magenta",
+    "tag.merge":    "dim",
+    "tag.search":   "cyan",
+    "tag.specify":  "cyan",
+    "tag.estimate": "cyan",
+    "tag.lineage":  "blue",
+    "tag.export":   "green",
+    "tag.retry":    "yellow",
+    "tag.throttle": "yellow",
+    "tag.llm":      "dim",
+    # Verdict styles
+    "verdict.build":    "green",
+    "verdict.mutate":   "yellow",
+    "verdict.kill":     "red",
+    "verdict.incubate": "dim",
+    # Semantic
+    "ok":      "green",
+    "warn":    "yellow",
+    "error":   "red",
+    "detail":  "dim",
+    "header":  "bold white",
+    "accent":  "cyan",
+    "score":   "blue",
+    "evolve":  "magenta",
+})
 
-_COLOR = _supports_color()
+console = Console(
+    theme=XBRAIN_THEME,
+    no_color=_NO_COLOR,
+    highlight=False,
+)
 
-# Enable ANSI on Windows 10+
-if _COLOR and sys.platform == "win32":
-    try:
-        import ctypes
-        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
-    except Exception:
-        pass
-
-class _C:
-    """ANSI escape codes — all empty strings when color is disabled."""
-    RESET   = "\033[0m"  if _COLOR else ""
-    BOLD    = "\033[1m"  if _COLOR else ""
-    DIM     = "\033[2m"  if _COLOR else ""
-    CYAN    = "\033[36m" if _COLOR else ""
-    GREEN   = "\033[32m" if _COLOR else ""
-    YELLOW  = "\033[33m" if _COLOR else ""
-    RED     = "\033[31m" if _COLOR else ""
-    MAGENTA = "\033[35m" if _COLOR else ""
-    BLUE    = "\033[34m" if _COLOR else ""
-    WHITE   = "\033[97m" if _COLOR else ""
-
-# Map phase tags to colors
-_TAG_COLORS: dict[str, str] = {
-    "IDEATE":   _C.CYAN,
-    "CLI":      _C.CYAN,
-    "DRY-RUN":  _C.CYAN,
-    "META":     _C.MAGENTA,
-    "CONSTCHK": _C.YELLOW,
-    "DIVERGE":  _C.GREEN,
-    "DEDUP":    _C.BLUE,
-    "CONVERGE": _C.BLUE,
-    "STRESS":   _C.RED,
-    "REFINE":   _C.MAGENTA,
-    "EVOLVE":   _C.MAGENTA,
-    "MERGE":    _C.DIM,
-    "SEARCH":   _C.CYAN,
-    "SPECIFY":  _C.CYAN,
-    "ESTIMATE": _C.CYAN,
-    "LINEAGE":  _C.BLUE,
-    "EXPORT":   _C.GREEN,
-    "RETRY":    _C.YELLOW,
-    "THROTTLE": _C.YELLOW,
-    "LLM":      _C.DIM,
+# Map phase tag strings to Rich style names
+_TAG_STYLES: dict[str, str] = {
+    "IDEATE":   "tag.ideate",
+    "CLI":      "tag.cli",
+    "DRY-RUN":  "tag.dryrun",
+    "META":     "tag.meta",
+    "CONSTCHK": "tag.constchk",
+    "DIVERGE":  "tag.diverge",
+    "DEDUP":    "tag.dedup",
+    "CONVERGE": "tag.converge",
+    "STRESS":   "tag.stress",
+    "REFINE":   "tag.refine",
+    "EVOLVE":   "tag.evolve",
+    "MERGE":    "tag.merge",
+    "SEARCH":   "tag.search",
+    "SPECIFY":  "tag.specify",
+    "ESTIMATE": "tag.estimate",
+    "LINEAGE":  "tag.lineage",
+    "EXPORT":   "tag.export",
+    "RETRY":    "tag.retry",
+    "THROTTLE": "tag.throttle",
+    "LLM":      "tag.llm",
 }
 
-# Verdict colors (consistent everywhere)
-VERDICT_COLORS: dict[str, str] = {
-    "BUILD":    _C.GREEN,
-    "MUTATE":   _C.YELLOW,
-    "KILL":     _C.RED,
-    "INCUBATE": _C.DIM,
+# Verdict → Rich style
+_VERDICT_STYLES: dict[str, str] = {
+    "BUILD":    "verdict.build",
+    "MUTATE":   "verdict.mutate",
+    "KILL":     "verdict.kill",
+    "INCUBATE": "verdict.incubate",
 }
-
-
-def _safe_print(text: str) -> None:
-    """Print with encoding safety."""
-    try:
-        print(text)
-    except UnicodeEncodeError:
-        enc = sys.stdout.encoding or "utf-8"
-        print(text.encode(enc, errors="replace").decode(enc, errors="replace"))
 
 
 def log(tag: str, msg: str) -> None:
-    """Print a tagged log line with color, encoding safety, and flush."""
-    color = _TAG_COLORS.get(tag.strip(), "")
-    reset = _C.RESET if color else ""
-    line = f"{color}[{tag:<9s}]{reset} {msg}"
-    _safe_print(line)
-    sys.stdout.flush()
+    """Print a tagged log line with themed color."""
+    style = _TAG_STYLES.get(tag.strip(), "")
+    tag_str = f"[{style}]\\[{tag:<9s}][/{style}]" if style else f"\\[{tag:<9s}]"
+    console.print(f"{tag_str} {msg}")
+
+
+def escape(text: str) -> str:
+    """Escape Rich markup in user-supplied text to prevent injection."""
+    return _escape(text)
 
 
 def log_ok(tag: str, msg: str) -> None:
     """Log a success/completion message (green OK prefix)."""
-    log(tag, f"{_C.GREEN}OK{_C.RESET} {msg}")
+    log(tag, f"[ok]OK[/ok] {msg}")
 
 
 def log_warn(tag: str, msg: str) -> None:
     """Log a warning message (yellow !! prefix)."""
-    log(tag, f"{_C.YELLOW}!!{_C.RESET} {msg}")
+    log(tag, f"[warn]!![/warn] {msg}")
 
 
 def log_error(tag: str, msg: str) -> None:
     """Log an error/failure message (red FAIL prefix)."""
-    log(tag, f"{_C.RED}FAIL{_C.RESET} {msg}")
+    log(tag, f"[error]FAIL[/error] {msg}")
 
 
 def log_detail(tag: str, msg: str) -> None:
     """Log a secondary/detail line (dimmed text)."""
-    log(tag, f"{_C.DIM}{msg}{_C.RESET}")
+    log(tag, f"[detail]{msg}[/detail]")
 
 
 def log_verdict(tag: str, verdict: str, msg: str) -> None:
     """Log a line with verdict-colored prefix."""
-    vc = VERDICT_COLORS.get(verdict, "")
-    log(tag, f"{vc}[{verdict}]{_C.RESET} {msg}")
+    vs = _VERDICT_STYLES.get(verdict, "")
+    if vs:
+        log(tag, f"[{vs}]\\[{verdict}][/{vs}] {msg}")
+    else:
+        log(tag, f"\\[{verdict}] {msg}")
 
 
 def fmt_verdict(verdict: str) -> str:
-    """Return a verdict string with proper coloring."""
-    vc = VERDICT_COLORS.get(verdict, "")
-    return f"{vc}{verdict}{_C.RESET}"
+    """Return a verdict string with proper Rich markup."""
+    vs = _VERDICT_STYLES.get(verdict, "")
+    return f"[{vs}]{verdict}[/{vs}]" if vs else verdict
 
 
 def fmt_verdicts(verdict_counts: dict[str, int]) -> str:
@@ -146,24 +158,27 @@ def fmt_verdicts(verdict_counts: dict[str, int]) -> str:
     parts = []
     for v in ("BUILD", "MUTATE", "KILL", "INCUBATE"):
         count = verdict_counts.get(v, 0)
-        vc = VERDICT_COLORS.get(v, "")
-        parts.append(f"{vc}{count} {v}{_C.RESET}")
+        vs = _VERDICT_STYLES.get(v, "")
+        if vs:
+            parts.append(f"[{vs}]{count} {v}[/{vs}]")
+        else:
+            parts.append(f"{count} {v}")
     return "  |  ".join(parts)
 
 
 def log_phase(phase: str, description: str) -> None:
-    """Print a visible phase separator for console readability."""
-    print()
-    bar = f"{_C.BOLD}{_C.WHITE}{'=' * 60}{_C.RESET}"
-    title = f"{_C.BOLD}{_C.WHITE}  {phase}: {description}{_C.RESET}"
-    _safe_print(bar)
-    _safe_print(title)
-    _safe_print(bar)
-    sys.stdout.flush()
+    """Print a visible phase separator as a Rich Panel."""
+    console.print()
+    console.print(Panel(
+        f"[header]{phase}: {description}[/header]",
+        border_style="white",
+        width=62,
+        padding=(0, 1),
+    ))
 
 
 def log_llm_call(tag: str, description: str) -> "_LLMTimer":
-    """Log the start of an LLM call and return a timer to log completion.
+    """Log the start of an LLM call with a spinner and return a timer.
 
     Usage::
 
@@ -171,7 +186,7 @@ def log_llm_call(tag: str, description: str) -> "_LLMTimer":
         data = self.llm.generate_json(...)
         timer.done()
     """
-    log(tag, f"  ... {description}...")
+    log(tag, f"[detail]  ... {description}...[/detail]")
     return _LLMTimer(tag)
 
 
@@ -194,16 +209,15 @@ class _LLMTimer:
 def log_progress(tag: str, current: int, total: int, label: str = "") -> None:
     """Log a progress indicator like [3/8]."""
     suffix = f" {label}" if label else ""
-    log(tag, f"  [{current}/{total}]{suffix}")
+    log(tag, f"  \\[{current}/{total}]{suffix}")
 
 
 def log_summary_line(msg: str) -> None:
     """Print a raw summary line (for final completion output)."""
-    _safe_print(msg)
+    console.print(msg)
 
 
 def log_summary_block(lines: list[str]) -> None:
     """Print multiple summary lines and flush once."""
     for line in lines:
         log_summary_line(line)
-    sys.stdout.flush()

@@ -77,6 +77,7 @@ class AttackResponse(BaseModel):
     freeform_attack: str = ""
     structured_attacks: list[str] = Field(default_factory=list)
     defenses: list[str] = Field(default_factory=list)
+    attack_outcomes: list[str] = Field(default_factory=list)
 
     @field_validator("structured_attacks", "defenses", mode="before")
     @classmethod

@@ -1,5 +1,49 @@
 # Changelog
 
+## v1.19.0 — 2026-03-21
+
+### Added
+
+#### Rich Terminal Output
+All terminal output now uses the [Rich](https://github.com/Textualize/rich) library instead of raw ANSI escape codes. A shared `Console` with a custom `Theme` (31 named styles) provides consistent, high-quality rendering across platforms:
+- **Phase panels:** Phase separators render as Rich `Panel` widgets instead of raw `=====` lines.
+- **Themed tags:** 20 phase tags (`tag.ideate`, `tag.stress`, etc.), 4 verdict styles, and 7 semantic styles (`ok`, `warn`, `error`, `detail`, `header`, `accent`, `score`, `evolve`).
+- **Lineage table:** The `lineage` command now renders a Rich `Table` with proper column alignment (previously misaligned due to ANSI escape code character counts in f-string padding).
+- **Markup injection safety:** User-supplied data (briefs, idea titles, constraints, run IDs) is escaped via `rich.markup.escape` to prevent Rich tags in LLM output from breaking terminal rendering.
+- **New dependency:** `rich>=13.0.0` added to `requirements.txt`.
+
+#### Attack Outcomes per Debate Round
+The stress test prompt now requests per-attack outcome judgments (`survived`, `fatal`, `weakened`). These are stored in the new `attack_outcomes` field on `AttackResponse` and wired into `DebateExchange.outcome`, giving each debate round an explicit result instead of an empty string.
+
+### Changed
+
+#### Report Condensed (~31% smaller)
+The `idea-report.md` output has been condensed for faster scanning:
+- Header fields merged onto fewer lines (Run ID + Date on one line).
+- Summary tokens + cost on one line; Quick Reference fields combined.
+- ICP compressed to a single line with inline fields.
+- Meta section fields joined with `|` separators.
+- Redundant blank lines and `---` separators removed throughout.
+- Stress test header, competitive landscape, and kill criteria inlined.
+
+### Fixed
+- **Dead code in summary block:** Removed unreachable `if final_pass > 0` branch inside `else` where `final_pass` is guaranteed ≤ 0 — the "passed stress testing" message was never displayed.
+- **Unused imports:** Removed `Status` from `log.py` and unused `console` import from `ideate.py`.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.19.0
+- `xbrain/log.py` — complete rewrite: Rich Console + Theme replaces ANSI `_C` class, added `escape()`, Panel-based phase separators
+- `xbrain/ideate.py` — all `_C.*` → Rich markup, `_esc()` on user data, dead code removal
+- `xbrain/cli.py` — Rich markup + Rich `Table` for lineage, `_esc()` on brief text
+- `xbrain/specify.py` — Rich markup + `_esc()` on title
+- `xbrain/pipeline_helpers.py` — Rich markup for calibration display
+- `xbrain/output.py` — report whitespace condensing (22 locations)
+- `xbrain/models.py` — `attack_outcomes` field on `AttackResponse`
+- `xbrain/prompts.py` — attack outcomes instructions + JSON example in stress test prompt
+- `requirements.txt` — added `rich>=13.0.0`
+
+---
+
 ## v1.18.0 — 2026-03-21
 
 ### Changed
