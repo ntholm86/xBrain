@@ -15,12 +15,9 @@ class Config:
     memory_dir: Path = WORKSPACE_DIR / "xbrain-memory"
 
     # Pipeline 1 defaults
-    diverge_rounds: int = 1
     ideas_per_round: int = 20
     converge_top_n: int = 8
-    stress_test_rounds: int = 1
-    score_threshold: float = 8.0
-    plateau_delta: float = 0.3
+    generations: int = 1  # Number of evolutionary generations (1 = no evolution loop)
 
     # Scoring weights
     SCORING_WEIGHTS: dict[str, float] = {
@@ -55,19 +52,19 @@ class Config:
             "diverge": "cheap", "dedup": "cheap",
             "gapfill": "cheap", "converge": "cheap", "stress": "cheap",
             "refine": "cheap", "meta": "cheap", "constraints": "cheap",
-            "specify": "cheap",
+            "specify": "cheap", "evolve": "cheap",
         },
         "balanced": {
             "diverge": "cheap", "dedup": "cheap",
             "gapfill": "cheap", "converge": "best", "stress": "best",
             "refine": "best", "meta": "cheap", "constraints": "cheap",
-            "specify": "best",
+            "specify": "best", "evolve": "cheap",
         },
         "best": {
             "diverge": "best", "dedup": "best",
             "gapfill": "best", "converge": "best", "stress": "best",
             "refine": "best", "meta": "best", "constraints": "best",
-            "specify": "best",
+            "specify": "best", "evolve": "best",
         },
     }
 
@@ -85,6 +82,7 @@ class Config:
         "stress-attack":     4096,
         "refine-diverge":    8192,
         "refine-converge":   12288,
+        "evolve":            8192,
     }
 
     # Cheap model (used for routing)

@@ -52,6 +52,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Number of ideas to score and stress-test (default: 8)",
     )
     ideate.add_argument(
+        "--generations",
+        type=int,
+        metavar="N",
+        help="Evolutionary generations: survivors are mutated, crossed, and re-tested N times (default: 1, no evolution). Higher = better ideas but more cost.",
+    )
+    ideate.add_argument(
         "--dry-run",
         action="store_true",
         help="Print the planned run without calling the LLM (useful for testing)",
@@ -103,6 +109,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     estimate.add_argument("--ideas", type=int, default=20, metavar="N", help="Ideas to generate")
     estimate.add_argument("--top", type=int, default=8, metavar="N", help="Ideas to score")
+    estimate.add_argument("--generations", type=int, default=1, metavar="N", help="Evolutionary generations")
     estimate.add_argument("--constraints", nargs="*", metavar="CONSTRAINT", help="Constraints")
     estimate.add_argument(
         "--strategy",
@@ -192,6 +199,8 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
         cfg.ideas_per_round = args.ideas
     if args.top:
         cfg.converge_top_n = args.top
+    if args.generations:
+        cfg.generations = args.generations
     if args.strategy:
         cfg.model_strategy = args.strategy
 
@@ -206,6 +215,7 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
             pricing=cfg.MODEL_PRICING,
             strategy=cfg.model_strategy,
             cheap_model=cfg.cheap_model,
+            generations=cfg.generations,
         )
         print("[DRY-RUN] Pipeline 1: IDEATE")
         print(f"  Model:       {cfg.model}")
@@ -214,6 +224,7 @@ def _cmd_ideate(args: argparse.Namespace) -> None:
         print(f"  Constraints: {constraints or '(none)'}")
         print(f"  Ideas:       {cfg.ideas_per_round}")
         print(f"  Top N:       {cfg.converge_top_n}")
+        print(f"  Generations: {cfg.generations}")
         print(f"  Language:    {language or 'english'}")
         if brief_text:
             preview = brief_text[:200] + ("..." if len(brief_text) > 200 else "")
@@ -288,6 +299,7 @@ def _cmd_estimate(args: argparse.Namespace) -> None:
         pricing=cfg.MODEL_PRICING,
         strategy=args.strategy,
         cheap_model=cfg.cheap_model,
+        generations=args.generations,
     )
 
     print("xBrain Cost Estimate")
@@ -314,6 +326,7 @@ def _cmd_estimate(args: argparse.Namespace) -> None:
             pricing=cfg.MODEL_PRICING,
             strategy=strat,
             cheap_model=cfg.cheap_model,
+            generations=args.generations,
         )
         print(f"    {strat:<12s} ${est['total_est_cost_usd']:.4f}")
 

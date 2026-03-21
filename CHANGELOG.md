@@ -1,5 +1,58 @@
 # Changelog
 
+## v1.13.1 — 2026-03-21
+
+### Fixed — Dead Code Cleanup & Pipeline Wiring
+
+#### Removed Dead Prompt Templates
+Removed `ADVERSARIAL_DEFENSE_SYSTEM/USER` and `ADVERSARIAL_REBUTTAL_SYSTEM/USER` — 140 lines of prompt engineering from an abandoned multi-round debate feature that was never called.
+
+#### Removed Unused Config Values
+Removed `stress_test_rounds`, `score_threshold`, `plateau_delta`, and `diverge_rounds` from Config — all were defined but never referenced in pipeline logic.
+
+#### Wired Mutation Archive into EVOLVE Phase
+`mutation-archive.json` was being written every run but never read. Now injected into the EVOLVE prompt via `build_mutation_archive_context()`, giving the evolutionary engine cross-run mutation learning — past mutations inform future evolution.
+
+#### Wired Refinement History into META-LEARN
+`refinement-history.json` was being written every run but never read. Now passed to META-LEARN as `{refinement_stats}`, enabling the meta-learner to assess refinement effectiveness and recommend whether refinement rounds are productive.
+
+#### Updated README — How It Works
+Rewrote the pipeline architecture diagram and phase details to reflect the evolutionary engine: EVOLVE phase, gene recombination, novelty scoring, adaptive stress weights, technique weights, and the `--generations N` loop. Updated cost section with generation pricing.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.13.1
+- `xbrain/prompts.py` — removed 140 lines of dead prompts, added `build_mutation_archive_context()`, added `{mutation_archive_context}` to EVOLVE_USER, added `{refinement_stats}` to META_LEARN_USER
+- `xbrain/config.py` — removed 4 unused config values
+- `xbrain/ideate.py` — fixed diverge log message, wired mutation archive into EVOLVE, wired refinement history into META-LEARN
+- `README.md` — rewrote How It Works section with evolutionary pipeline
+
+## v1.13.0 — 2026-03-20
+
+### Added
+
+#### Multi-Generation Evolution (`--generations N`)
+New `--generations` flag enables evolutionary idea refinement. After the initial stress test, survivors are evolved through mutation (fixing weaknesses), crossover (combining best traits of two ideas), and novelty exploration (maximally different ideas). Each generation runs through CONVERGE + STRESS TEST again. Ideas that survive multiple generations are battle-hardened. Default: 1 (no evolution). Cost scales linearly with generation count — users control their own API spend.
+
+#### Idea Gene Recombination
+High-scoring ideas now extract reusable "genes" (solution patterns, mechanisms, audience fits) stored in `idea-genes.json`. These genes are injected into both DIVERGE and EVOLVE prompts, enabling cross-run recombination — a proven mechanism from run #5 can be transplanted into a completely different domain in run #12.
+
+#### Novelty Scoring in CONVERGE
+CONVERGE now receives the full archive of previous winners and scores `novelty_score` more harshly for ideas that resemble past output. Ideas with novelty < 0.5 are penalised, ensuring each run produces genuinely new ideas rather than rehashing previous winners.
+
+#### Adaptive Stress Test Weights
+Stress testing now learns from history. Attack angles that have historically killed the most ideas (e.g., "Prior art" or "Defensibility") receive extra scrutiny weight, making the stress test progressively harder in the areas that matter most.
+
+#### Self-Modifying Technique Weights
+META-LEARN now tracks which generation techniques (domain_scan, mechanism_stealing, etc.) produce the most BUILD verdicts vs KILLs. Technique weights are stored in `technique-weights.json` and injected into DIVERGE, automatically allocating more idea slots to productive techniques and fewer to underperforming ones.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.13.0
+- `xbrain/config.py` — added `generations` field, `evolve` phase routing and token config
+- `xbrain/cli.py` — added `--generations` argument to ideate and estimate subcommands
+- `xbrain/prompts.py` — EVOLVE_SYSTEM/EVOLVE_USER prompts, gene/novelty/stress/technique context builders, META_LEARN_USER extended with technique_stats
+- `xbrain/ideate.py` — `_phase_evolve()` method, generation loop in `run()`, gene/novelty/stress/technique context wiring, cost estimate updated
+- `xbrain/memory.py` — `get_technique_weights()`, `save_technique_weights()`, `get_technique_verdict_stats()`
+
 ## v1.12.0 — 2026-03-20
 
 ### Added

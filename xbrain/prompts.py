@@ -67,6 +67,8 @@ define what's in scope — don't pre-filter by format.
 {playbook_context}
 {winner_repulsion_context}
 {failure_taxonomy_context}
+{gene_context}
+{technique_weight_context}
 
 Apply these techniques:
 
@@ -230,6 +232,7 @@ RAW IDEAS:
 {ideas_json}
 
 {calibration_context}
+{novelty_context}
 
 STEPS:
 1. CLUSTER similar ideas, merge overlaps, eliminate duplicates.
@@ -430,6 +433,7 @@ Stress-test these {candidate_count} idea candidates. For EACH idea, \
 perform a thorough adversarial analysis, then assess feasibility.
 
 {brief_context}
+{adaptive_stress_context}
 
 CANDIDATES:
 {candidates_json}
@@ -527,155 +531,6 @@ Respond with ONLY valid JSON:
         "Abort if ...",
         "Abort if ..."
       ],
-      "verdict": "BUILD"
-    }}
-  ]
-}}
-"""
-
-# ---------------------------------------------------------------------------
-# Phase 3b: ADVERSARIAL DEFENSE — Defender rebuts attacker's arguments
-# ---------------------------------------------------------------------------
-
-ADVERSARIAL_DEFENSE_SYSTEM = (
-    "You are a passionate advocate and strategic defender of startup ideas. "
-    "Your job is to find every possible strength, counter-argument, and "
-    "creative pivot that makes an idea viable despite attacks. Be specific, "
-    "evidence-based, and resourceful. A weak defense means a worthy idea dies. "
-    "You MUST respond with valid JSON only — no markdown, no commentary."
-)
-
-ADVERSARIAL_DEFENSE_USER = """\
-You are defending {candidate_count} idea(s) against a Devil's Advocate. \
-The attacker has made their case. Now construct the STRONGEST possible defense.
-
-CANDIDATES:
-{candidates_json}
-
-ATTACKER'S ARGUMENTS:
-{attacks_json}
-
-For EACH idea, respond to EVERY attack with a specific, evidence-based defense:
-
-1. For each structured attack, provide a direct counter-argument. Don't just \
-dismiss — acknowledge valid points and explain how they can be mitigated.
-
-2. Identify STRENGTHS the attacker ignored — what makes this idea resilient?
-
-3. Propose PIVOTS: if an attack reveals a real weakness, how could the idea \
-adapt to neutralize it?
-
-4. Rate each exchange: did the defense SURVIVE (convincing counter), get \
-WEAKENED (partial counter), or is it FATAL (no viable defense)?
-
-LENGTH LIMIT: Keep each field under 150 characters. defense and pivot_if_needed \
-must be ONE sentence each. Be dense, not verbose.
-
-Respond with ONLY valid JSON:
-{{
-  "defenses": [
-    {{
-      "idea_id": "idea-001",
-      "exchanges": [
-        {{
-          "angle": "Prior art",
-          "attack_summary": "The attacker's argument...",
-          "defense": "Why this attack fails or how to mitigate...",
-          "strengths_ignored": "What the attacker missed...",
-          "pivot_if_needed": "How to adapt if the attack has merit...",
-          "outcome": "SURVIVED"
-        }}
-      ],
-      "overall_defense_strength": "strong",
-      "strongest_defense": "The single most compelling defense across all angles"
-    }}
-  ]
-}}
-"""
-
-# ---------------------------------------------------------------------------
-# Phase 3c: ADVERSARIAL REBUTTAL — Attacker and Defender respond to each other
-# ---------------------------------------------------------------------------
-
-ADVERSARIAL_REBUTTAL_SYSTEM = (
-    "You are a neutral judge overseeing a debate between a Devil's Advocate "
-    "(attacker) and an Idea Champion (defender). Each side has made their "
-    "initial arguments. Now facilitate ONE final rebuttal round where each "
-    "side responds to the other's strongest points, then render a verdict. "
-    "You MUST respond with valid JSON only — no markdown, no commentary."
-)
-
-ADVERSARIAL_REBUTTAL_USER = """\
-Judge this adversarial debate for {candidate_count} idea(s). Each idea has \
-been attacked and defended. Now run the FINAL REBUTTAL round and render verdicts.
-
-CANDIDATES:
-{candidates_json}
-
-DEBATE SO FAR:
-{debate_json}
-
-For EACH idea:
-
-1. ATTACKER REBUTTAL: Given the defender's arguments, what does the attacker \
-say in response? The attacker should target the weakest defenses and expose \
-any hand-waving.
-
-2. DEFENDER REBUTTAL: Given the attacker's new points, what is the defender's \
-final response? The defender should double down on the strongest points and \
-concede what can't be defended.
-
-3. FINAL VERDICT: Based on the full debate, what is the outcome?
-
-4. FEASIBILITY ASSESSMENT (score each 1-5, where 5 is best/lowest risk):
-   - technical_risk, data_availability, regulatory_risk, cost_infra_month
-   - time_to_prototype, maintenance_burden, llm_capability_fit
-   - defensibility, market_timing
-
-5. KILL CRITERIA: For surviving ideas, define 2-3 conditions that should \
-abort a build if discovered during execution.
-
-LENGTH LIMIT: Keep each field under 150 characters. Rebuttals must be ONE \
-sentence each. Limit to 4 exchanges per idea (most important angles only). \
-Be dense, not verbose.
-
-Respond with ONLY valid JSON:
-{{
-  "results": [
-    {{
-      "idea_id": "idea-001",
-      "exchanges": [
-        {{
-          "angle": "Prior art",
-          "attacker_rebuttal": "The attacker's response to the defense...",
-          "defender_rebuttal": "The defender's final word...",
-          "final_outcome": "SURVIVED"
-        }}
-      ],
-      "strongest_argument": "The single most devastating attack across all rounds",
-      "strongest_defense": "The single most compelling defense across all rounds",
-      "suggested_mutation": "How the idea should change (empty string if BUILD)",
-      "feasibility_matrix": {{
-        "technical_risk": 4,
-        "data_availability": 3,
-        "regulatory_risk": 4,
-        "cost_infra_month": 4,
-        "time_to_prototype": 3,
-        "maintenance_burden": 3,
-        "llm_capability_fit": 4,
-        "defensibility": 3,
-        "market_timing": 4
-      }},
-      "feasibility_verdict": "BUILDABLE",
-      "llm_capability_fit": "strong",
-      "kill_criteria": [
-        "Abort if key data API access is denied",
-        "Abort if scope exceeds 3x original estimate"
-      ],
-      "attacks_made": 9,
-      "attacks_survived": 6,
-      "attacks_fatal": 1,
-      "attacks_weakened": 2,
       "verdict": "BUILD"
     }}
   ]
@@ -884,6 +739,209 @@ def build_refinement_context(
 
 
 # ---------------------------------------------------------------------------
+# Phase 4: EVOLVE — Multi-generation evolutionary operators
+# ---------------------------------------------------------------------------
+
+EVOLVE_SYSTEM = (
+    "You are an evolutionary idea-engineering engine. You take ideas that "
+    "survived adversarial stress testing and apply evolutionary operators "
+    "(mutation, crossover, novelty search) to produce a superior next "
+    "generation. Every new idea must be STRICTLY BETTER than its parents — "
+    "specifically addressing the weaknesses exposed by stress testing. "
+    "You MUST respond with valid JSON only — no markdown, no commentary."
+)
+
+EVOLVE_USER = """\
+GENERATION {generation}/{max_generations}: Evolve survivors into a stronger next generation.
+
+{brief_context}
+
+SURVIVORS FROM PREVIOUS GENERATION (with stress test results):
+{survivors_json}
+
+{gene_context}
+
+{mutation_archive_context}
+
+EVOLUTIONARY OPERATORS — apply ALL of these:
+
+1. ELITE CARRY-FORWARD: The top {elite_count} BUILD-verdict ideas survive \
+unchanged into the next generation. List their IDs in "elites".
+
+2. MUTATION (for each MUTATE-verdict idea): Apply the suggested_mutation \
+from its stress test. The mutated idea must:
+   - Fix the specific weakness identified
+   - Preserve the core strength that earned a passing score
+   - Get a NEW id (e.g., "evo-{generation}-mut-001")
+
+3. CROSSOVER: Take the 2 highest-scoring survivors and COMBINE them:
+   - Extract the MECHANISM from idea A (how it works)
+   - Extract the AUDIENCE from idea B (who it serves)
+   - Create a hybrid that uses A's mechanism to serve B's audience
+   - Or: combine A's distribution channel with B's core value proposition
+   - Generate 2-3 crossover offspring with NEW ids (e.g., "evo-{generation}-cross-001")
+
+4. NOVELTY EXPLORER: Generate 2-3 ideas that are MAXIMALLY DIFFERENT from \
+ALL survivors. These ideas must:
+   - Use a completely different solution mechanism
+   - Target a different audience or domain
+   - NOT be a variation of any surviving idea
+   - Explore angles that were completely absent from previous generation
+   - Get NEW ids (e.g., "evo-{generation}-novel-001")
+
+IDEA GENE RECOMBINATION: If idea genes from previous runs are available \
+above, incorporate 1-2 high-scoring genes into your crossover or novelty \
+ideas — transplant a proven mechanism/pattern into a new context.
+
+Respond with ONLY valid JSON:
+{{
+  "generation": {generation},
+  "elites": ["idea-001", "idea-003"],
+  "evolved_ideas": [
+    {{
+      "id": "evo-{generation}-mut-001",
+      "concept": "One sentence description",
+      "source_technique": "mutation|crossover|novelty_explorer",
+      "parent_ideas": ["idea-002"],
+      "domain_tags": ["domain1", "domain2"],
+      "novelty_signal": "What makes this different from parents",
+      "evolution_rationale": "What weakness was fixed or what was combined"
+    }}
+  ]
+}}
+
+Generate at least {evolve_count} evolved ideas (mutations + crossovers + novelty). Be bold.
+"""
+
+# ---------------------------------------------------------------------------
+# Context builders for evolutionary features
+# ---------------------------------------------------------------------------
+
+
+def build_gene_context(genes: list[dict]) -> str:
+    """Build context from extracted idea genes for recombination in DIVERGE/EVOLVE."""
+    if not genes:
+        return ""
+    lines = [
+        "IDEA GENES (reusable patterns extracted from high-scoring ideas in "
+        "previous runs — recombine these into new contexts):"
+    ]
+    for g in genes[:15]:  # Cap at 15 to avoid token bloat
+        title = g.get("title", "?")
+        pattern = g.get("pattern", "")[:120]
+        score = g.get("score", 0)
+        verdict = g.get("verdict", "?")
+        domains = ", ".join(g.get("domains", [])[:3])
+        lines.append(f"- [{score:.1f}/{verdict}] {title} ({domains}): {pattern}")
+    lines.append(
+        "\nUse these genes as RECOMBINATION material — transplant a proven "
+        "mechanism or pattern into a completely different domain or audience. "
+        "Do NOT clone the original idea."
+    )
+    return "\n".join(lines)
+
+
+def build_mutation_archive_context(mutations: list[dict]) -> str:
+    """Build context from cross-run mutation archive for EVOLVE phase."""
+    if not mutations:
+        return ""
+    lines = [
+        "MUTATION ARCHIVE (past mutations from previous runs — learn from these):"
+    ]
+    for m in mutations[-10:]:  # Most recent 10
+        title = m.get("idea_title", "?")
+        mutation = (m.get("suggested_mutation", "") or "")[:120]
+        lines.append(f"- {title}: {mutation}")
+    lines.append(
+        "\nUse these past mutations as inspiration. If a similar weakness "
+        "appears in current survivors, apply a SIMILAR fix. Avoid repeating "
+        "mutation strategies that appear frequently — try novel mutations."
+    )
+    return "\n".join(lines)
+
+
+def build_adaptive_stress_context(attack_patterns: list[dict], kill_log: list[dict]) -> str:
+    """Build context that weights stress test angles by historical kill rates."""
+    if not attack_patterns and not kill_log:
+        return ""
+    # Count kills by attack angle category
+    angle_kills: dict[str, int] = {}
+    for k in kill_log:
+        reason = (k.get("reason", "") or "").lower()
+        if "prior art" in reason or "already exists" in reason:
+            angle_kills["Prior art"] = angle_kills.get("Prior art", 0) + 1
+        elif "adopt" in reason or "won't use" in reason:
+            angle_kills["Adoption failure"] = angle_kills.get("Adoption failure", 0) + 1
+        elif "technical" in reason or "infeasible" in reason:
+            angle_kills["Technical blocker"] = angle_kills.get("Technical blocker", 0) + 1
+        elif "defensib" in reason or "clone" in reason or "moat" in reason:
+            angle_kills["Defensibility"] = angle_kills.get("Defensibility", 0) + 1
+        elif "timing" in reason or "too late" in reason:
+            angle_kills["Timing"] = angle_kills.get("Timing", 0) + 1
+        elif "cost" in reason or "economic" in reason:
+            angle_kills["Economics"] = angle_kills.get("Economics", 0) + 1
+    if not angle_kills:
+        return ""
+    # Sort by frequency, most lethal first
+    sorted_angles = sorted(angle_kills.items(), key=lambda x: -x[1])
+    lines = [
+        "ADAPTIVE STRESS WEIGHTS — These attack angles have historically "
+        "been the most lethal. Apply EXTRA SCRUTINY to these angles and be "
+        "MORE AGGRESSIVE in your attacks along these dimensions:"
+    ]
+    for angle, count in sorted_angles[:5]:
+        lines.append(f"- {angle}: {count} kills (HIGH PRIORITY — probe deeply)")
+    lines.append(
+        "\nFor the high-priority angles above, require STRONGER evidence "
+        "before marking as 'survived'. A vague defense is not enough."
+    )
+    return "\n".join(lines)
+
+
+def build_novelty_context(previous_winners: list[dict], archive_size: int) -> str:
+    """Build context for novelty scoring in CONVERGE — penalise similarity to archive."""
+    if not previous_winners:
+        return ""
+    lines = [
+        f"NOVELTY SCORING — {archive_size} ideas already exist in the archive. "
+        "Score novelty_score HARSHLY for any idea that resembles these past winners:"
+    ]
+    for w in previous_winners[:10]:
+        lines.append(f"- {w['title']}")
+    lines.append(
+        "\nNovelty 0.9+: Nothing like this in the archive. "
+        "Novelty 0.5-0.8: Similar mechanism or domain but different angle. "
+        "Novelty <0.5: Too close to existing ideas — penalise heavily."
+    )
+    return "\n".join(lines)
+
+
+def build_technique_weight_context(weights: dict[str, float]) -> str:
+    """Build context to guide technique allocation in DIVERGE based on learned weights."""
+    if not weights:
+        return ""
+    adjusted = {k: v for k, v in weights.items() if v != 1.0}
+    if not adjusted:
+        return ""
+    lines = [
+        "TECHNIQUE ALLOCATION (learned from previous runs -- adjust technique "
+        "mix based on what historically produces survivors):"
+    ]
+    sorted_w = sorted(weights.items(), key=lambda x: -x[1])
+    for tech, weight in sorted_w:
+        if weight > 1.2:
+            lines.append(f"- {tech}: USE MORE (weight {weight:.1f}x) -- historically produces more BUILD verdicts")
+        elif weight < 0.8:
+            lines.append(f"- {tech}: USE LESS (weight {weight:.1f}x) -- historically produces more KILL verdicts")
+    if len(lines) == 1:
+        return ""  # No meaningful adjustments
+    lines.append(
+        "\nAllocate more idea slots to high-weight techniques and fewer to low-weight ones."
+    )
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Meta-Learning: Distilled playbook + score calibration
 # ---------------------------------------------------------------------------
 
@@ -896,10 +954,12 @@ META_LEARN_SYSTEM = (
 META_LEARN_USER = """\
 Analyze these results from {run_count} ideation runs.
 
-SCORE DISTRIBUTION (score→verdict): {score_verdicts}
+SCORE DISTRIBUTION (score->verdict): {score_verdicts}
 KILL REASONS (truncated): {kill_reasons}
 ATTACK PATTERNS: {attack_patterns}
 DOMAIN HEAT MAP: {domain_heat}
+TECHNIQUE STATS: {technique_stats}
+REFINEMENT HISTORY: {refinement_stats}
 
 Distill into a compact playbook (max 200 words) with:
 1. SCORING BIAS: Are scores inflated? Which dimensions are consistently over/under-rated?
@@ -907,6 +967,10 @@ Distill into a compact playbook (max 200 words) with:
 3. WINNING TRAITS: What surviving ideas have in common
 4. DOMAIN GAPS: Underexplored domains worth targeting
 5. ANTI-PATTERNS: 3 idea shapes to avoid generating
+6. TECHNIQUE PERFORMANCE: Which generation techniques produce the most BUILD verdicts? \
+Which produce mostly KILLs? Recommend technique weight adjustments.
+7. REFINEMENT EFFECTIVENESS: Are refinement rounds productive? How many rounds \
+typically produce a BUILD? If refinement rarely helps, note that.
 
 Respond with ONLY valid JSON:
 {{
@@ -926,14 +990,27 @@ Respond with ONLY valid JSON:
       "market_timing": 1.0
     }}
   }},
+  "technique_weights": {{
+    "domain_scan": 1.0,
+    "cross_domain_collision": 1.0,
+    "contrarian_inversion": 1.0,
+    "constraint_injection": 1.0,
+    "mechanism_stealing": 1.0,
+    "gap_fill": 1.0
+  }},
   "domain_recommendations": ["domain1", "domain2"],
   "anti_patterns": ["pattern1", "pattern2", "pattern3"]
 }}
 
 dimension_multipliers: Set each to a value between 0.5 and 1.5.
-- <1.0 means the LLM historically OVER-scores that dimension → deflate it.
-- >1.0 means the LLM historically UNDER-scores that dimension → inflate it.
+- <1.0 means the LLM historically OVER-scores that dimension -> deflate it.
+- >1.0 means the LLM historically UNDER-scores that dimension -> inflate it.
 - 1.0 means no correction needed.
+
+technique_weights: Set each to a value between 0.5 and 2.0.
+- >1.0 means this technique produces more survivors -> use it more.
+- <1.0 means this technique produces more kills -> use it less.
+- 1.0 means no adjustment.
 """
 
 

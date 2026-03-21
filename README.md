@@ -1,6 +1,6 @@
 # xBrain — AI Idea Engine
 
-Generate, score, stress-test, and refine project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then runs adversarial stress testing — a devil's advocate attacks every idea from 9 angles — so only the genuinely strong ones survive.
+Generate, score, stress-test, and evolve project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then runs adversarial stress testing — a devil's advocate attacks every idea from 9 angles — so only the genuinely strong ones survive. With `--generations N`, surviving ideas are evolved through mutation, crossover, and selection pressure across multiple generations, producing battle-hardened ideas that have beaten the stress test repeatedly.
 
 ## Setup
 
@@ -81,6 +81,23 @@ Default: 8. Only the best raw ideas get scored and attacked.
 ```
 python -m xbrain ideate --top 5
 ```
+
+### `--generations` — Evolutionary refinement
+
+Run multiple generations of evolutionary refinement. After the initial stress test, surviving ideas are mutated (fixing identified weaknesses), crossed over (combining best traits), and novelty-explored (maximally different new ideas). Each generation runs through scoring and stress testing again. Ideas that survive multiple generations are battle-hardened.
+
+```
+# Default: 1 generation (no evolution)
+python -m xbrain ideate --generations 1
+
+# 3 generations: mutate, crossover, and re-test survivors
+python -m xbrain ideate --generations 3
+
+# 10 generations: intense evolutionary pressure (higher cost, stronger ideas)
+python -m xbrain ideate --brief problem.txt --generations 10
+```
+
+Cost scales linearly with generation count. Use `--dry-run` to preview the estimated cost before running.
 
 ### `--dry-run` — Preview without API calls
 
@@ -290,14 +307,18 @@ XBRAIN_BEST_MODEL=claude-sonnet-4-20250514     # Model for critical phases (bala
 
 ## How It Works
 
-xBrain runs a multi-phase pipeline where each phase builds on the last. The key insight: most ideation tools generate ideas and stop. xBrain generates ideas, then actively tries to destroy them — and the ideas that survive are the ones worth building.
+xBrain runs a multi-phase pipeline inspired by evolutionary computation. Most ideation tools generate ideas and stop. xBrain generates ideas, then actively tries to destroy them — and optionally evolves survivors through multiple generations of mutation, crossover, and selection pressure. Ideas that survive are battle-hardened.
+
+With `--generations N`, the pipeline becomes an evolutionary engine: after stress testing, surviving ideas are mutated (fixing weaknesses), crossed over (combining best traits from multiple ideas), and novelty-explored (maximally different new ideas). Each generation runs through scoring and stress testing again. The ideas that come out of 5 or 10 generations have been pressure-tested repeatedly — the weak mutations die, the strong ones compound.
+
+The system also learns across runs. Meta-learning distills patterns from previous results (what scores well, what gets killed, which generation techniques work), injecting that accumulated knowledge into future runs. Idea "genes" — reusable solution patterns extracted from high-scoring ideas — are recombined into new contexts. Technique weights are adjusted based on which generation methods produce the most survivors.
 
 <details>
 <summary><strong>Pipeline Architecture (click to expand)</strong></summary>
 
 ```
-                                    xBrain Pipeline: Prompt to Report
-                                    ==================================
+                                    xBrain Pipeline
+                                    ===============
 
   USER INPUT                                    PERSISTENT MEMORY
   +---------------------+                       +----------------------------+
@@ -305,23 +326,30 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   | --constraints       |                       |   idea-archive.json        |
   | --ideas N           |                       |   kill-log.json            |
   | --top N             |                       |   domain-heat-map.json     |
-  | --lang              |                       |   playbook.json            |
-  | --strategy          |                       |   score-calibration.json   |
-  +--------+------------+                       |   idea-lineage.json        |
-           |                                    |   idea-genes.json          |
+  | --generations N     |                       |   playbook.json            |
+  | --lang              |                       |   score-calibration.json   |
+  | --strategy          |                       |   idea-lineage.json        |
+  +--------+------------+                       |   idea-genes.json          |
+           |                                    |   technique-weights.json   |
            v                                    |   mutation-archive.json    |
   +========================================+    |   attack-patterns.json     |
   | PHASE -1: META-LEARN                   |    |   meta-metrics.json        |
   | (every 3 runs — runs FIRST)            |    |   refinement-history.json  |
   |                                        |    |   failure-taxonomy.json    |
   |  Reads past run metrics, score history,|    +----------+-----------------+
-  |  kill reasons, attack patterns.        |<---reads------+
-  |  Distills into compact playbook        |               |
-  |  (~200 tokens) + score calibration     |               |
-  |  with per-dimension multipliers.       |               |
+  |  kill reasons, attack patterns,        |<---reads------+
+  |  technique→verdict stats, refinement   |               |
+  |  effectiveness.                        |               |
+  |                                        |               |
+  |  Distills into:                        |               |
+  |  • Compact playbook (~200 tokens)      |               |
+  |  • Score calibration multipliers       |               |
+  |  • Technique weights (which methods    |               |
+  |    produce the most BUILD verdicts)    |               |
   |                                        |               |
   |  Output: playbook.json,               |               |
-  |          score-calibration.json        |---writes----->+
+  |          score-calibration.json,       |               |
+  |          technique-weights.json        |---writes----->+
   +==================+=====================+
                      |
                      v
@@ -336,20 +364,20 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
                      |
                      v
   +========================================+       +==========================+
-  | PHASE 1: DIVERGE (Round 1)             |       | Injected Context:        |
+  | PHASE 1: DIVERGE                       |       | Injected Context:        |
   | temp=0.9                               |<------| - Playbook (meta-learn)  |
-  |                                        |       | - Memory (past ideas,    |
-  |  Generate N raw idea seeds using       |       |   killed titles, domain  |
-  |  6 simultaneous techniques:            |       |   heat map)              |
-  |                                        |       | - Brief text             |
-  |  1. Domain Scan                        |       | - Constraints            |
-  |  2. Cross-Domain Collision             |       | - Winner repulsion list  |
-  |  3. Contrarian Inversion              |       | - Failure taxonomy       |
-  |  4. Contextual Constraints             |       +==========================+
-  |  5. AI-Augmentable Gap Detection       |
-  |  6. Mechanism Stealing                 |
-  |                                        |
-  |  Output: RawIdea[] (id, concept,       |
+  |                                        |       | - Idea genes (reusable   |
+  |  Generate N raw idea seeds using       |       |   patterns from past     |
+  |  6 simultaneous techniques:            |       |   high-scorers)          |
+  |                                        |       | - Technique weights      |
+  |  1. Domain Scan                        |       | - Memory (past ideas,    |
+  |  2. Cross-Domain Collision             |       |   killed titles, domain  |
+  |  3. Contrarian Inversion              |       |   heat map)              |
+  |  4. Contextual Constraints             |       | - Brief text             |
+  |  5. AI-Augmentable Gap Detection       |       | - Constraints            |
+  |  6. Mechanism Stealing                 |       | - Winner repulsion list  |
+  |                                        |       | - Failure taxonomy       |
+  |  Output: RawIdea[] (id, concept,       |       +==========================+
   |    source_technique, domain_tags,      |
   |    novelty_signal)                     |
   +==================+=====================+
@@ -370,7 +398,7 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
                      |
                      v
   +========================================+
-  | PHASE 1c: DIVERGE GAP-FILL (Round 2)  |
+  | PHASE 1c: DIVERGE GAP-FILL            |
   | temp=0.95 (max creativity)             |
   |                                        |
   |  Generate new ideas ONLY in gap areas. |
@@ -382,17 +410,17 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   +==================+=====================+
                      |
                      v
-  +========================================+
-  | PHASE 2: CONVERGE                      |
-  | temp=0.5                               |
-  |                                        |
-  |  Cluster, score, rank. Select top N.   |
-  |                                        |
-  |  Per idea:                             |
-  |    - Target persona (who/pain/context) |
-  |    - 8-dim scoring (0-10 each):        |
-  |      (+) impact, confidence,           |
-  |          sustainability, defensibility,|
+  +========================================+       +==========================+
+  | PHASE 2: CONVERGE                      |       | Novelty Scoring:         |
+  | temp=0.5                               |       | When generations > 1,    |
+  |                                        |<------| CONVERGE adds a novelty  |
+  |  Cluster, score, rank. Select top N.   |       | dimension that rewards   |
+  |                                        |       | ideas solving problems   |
+  |  Per idea:                             |       | in genuinely new ways.   |
+  |    - Target persona (who/pain/context) |       | Prevents evolutionary    |
+  |    - 8-dim scoring (0-10 each):        |       | convergence to a local   |
+  |      (+) impact, confidence,           |       | optimum.                 |
+  |          sustainability, defensibility,|       +==========================+
   |          market_timing                 |
   |      (-) effort, cost, ethical_risk    |
   |    - Score reasoning per dimension     |
@@ -408,7 +436,7 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
                      |
                      v
   +=================================================================+
-  | PHASE 3: STRESS TEST (Single-Round Attack)                      |
+  | PHASE 3: STRESS TEST                                            |
   | ALL ideas tested IN PARALLEL (async API calls per idea)         |
   |                                                                 |
   |  Web search: prior art lookup per idea                          |
@@ -423,6 +451,12 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   |  |  Timing, Defensibility, Expertise gap                      | |
   |  |  + 1 freeform devastating attack                           | |
   |  |                                                            | |
+  |  |  +--- Adaptive Weights ----------------------+             | |
+  |  |  | Attack angles that historically kill more |             | |
+  |  |  | ideas are weighted MORE heavily. Learned  |             | |
+  |  |  | from cross-run kill patterns.             |             | |
+  |  |  +------------------------------------------+             | |
+  |  |                                                            | |
   |  |  Judge renders per-idea:                                   | |
   |  |    - Feasibility matrix (9 dims, 1-5 scale)               | |
   |  |    - Kill criteria (abort conditions)                      | |
@@ -431,6 +465,49 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   |  +-----------------------------------------------------------+ |
   +=========================+=======================================+
                             |
+                            v
+              +-------------+------------------+
+              | --generations > 1?             |
+              +------+---+--------------------++
+               YES   |   |  NO
+              +------+   +----> continue to REFINE / OUTPUT
+              |
+              v
+  +=================================================================+
+  | PHASE 3.5: EVOLVE (repeated for each generation 2..N)           |
+  |                                                                 |
+  |  +----- EVOLUTIONARY OPERATORS -----+                           |
+  |  |                                  |                           |
+  |  |  1. ELITE CARRY-FORWARD          |  Top BUILD ideas survive  |
+  |  |     unchanged into next gen      |  as anchors.              |
+  |  |                                  |                           |
+  |  |  2. MUTATION                     |  Each MUTATE idea gets    |
+  |  |     Fix the specific weakness    |  its suggested_mutation   |
+  |  |     from stress testing          |  applied. Past mutations  |
+  |  |                                  |  from cross-run archive   |
+  |  |  3. CROSSOVER                    |  inform the process.      |
+  |  |     Combine mechanism from A     |                           |
+  |  |     with audience from B         |                           |
+  |  |     (2-3 hybrid offspring)       |                           |
+  |  |                                  |                           |
+  |  |  4. NOVELTY EXPLORER             |  Maximally different from |
+  |  |     Generate ideas unlike ALL    |  all survivors to prevent |
+  |  |     survivors (2-3 new ideas)    |  convergence to a local   |
+  |  |                                  |  optimum.                 |
+  |  |                                  |                           |
+  |  |  5. GENE RECOMBINATION           |  If idea genes exist from |
+  |  |     Transplant proven patterns   |  previous runs, inject    |
+  |  |     into new contexts            |  them into crossovers.    |
+  |  +----------------------------------+                           |
+  |                                                                 |
+  |  Evolved ideas → CONVERGE → STRESS TEST → next generation      |
+  |                                                                 |
+  |  Verdict override: MUTATE ideas that survive 5+ attacks with    |
+  |  ≤1 fatal get promoted to BUILD (battle-hardened).              |
+  +=================================================================+
+                            |
+                            | (loops back to CONVERGE + STRESS TEST
+                            |  for each generation)
                             v
                    +--------+--------+
                    | Any BUILD       |
@@ -470,12 +547,14 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
   |                                        |
   |  Writes to xbrain-memory/persistent/:  |
   |    - Idea archive (all survivors)      |
-  |    - Kill log (KILL ideas + reasons)   |
-  |    - Mutation archive                  |
+  |    - Kill log (KILL ideas + why)       |
+  |    - Mutation archive (cross-run       |
+  |      mutation learning)                |
   |    - Attack patterns                   |  +---> feeds into
   |    - Domain heat map                   |  |     future runs
-  |    - Idea lineage (idea->run graph)    |  |     via META-LEARN
-  |    - Idea genes (score >= 6.5)         |  |
+  |    - Idea lineage (idea→run graph)     |  |     via META-LEARN
+  |    - Idea genes (score ≥ 6.5)          |  |
+  |    - Technique weights                 |  |
   |    - Failure taxonomy                  |  |
   |    - Refinement history                |  |
   |    - Run metrics                       +--+
@@ -528,33 +607,36 @@ xBrain runs a multi-phase pipeline where each phase builds on the last. The key 
 <summary><strong>Phase Details (click to expand)</strong></summary>
 
 **Phase -1 — META-LEARN** (every 3 runs, runs at pipeline start)
-Cross-session learning. Distills accumulated results from previous runs into a compact playbook with score calibration multipliers (0.5–1.5), fatal patterns, anti-patterns, and domain gaps. Applied post-LLM in CONVERGE — scores are corrected in code, not by asking the LLM. Only triggers after 3+ runs.
+Cross-session learning. Reads accumulated data from all previous runs: score distributions, kill reasons, attack patterns, technique→verdict correlations, and refinement effectiveness. Distills into a compact playbook with score calibration multipliers (0.5–1.5), technique weights (which generation methods produce the most survivors), fatal patterns, anti-patterns, and domain gaps. Score calibration is applied post-LLM in CONVERGE — scores are corrected in code, not by asking the LLM. Technique weights bias DIVERGE toward methods that historically produce BUILD verdicts. Only triggers after 3+ runs.
 
 **Phase -0.5 — CONSTRAINT CHECK** (automatic, when 2+ constraints provided)
 Analyzes constraints for logical contradictions. Warns about conflicts and suggests resolutions. Non-blocking.
 
-**Phase 1 — DIVERGE** (Round 1)
-Raw idea generation using six techniques: Domain Scan, Cross-Domain Collision, Contrarian Inversion, Contextual Constraints, AI-Augmentable Gap Detection, and Mechanism Stealing. The AI determines which domains to explore based on the brief context — scanning broadly when no brief is given.
+**Phase 1 — DIVERGE**
+Raw idea generation using six techniques: Domain Scan, Cross-Domain Collision, Contrarian Inversion, Contextual Constraints, AI-Augmentable Gap Detection, and Mechanism Stealing. Each technique is weighted by meta-learning: techniques that historically produce more BUILD ideas are emphasized, while poor-performing techniques are dampened. Idea genes from high-scoring past ideas are injected as recombination material — proven solution patterns transplanted into new domains.
 
 **Phase 1b — DEDUP** (Semantic Deduplication)
 Collapses near-identical ideas and identifies over-represented themes and gap areas.
 
-**Phase 1c — DIVERGE GAP-FILL** (Round 2)
+**Phase 1c — DIVERGE GAP-FILL**
 Generates new ideas specifically for gap areas at higher creativity (temperature=0.95), avoiding over-represented themes.
 
 **Phase 2 — CONVERGE**
-Clusters, scores, and ranks. Output format adapts to brief type (product, internal tool, process). Each idea gets a target persona, ICP, 8-dimension scoring with reasoning, inverse fragility check, and moat check. Scores are calibrated post-LLM using meta-learning multipliers.
+Clusters, scores, and ranks. Output format adapts to brief type (product, internal tool, process). Each idea gets a target persona, ICP, 8-dimension scoring with reasoning, inverse fragility check, and moat check. When running multi-generation evolution, a novelty dimension is added that rewards ideas solving problems in genuinely new ways — preventing evolutionary convergence to a local optimum. Scores are calibrated post-LLM using meta-learning multipliers.
 
 Scoring dimensions: Impact (25%), Confidence (20%), Sustainability (10%), Defensibility (10%), Market Timing (5%), Effort (-10%), Cost (-10%), Ethical Risk (-10%). Composite = weighted sum + 3.0, clamped to [0, 10].
 
 **Phase 3 — STRESS TEST**
-Single-round adversarial attack. Each idea tested in parallel via async API calls. Web search finds real prior art per idea before attacking. 9 structured attack angles + 1 freeform. Produces feasibility matrix (9 dims, 1-5), kill criteria, and verdict (BUILD/MUTATE/KILL/INCUBATE).
+Adversarial attack with adaptive weights. Each idea tested in parallel via async API calls. Web search finds real prior art per idea before attacking. 9 structured attack angles + 1 freeform. Attack angles that historically kill more ideas (learned from cross-run patterns) are weighted more heavily. Produces feasibility matrix (9 dims, 1-5), kill criteria, and verdict (BUILD/MUTATE/KILL/INCUBATE).
+
+**Phase 3.5 — EVOLVE** (when `--generations > 1`)
+The evolutionary engine. For each generation after the first, applies four operators to survivors: (1) **Elite carry-forward** — top BUILD ideas survive unchanged as anchors. (2) **Mutation** — each MUTATE idea gets its suggested fix applied, informed by the cross-run mutation archive. (3) **Crossover** — combines the mechanism of one high-scorer with the audience of another, producing hybrid offspring. (4) **Novelty explorer** — generates ideas maximally different from all survivors, preventing the population from collapsing to a single niche. Idea genes from past runs are recombined into crossover and novelty ideas. Each generation's offspring go through CONVERGE and STRESS TEST again. MUTATE ideas that survive 5+ attacks with ≤1 fatal get promoted to BUILD (battle-hardened through evolutionary pressure).
 
 **Phase 4 — REFINE** (automatic, if no BUILD verdicts)
 Up to 3 refinement rounds. Extracts mutations, attack patterns, failure blocklist, and problem reframes from previous round. Re-generates with progressively lower creativity and fewer ideas. Stops when BUILD found or 3 rounds exhausted.
 
 **Phase 5 — MEMORY UPDATE** (automatic, end of every run)
-Persists idea archive, kill log, mutations, attack patterns, failure taxonomy, domain heat map, lineage, idea genes (score ≥ 6.5), and run metrics.
+Persists idea archive, kill log, mutation archive (for cross-run mutation learning), attack patterns, failure taxonomy, domain heat map, lineage, idea genes (score ≥ 6.5), technique weights, refinement history, and run metrics. All data feeds back into future runs via META-LEARN.
 
 </details>
 
@@ -572,10 +654,11 @@ xBrain remembers across runs. Files in `xbrain-memory/persistent/`:
 | `score-calibration.json` | Score bias detection and correction |
 | `idea-lineage.json` | Idea evolution graph (parent→child, run→idea) |
 | `idea-genes.json` | Reusable idea patterns extracted from high-scoring ideas |
-| `mutation-archive.json` | MUTATE ideas with their suggested mutations |
+| `technique-weights.json` | Learned technique multipliers (which methods produce survivors) |
+| `mutation-archive.json` | Cross-run mutation patterns (what fixes work) |
 | `attack-patterns.json` | Recurring attack patterns from stress tests |
 | `failure-taxonomy.json` | Categorized failure patterns |
-| `refinement-history.json` | History of refinement rounds |
+| `refinement-history.json` | Refinement effectiveness history (fed into META-LEARN) |
 
 ### The Report
 
@@ -588,9 +671,11 @@ Each run generates `idea-report.md` with:
 
 ## Cost
 
-The stress test runs **per-idea parallel API calls** — with 8 ideas, each fires 8 concurrent requests. Combined with sequential phases (constraint check, diverge, dedup, gap-fill, converge), a typical run makes ~12 API calls and completes in under 3 minutes.
+The stress test runs **per-idea parallel API calls** — with 8 ideas, each fires 8 concurrent requests. Combined with sequential phases (constraint check, diverge, dedup, gap-fill, converge), a typical single-generation run makes ~12 API calls and completes in under 3 minutes.
 
-Approximate cost per run with Sonnet: **$0.10–$0.15** (simple run), **$0.20–$0.40** (with refinement rounds).
+Approximate cost per run with Sonnet: **$0.10–$0.15** (1 generation), **$0.20–$0.40** (with refinement), **~$0.25** per extra generation.
+
+With Haiku, costs are roughly 10x lower. A 2-generation run with Haiku costs ~$0.24.
 
 API calls include automatic **retry with exponential backoff** for rate limits, timeouts, and connection errors (up to 3 attempts).
 

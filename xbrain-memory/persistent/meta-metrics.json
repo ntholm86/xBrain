@@ -485,5 +485,15 @@
     "pass_count": 6,
     "tokens_in": 24832,
     "tokens_out": 26242
+  },
+  {
+    "run_id": "20260321-033715-ai-tools-for-freelance-graphic",
+    "timestamp": "2026-03-21T03:37:15.077010+00:00",
+    "ideas_generated": 12,
+    "candidates": 4,
+    "build_count": 3,
+    "pass_count": 5,
+    "tokens_in": 43590,
+    "tokens_out": 39223
   }
 ]

@@ -4405,5 +4405,64 @@
       "manufacturing",
       "B2B_sales"
     ]
+  },
+  {
+    "id": "evo-2-mut-001",
+    "title": "Brief Enforcer: Multi-Channel Intake Orchestrator",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "client_communication",
+      "workflow_automation",
+      "integration_platform",
+      "scope_management"
+    ]
+  },
+  {
+    "id": "evo-2-cross-001",
+    "title": "Design System Auto-Auditor",
+    "score": 7.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "design_systems",
+      "constraint_inference",
+      "design_ops",
+      "automation"
+    ]
+  },
+  {
+    "id": "gap-001",
+    "title": "Design Brief Decoder: Structured Requirements from Chaos",
+    "score": 7.0,
+    "verdict": "BUILD",
+    "domains": [
+      "client_communication",
+      "requirements_engineering",
+      "natural_language_processing"
+    ]
+  },
+  {
+    "id": "evo-2-novel-002",
+    "title": "Design Debt Auditor",
+    "score": 6.4,
+    "verdict": "BUILD",
+    "domains": [
+      "design_operations",
+      "technical_debt",
+      "automation",
+      "quality_assurance"
+    ]
+  },
+  {
+    "id": "evo-2-novel-003",
+    "title": "Variant Generator with A/B Testing Integration",
+    "score": 6.3,
+    "verdict": "BUILD",
+    "domains": [
+      "generative_design",
+      "a_b_testing",
+      "data_driven_design",
+      "empirical_validation"
+    ]
   }
 ]

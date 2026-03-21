@@ -63,6 +63,10 @@ class MemoryStore:
         """Return extracted reusable idea genes."""
         return self._read("idea-genes.json", [])
 
+    def get_technique_weights(self) -> dict[str, float]:
+        """Return learned technique weights (technique -> multiplier)."""
+        return self._read("technique-weights.json", {})
+
     # --- Writers ---
 
     def save_run(
@@ -148,6 +152,10 @@ class MemoryStore:
         # Keep only last 100 genes to prevent unbounded growth
         self._write("idea-genes.json", existing[-100:])
 
+    def save_technique_weights(self, weights: dict[str, float]) -> None:
+        """Save learned technique weights from meta-learning."""
+        self._write("technique-weights.json", weights)
+
     # --- Helpers ---
 
     def get_previous_winners(self, limit: int = 20) -> list[dict]:
@@ -191,7 +199,23 @@ class MemoryStore:
         # We need the full archive with domain_tags — but we only store id/title/score/verdict
         # So we use domain_heat_map + kill_log to approximate
         return self.get_domain_heat_map()
-
+    def get_technique_verdict_stats(self) -> str:
+        """Return compact technique->verdict stats from lineage for META-LEARN."""
+        lineage = self.get_lineage()
+        if not lineage:
+            return "No technique stats available yet."
+        tech_stats: dict[str, dict[str, int]] = {}
+        for entry in lineage:
+            tech = entry.get("source_technique", "unknown")
+            verdict = entry.get("verdict", "?")
+            if tech not in tech_stats:
+                tech_stats[tech] = {}
+            tech_stats[tech][verdict] = tech_stats[tech].get(verdict, 0) + 1
+        parts = []
+        for tech, verdicts in tech_stats.items():
+            vstr = "/".join(f"{v}:{c}" for v, c in sorted(verdicts.items()))
+            parts.append(f"{tech}({vstr})")
+        return "; ".join(parts)
     def _read(self, filename: str, default):
         p = self.path / filename
         if p.exists():

@@ -43,6 +43,8 @@ from xbrain.prompts import (
     DIVERGE_GAPFILL_USER,
     DIVERGE_SYSTEM,
     DIVERGE_USER,
+    EVOLVE_SYSTEM,
+    EVOLVE_USER,
     META_LEARN_SYSTEM,
     META_LEARN_USER,
     STRESS_TEST_SYSTEM,
@@ -59,6 +61,11 @@ from xbrain.prompts import (
     build_failure_taxonomy_context,
     build_failure_blocklist_context,
     build_search_context,
+    build_gene_context,
+    build_mutation_archive_context,
+    build_adaptive_stress_context,
+    build_novelty_context,
+    build_technique_weight_context,
     CANONICAL_FAILURE_TYPES,
 )
 
@@ -191,6 +198,7 @@ class IdeatePipeline:
             pricing=self.cfg.MODEL_PRICING,
             strategy=self.cfg.model_strategy,
             cheap_model=self.cfg.cheap_model,
+            generations=self.cfg.generations,
         )
         _log("IDEATE", f"Estimated cost: ${estimate['total_est_cost_usd']:.4f}")
 
@@ -315,6 +323,56 @@ class IdeatePipeline:
             _log("IDEATE", f"!! Refinement error after round {refinement_round}: {str(e)}")
             _log("IDEATE", f"Proceeding with round {refinement_round} results.")
 
+        # ── Multi-generation evolution loop ──────────────────────────
+        if self.cfg.generations > 1:
+            for gen in range(2, self.cfg.generations + 1):
+                gen_pass = sum(1 for s in result.stress_test_results if s.verdict in ("BUILD", "MUTATE"))
+                if gen_pass == 0:
+                    _log("IDEATE", f"  No survivors for generation {gen}. Stopping evolution.")
+                    break
+
+                # EVOLVE phase: mutate, crossover, novelty-explore
+                elites, evolved_raw = self._phase_evolve(
+                    survivors, result.stress_test_results, gen, brief_text,
+                )
+
+                if not evolved_raw:
+                    _log("EVOLVE", f"  No evolved ideas produced in generation {gen}. Stopping.")
+                    break
+
+                # CONVERGE on evolved ideas
+                _log_phase_header("CONVERGE", f"Gen {gen}: Scoring {len(evolved_raw)} evolved ideas")
+                tp2 = time.monotonic()
+                evolved_candidates = self._phase_converge(evolved_raw)
+                _log("CONVERGE", f"Gen {gen} done in {time.monotonic() - tp2:.0f}s")
+
+                # Combine elites with evolved candidates for stress testing
+                all_gen_candidates = list(elites) + evolved_candidates
+
+                # STRESS TEST the new generation
+                _log_phase_header("STRESS TEST", f"Gen {gen}: Testing {len(all_gen_candidates)} candidates")
+                tp2 = time.monotonic()
+                gen_stress = self._phase_stress_test(all_gen_candidates)
+                _log("STRESS", f"Gen {gen} done in {time.monotonic() - tp2:.0f}s")
+
+                # Merge into result
+                result.stress_test_results.extend(gen_stress)
+                gen_survivors = self._merge_survivors(all_gen_candidates, gen_stress)
+
+                # Tag generation on each survivor
+                for s in gen_survivors:
+                    s.phase = f"gen_{gen}"
+
+                # Replace survivors with new generation (elites + evolved)
+                survivors = gen_survivors
+                result.survivors = survivors
+
+                gen_build = sum(1 for s in gen_stress if s.verdict == "BUILD")
+                gen_mutate = sum(1 for s in gen_stress if s.verdict == "MUTATE")
+                gen_kill = sum(1 for s in gen_stress if s.verdict == "KILL")
+                _log("EVOLVE", f"  Gen {gen} results: {_C.GREEN}{gen_build} BUILD{_C.RESET} | "
+                     f"{_C.YELLOW}{gen_mutate} MUTATE{_C.RESET} | {_C.RED}{gen_kill} KILL{_C.RESET}")
+
         # Token totals
         result.total_input_tokens = self.llm.total_input_tokens
         result.total_output_tokens = self.llm.total_output_tokens
@@ -364,6 +422,8 @@ class IdeatePipeline:
         ]
         if refinement_round > 0:
             lines.append(f"  Refinement:       {refinement_round} round(s)")
+        if self.cfg.generations > 1:
+            lines.append(f"  Generations:      {self.cfg.generations}")
         lines.append("")
 
         final_pass = final_build + final_mutate
@@ -445,6 +505,8 @@ class IdeatePipeline:
                 p.get("pattern", "")[:60] for p in (attack_patterns or [])[:5]
             ),
             domain_heat=json.dumps(domain_heat),
+            technique_stats=self.memory.get_technique_verdict_stats(),
+            refinement_stats=json.dumps(self.memory.get_refinement_history()[-5:]),
         )
 
         timer = log_llm_call("META", "Distilling cross-run playbook")
@@ -471,6 +533,13 @@ class IdeatePipeline:
         anti_patterns = data.get("anti_patterns", [])
         if anti_patterns:
             _log("META", f"  Anti-patterns: {'; '.join(anti_patterns[:3])}")
+
+        technique_weights = data.get("technique_weights", {})
+        if technique_weights:
+            self.memory.save_technique_weights(technique_weights)
+            adjusted = {k: v for k, v in technique_weights.items() if v != 1.0}
+            if adjusted:
+                _log("META", f"  Technique weights: {adjusted}")
 
     def _phase_check_constraints(self, constraints: list[str]) -> None:
         """Detect contradictions in user-specified constraints before running the pipeline."""
@@ -512,7 +581,7 @@ class IdeatePipeline:
         constraints: list[str] | None,
         brief_text: str | None = None,
     ) -> list[RawIdea]:
-        _log("DIVERGE", f"Round 1/{self.cfg.diverge_rounds} -- generating raw idea seeds...")
+        _log("DIVERGE", "Generating raw idea seeds...")
 
         domain_ctx = build_domain_context()
         constraint_ctx = build_constraint_context(constraints)
@@ -526,6 +595,7 @@ class IdeatePipeline:
 
         winner_ctx = build_winner_repulsion_context(self.memory.get_previous_winners())
         failure_ctx = build_failure_taxonomy_context(self.memory.get_failure_taxonomy())
+        gene_ctx = build_gene_context(self.memory.get_idea_genes())
 
         prompt = DIVERGE_USER.format(
             idea_count=self.cfg.ideas_per_round,
@@ -537,6 +607,8 @@ class IdeatePipeline:
             playbook_context=build_playbook_context(self.memory.get_playbook()),
             winner_repulsion_context=winner_ctx,
             failure_taxonomy_context=failure_ctx,
+            gene_context=gene_ctx,
+            technique_weight_context=build_technique_weight_context(self.memory.get_technique_weights()),
         )
 
         timer = log_llm_call("DIVERGE", f"Generating {self.cfg.ideas_per_round} idea seeds")
@@ -680,12 +752,16 @@ class IdeatePipeline:
         ideas_json = json.dumps(ideas_compact, indent=2, ensure_ascii=False)
 
         calibration_ctx = build_calibration_context(self.memory.get_score_stats())
+        novelty_ctx = build_novelty_context(
+            self.memory.get_previous_winners(), self.memory.past_idea_count()
+        )
 
         prompt_a = CONVERGE_USER.format(
             idea_count=len(raw_ideas),
             top_n=self.cfg.converge_top_n,
             ideas_json=ideas_json,
             calibration_context=calibration_ctx,
+            novelty_context=novelty_ctx,
             brief_context=build_brief_context(self._brief_text),
         )
 
@@ -892,6 +968,9 @@ class IdeatePipeline:
         stress_model = self._model_for_phase("stress")
         sys_attack = self._sys(STRESS_TEST_SYSTEM)
         brief_ctx = build_brief_context(self._brief_text)
+        adaptive_ctx = build_adaptive_stress_context(
+            self.memory.get_attack_patterns(), self.memory.get_kill_log()
+        )
 
         # ── Prior art search for each candidate ──────────────────────
         prior_art_by_id: dict[str, str] = {}
@@ -923,6 +1002,7 @@ class IdeatePipeline:
                 )
             prompt = STRESS_TEST_USER.format(
                 candidate_count=1, candidates_json=cj, brief_context=brief_ctx,
+                adaptive_stress_context=adaptive_ctx,
             )
             if prior_art_ctx:
                 prompt = prior_art_ctx + prompt
@@ -1036,6 +1116,103 @@ class IdeatePipeline:
             _log("STRESS", f"  Verdicts: {verdicts}")
 
         return results
+
+    def _phase_evolve(
+        self,
+        survivors: list[IdeaCard],
+        stress_results: list[StressTestResult],
+        generation: int,
+        brief_text: str | None,
+    ) -> tuple[list[IdeaCard], list[RawIdea]]:
+        """Evolutionary phase: mutate, crossover, and novelty-explore from survivors.
+
+        Returns (elite_cards, evolved_raw_ideas) where elite_cards are carried
+        forward unchanged and evolved_raw_ideas need scoring + stress testing.
+        """
+        _log_phase_header("EVOLVE", f"Generation {generation}/{self.cfg.generations}")
+
+        # Separate by verdict
+        build_ideas = [s for s in survivors if s.stress_test_verdict == "BUILD"]
+        mutate_ideas = [s for s in survivors if s.stress_test_verdict == "MUTATE"]
+        all_passing = build_ideas + mutate_ideas
+
+        if not all_passing:
+            _log("EVOLVE", "  No survivors to evolve. Skipping.")
+            return [], []
+
+        # Elites: top BUILD ideas carry forward unchanged
+        elite_count = max(1, len(build_ideas) // 2)
+        elites = sorted(build_ideas, key=lambda c: c.composite_score, reverse=True)[:elite_count]
+        _log("EVOLVE", f"  Elites (carry-forward): {len(elites)}")
+        for e in elites:
+            _log("EVOLVE", f"    {_C.GREEN}[BUILD]{_C.RESET} {e.composite_score:.1f} {e.title}")
+
+        # Build survivors JSON with stress test context
+        survivors_data = []
+        for c in all_passing:
+            st = next((s for s in stress_results if s.idea_id == c.id), None)
+            entry = {
+                "id": c.id,
+                "title": c.title,
+                "rationale": c.rationale,
+                "domain_tags": c.domain_tags,
+                "composite_score": c.composite_score,
+                "verdict": c.stress_test_verdict,
+            }
+            if st:
+                entry["strongest_argument"] = st.strongest_argument
+                entry["strongest_defense"] = st.strongest_defense
+                entry["suggested_mutation"] = st.suggested_mutation
+                entry["attacks_survived"] = st.attacks_survived
+                entry["attacks_fatal"] = st.attacks_fatal
+            survivors_data.append(entry)
+
+        survivors_json = json.dumps(survivors_data, indent=2, ensure_ascii=False)
+        gene_ctx = build_gene_context(self.memory.get_idea_genes())
+        mutation_ctx = build_mutation_archive_context(self.memory.get_mutation_archive())
+        brief_ctx = build_brief_context(brief_text)
+        evolve_count = max(4, self.cfg.converge_top_n)
+
+        prompt = EVOLVE_USER.format(
+            generation=generation,
+            max_generations=self.cfg.generations,
+            brief_context=brief_ctx,
+            survivors_json=survivors_json,
+            gene_context=gene_ctx,
+            mutation_archive_context=mutation_ctx,
+            elite_count=elite_count,
+            evolve_count=evolve_count,
+        )
+
+        timer = log_llm_call("EVOLVE", f"Evolving generation {generation} ({evolve_count} offspring)")
+        data = self.llm.generate_json(
+            self._sys(EVOLVE_SYSTEM), prompt, temperature=0.85,
+            model_override=self._model_for_phase("evolve"), phase="evolve",
+            max_tokens=self._max_tokens_for_phase("evolve"),
+        )
+        timer.done()
+
+        # Parse evolved ideas as RawIdeas
+        evolved_raw = data.get("evolved_ideas", [])
+        evolved_ideas = []
+        for item in evolved_raw:
+            try:
+                idea = RawIdea(**item)
+                evolved_ideas.append(idea)
+            except Exception:
+                _log("EVOLVE", f"  [WARN] Failed to parse evolved idea: {item.get('id', '?')}")
+
+        # Log results
+        techniques = {}
+        for idea in evolved_ideas:
+            techniques[idea.source_technique] = techniques.get(idea.source_technique, 0) + 1
+        tech_str = ", ".join(f"{k} ({v})" for k, v in techniques.items())
+        _log("EVOLVE", f"  {len(evolved_ideas)} evolved ideas: {tech_str}")
+        for idx, idea in enumerate(evolved_ideas, 1):
+            parents = ", ".join(idea.domain_tags[:2])
+            _log("EVOLVE", f"  {_C.DIM}  {idx:>2}. [{idea.source_technique}] {idea.concept[:70]} ({parents}){_C.RESET}")
+
+        return elites, evolved_ideas
 
     def _phase_refine(
         self,
@@ -1178,6 +1355,8 @@ class IdeatePipeline:
             playbook_context=build_playbook_context(self.memory.get_playbook()),
             winner_repulsion_context=build_winner_repulsion_context(self.memory.get_previous_winners()),
             failure_taxonomy_context=build_failure_taxonomy_context(self.memory.get_failure_taxonomy()),
+            gene_context=build_gene_context(self.memory.get_idea_genes()),
+            technique_weight_context=build_technique_weight_context(self.memory.get_technique_weights()),
         )
 
         # Append failure blocklist (hard constraints) BEFORE soft refinement context
@@ -1218,6 +1397,9 @@ class IdeatePipeline:
             top_n=converge_top_n,
             ideas_json=ideas_json,
             calibration_context=build_calibration_context(self.memory.get_score_stats()),
+            novelty_context=build_novelty_context(
+                self.memory.get_previous_winners(), self.memory.past_idea_count()
+            ),
             brief_context=build_brief_context(self._brief_text),
         )
 
@@ -1624,6 +1806,7 @@ class IdeatePipeline:
         pricing: dict[str, tuple[float, float]],
         strategy: str = "single",
         cheap_model: str = "",
+        generations: int = 1,
     ) -> dict:
         """Estimate API cost before running. Returns phase breakdown and total."""
         # Rough token estimates per phase (based on observed runs)
@@ -1646,8 +1829,14 @@ class IdeatePipeline:
         _add("gapfill", 1500, 2000)
         _add("converge", 2000 + ideas_per_round * 80, 5000 + converge_top_n * 500)
         _add("stress", 2000 + converge_top_n * 300, 5000 + converge_top_n * 800)
-        _add("stress-defense", 2000 + converge_top_n * 500, 4000 + converge_top_n * 600)
-        _add("stress-rebuttal", 2000 + converge_top_n * 600, 5000 + converge_top_n * 700)
+
+        # Add evolution loop cost (per extra generation)
+        extra_gens = max(0, generations - 1)
+        if extra_gens > 0:
+            for _ in range(extra_gens):
+                _add("evolve", 2000 + converge_top_n * 300, 4000 + converge_top_n * 200)
+                _add("converge-evo", 2000 + converge_top_n * 80, 5000 + converge_top_n * 500)
+                _add("stress-evo", 2000 + converge_top_n * 300, 5000 + converge_top_n * 800)
 
         total_cost = 0.0
         for p in phases:
