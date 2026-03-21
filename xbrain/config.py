@@ -18,6 +18,7 @@ class Config:
     ideas_per_round: int = 20
     converge_top_n: int = 8
     generations: int = 1  # Number of evolutionary generations (1 = no evolution loop)
+    stress_attack_count: int = int(os.getenv("XBRAIN_ATTACK_COUNT", "9"))
 
     # Scoring weights
     SCORING_WEIGHTS: dict[str, float] = {
@@ -52,19 +53,19 @@ class Config:
             "diverge": "cheap", "dedup": "cheap",
             "gapfill": "cheap", "converge": "cheap", "stress": "cheap",
             "refine": "cheap", "meta": "cheap", "constraints": "cheap",
-            "specify": "cheap", "evolve": "cheap",
+            "specify": "cheap", "evolve": "cheap", "stress-angles": "cheap",
         },
         "balanced": {
             "diverge": "cheap", "dedup": "cheap",
             "gapfill": "cheap", "converge": "best", "stress": "best",
             "refine": "best", "meta": "cheap", "constraints": "cheap",
-            "specify": "best", "evolve": "cheap",
+            "specify": "best", "evolve": "cheap", "stress-angles": "cheap",
         },
         "best": {
             "diverge": "best", "dedup": "best",
             "gapfill": "best", "converge": "best", "stress": "best",
             "refine": "best", "meta": "best", "constraints": "best",
-            "specify": "best", "evolve": "best",
+            "specify": "best", "evolve": "best", "stress-angles": "best",
         },
     }
 
@@ -79,6 +80,7 @@ class Config:
         "converge-cluster":  6144,
         "converge-compare":  12288,
         "converge-enrich":   12288,
+        "stress-angles":    1024,
         "stress-attack":     4096,
         "refine-diverge":    8192,
         "refine-converge":   12288,

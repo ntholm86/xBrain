@@ -19,10 +19,13 @@ from __future__ import annotations
 
 import os
 import time
+from contextlib import contextmanager
 
 from rich.console import Console
 from rich.markup import escape as _escape
 from rich.panel import Panel
+from rich.spinner import Spinner
+from rich.text import Text
 from rich.theme import Theme
 
 # ── Shared Rich Console ──────────────────────────────────────────────────
@@ -221,3 +224,78 @@ def log_summary_block(lines: list[str]) -> None:
     """Print multiple summary lines and flush once."""
     for line in lines:
         log_summary_line(line)
+
+
+# ── Phase spinner ────────────────────────────────────────────────────
+#
+# Usage:
+#   with phase_spinner("DIVERGE", "Generating ideas") as spin:
+#       spin.update("stream 1/3...")
+#       ...
+#       spin.update("stream 2/3...")
+#
+
+class _PhaseSpinner:
+    """Wrapper that updates a Rich Status spinner with sub-step info."""
+
+    __slots__ = ("_status", "_tag", "_base", "_t0")
+
+    def __init__(self, status, tag: str, base: str) -> None:
+        self._status = status
+        self._tag = tag
+        self._base = base
+        self._t0 = time.monotonic()
+
+    def update(self, detail: str) -> None:
+        """Change the spinner text to show current sub-step."""
+        elapsed = time.monotonic() - self._t0
+        self._status.update(
+            f"[accent]{self._tag}[/accent]  {self._base} — {detail}  [dim]({elapsed:.0f}s)[/dim]"
+        )
+
+    @property
+    def elapsed(self) -> float:
+        return time.monotonic() - self._t0
+
+
+@contextmanager
+def phase_spinner(tag: str, description: str):
+    """Context manager that shows a Rich spinner during a pipeline phase.
+
+    Yields a _PhaseSpinner you can call .update(detail) on to show sub-steps.
+    All regular log() calls still work while the spinner is active.
+    """
+    spinner_text = f"[accent]{tag}[/accent]  {description}  [dim](0s)[/dim]"
+    t0 = time.monotonic()
+
+    # Use transient=True so the spinner line disappears when done,
+    # leaving only the log() output
+    with console.status(
+        spinner_text,
+        spinner="dots",
+        spinner_style="cyan",
+    ) as status:
+        spin = _PhaseSpinner(status, tag, description)
+
+        # Background ticker: update elapsed time every second
+        import threading
+
+        _stop = threading.Event()
+
+        def _tick():
+            while not _stop.wait(2.0):
+                elapsed = time.monotonic() - t0
+                # Only update the time portion; keep current detail text
+                try:
+                    status.update(status.status)  # refresh spinner
+                except Exception:
+                    break
+
+        ticker = threading.Thread(target=_tick, daemon=True)
+        ticker.start()
+
+        try:
+            yield spin
+        finally:
+            _stop.set()
+            ticker.join(timeout=1.0)

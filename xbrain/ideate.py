@@ -25,6 +25,7 @@ from xbrain.log import (
     fmt_verdict,
     fmt_verdicts,
     escape as _esc,
+    phase_spinner,
 )
 from xbrain.memory import MemoryStore
 from xbrain.models import (
@@ -43,8 +44,14 @@ from xbrain.output import generate_idea_report
 from xbrain.pipeline_helpers import apply_calibration, sanitize_text, make_run_id
 from xbrain.search import SearchAggregator, format_search_results
 from xbrain.prompts import (
+    ANGLE_CATALOG_BY_ID,
+    ANGLE_SELECT_SYSTEM,
+    ANGLE_SELECT_USER,
+    ATTACK_ANGLE_CATALOG,
     CONSTRAINT_CHECK_SYSTEM,
     CONSTRAINT_CHECK_USER,
+    CONSTRAINT_EXTRACT_SYSTEM,
+    CONSTRAINT_EXTRACT_USER,
     CONVERGE_SYSTEM,
     CONVERGE_USER,
     CONVERGE_COMPARE_SYSTEM,
@@ -78,6 +85,8 @@ from xbrain.prompts import (
     build_gene_context,
     build_mutation_archive_context,
     build_adaptive_stress_context,
+    build_angle_catalog_text,
+    build_attack_angles_text,
     build_novelty_context,
     build_technique_weight_context,
     build_kill_reason_context,
@@ -99,6 +108,7 @@ PHASE_CONVERGE_CLUSTER = "converge-cluster"
 PHASE_CONVERGE_COMPARE = "converge-compare"
 PHASE_CONVERGE_ENRICH = "converge-enrich"
 PHASE_STRESS = "stress"
+PHASE_STRESS_ANGLES = "stress-angles"
 PHASE_STRESS_ATTACK = "stress-attack"
 PHASE_EVOLVE = "evolve"
 PHASE_REFINE = "refine"
@@ -215,36 +225,62 @@ class IdeatePipeline:
         if constraints and len(constraints) >= 2:
             self._phase_check_constraints(constraints)
 
+        # Phase -0.25 — Extract hard constraints from brief text
+        if brief_text:
+            extracted = self._phase_extract_constraints(brief_text)
+            if extracted:
+                constraints = list(constraints or []) + extracted
+                result.constraints = constraints
+
+        # Store constraints for downstream phases (CONVERGE, EVOLVE)
+        self._constraints = constraints
+
         # Phase 1 — Diverge
         _log_phase_header("DIVERGE", "Generating raw idea seeds")
         tp = time.monotonic()
-        raw_ideas = self._phase_diverge(constraints, brief_text)
-        result.raw_ideas = raw_ideas
+        with phase_spinner("DIVERGE", "Generating raw idea seeds") as spin:
+            raw_ideas = self._phase_diverge(constraints, brief_text)
+            result.raw_ideas = raw_ideas
+            spin.update(f"{len(raw_ideas)} seeds → dedup")
 
-        # Phase 1b — Dedup + Gap Analysis
-        raw_ideas, gaps, overrepresented = self._phase_dedup(raw_ideas)
+            # Phase 1b — Dedup + Gap Analysis
+            raw_ideas, gaps, overrepresented = self._phase_dedup(raw_ideas)
 
-        # Phase 1c — Gap-Fill Divergence (multi-turn)
-        if gaps:
-            gap_ideas = self._phase_diverge_gapfill(
-                gaps, overrepresented, raw_ideas, brief_text
-            )
-            if gap_ideas:
-                raw_ideas.extend(gap_ideas)
-                result.raw_ideas = raw_ideas
-        _log_ok("DIVERGE", f"done in {time.monotonic() - tp:.0f}s")
+            # Phase 1c — Gap-Fill Divergence (multi-turn)
+            if gaps:
+                spin.update(f"gap-filling {len(gaps)} gaps")
+                gap_ideas = self._phase_diverge_gapfill(
+                    gaps, overrepresented, raw_ideas, brief_text, constraints
+                )
+                if gap_ideas:
+                    raw_ideas.extend(gap_ideas)
+                    result.raw_ideas = raw_ideas
+        _log_ok("DIVERGE", f"done in {time.monotonic() - tp:.0f}s — {len(raw_ideas)} ideas")
 
         # Phase 2 — Converge
         _log_phase_header("CONVERGE", f"Scoring and ranking {len(raw_ideas)} ideas")
         tp = time.monotonic()
-        candidates = self._phase_converge(raw_ideas)
+        with phase_spinner("CONVERGE", f"Scoring {len(raw_ideas)} ideas") as spin:
+            candidates = self._phase_converge(raw_ideas)
         _log_ok("CONVERGE", f"done in {time.monotonic() - tp:.0f}s")
         result.candidates = candidates
+
+        # Phase 2.5 — Select Attack Angles
+        with phase_spinner("ANGLES", "Selecting attack angles") as spin:
+            selected_angles = self._phase_select_attack_angles(
+                brief_text, candidates
+            )
+        result.selected_attack_angles = [
+            {"id": a["id"], "name": a["name"], "category": a["category"],
+             "relevance": a.get("relevance", "")}
+            for a in selected_angles
+        ]
 
         # Phase 3 — Stress Test
         _log_phase_header("STRESS TEST", f"Adversarial debate for {len(candidates)} candidates")
         tp = time.monotonic()
-        stress_results = self._phase_stress_test(candidates)
+        with phase_spinner("STRESS", f"Attacking {len(candidates)} candidates") as spin:
+            stress_results = self._phase_stress_test(candidates, selected_angles)
         _log_ok("STRESS", f"done in {time.monotonic() - tp:.0f}s")
         result.stress_test_results = stress_results
 
@@ -281,18 +317,20 @@ class IdeatePipeline:
                     }
 
                 # Run refinement phase
-                refinement_survivors = self._phase_refine(
-                    raw_ideas, survivors, stress_results, constraints, brief_text,
-                    iteration=refinement_round,
-                    cached_context=_cached_ctx,
-                )
+                with phase_spinner("REFINE", f"Round {refinement_round}: Generating refined ideas") as spin:
+                    refinement_survivors = self._phase_refine(
+                        raw_ideas, survivors, stress_results, constraints, brief_text,
+                        iteration=refinement_round,
+                        cached_context=_cached_ctx,
+                    )
                 
                 if not refinement_survivors:
                     _log_warn("REFINE", "No refined candidates generated. Stopping refinement loop.")
                     break
                 
                 # Re-run stress test on refined ideas
-                refinement_stress = self._phase_stress_test(refinement_survivors)
+                with phase_spinner("STRESS", f"Refine round {refinement_round}: Testing {len(refinement_survivors)} ideas") as spin:
+                    refinement_stress = self._phase_stress_test(refinement_survivors, selected_angles)
                 
                 # Merge refinement survivors and stress results into the result
                 result.survivors.extend(refinement_survivors)
@@ -332,68 +370,78 @@ class IdeatePipeline:
                     _log_warn("IDEATE", f"No survivors for generation {gen}. Stopping evolution.")
                     break
 
-                # EVOLVE phase: mutate, crossover, novelty-explore
-                elites, evolved_raw = self._phase_evolve(
-                    survivors, result.stress_test_results, gen, brief_text,
-                )
+                try:
+                    # EVOLVE phase: mutate, crossover, novelty-explore
+                    with phase_spinner("EVOLVE", f"Gen {gen}: Evolving survivors") as spin:
+                        elites, evolved_raw = self._phase_evolve(
+                            survivors, result.stress_test_results, gen, brief_text,
+                        )
 
-                if not evolved_raw:
-                    _log_warn("EVOLVE", f"No evolved ideas produced in generation {gen}. Stopping.")
+                    if not evolved_raw:
+                        _log_warn("EVOLVE", f"No evolved ideas produced in generation {gen}. Stopping.")
+                        break
+
+                    # CONVERGE on evolved ideas
+                    _log_phase_header("CONVERGE", f"Gen {gen}: Scoring {len(evolved_raw)} evolved ideas")
+                    tp2 = time.monotonic()
+                    with phase_spinner("CONVERGE", f"Gen {gen}: Scoring {len(evolved_raw)} evolved ideas") as spin:
+                        evolved_candidates = self._phase_converge(evolved_raw)
+                    _log_ok("CONVERGE", f"Gen {gen} done in {time.monotonic() - tp2:.0f}s")
+
+                    # Tag evolution metadata on converged candidates
+                    # Build lookup of raw evolved idea source_technique by id
+                    evolved_technique_map = {r.id: r.source_technique for r in evolved_raw}
+                    for ec in evolved_candidates:
+                        ec.generation = gen
+                        ec.evolution_rationale = evolved_technique_map.get(ec.id, ec.source_technique)
+
+                    # Combine elites with evolved candidates for stress testing
+                    all_gen_candidates = list(elites) + evolved_candidates
+
+                    # STRESS TEST the new generation
+                    _log_phase_header("STRESS TEST", f"Gen {gen}: Testing {len(all_gen_candidates)} candidates")
+                    tp2 = time.monotonic()
+                    with phase_spinner("STRESS", f"Gen {gen}: Attacking {len(all_gen_candidates)} candidates") as spin:
+                        gen_stress = self._phase_stress_test(all_gen_candidates, selected_angles)
+                    _log_ok("STRESS", f"Gen {gen} done in {time.monotonic() - tp2:.0f}s")
+
+                    # Merge into result
+                    result.stress_test_results.extend(gen_stress)
+                    gen_survivors = self._merge_survivors(all_gen_candidates, gen_stress)
+
+                    # Tag generation on each survivor
+                    for s in gen_survivors:
+                        s.phase = f"gen_{gen}"
+                        s.generation = gen
+
+                    # Replace survivors with new generation (elites + evolved)
+                    survivors = gen_survivors
+                    result.survivors = survivors
+
+                    gen_build = sum(1 for s in gen_stress if s.verdict == "BUILD")
+                    gen_mutate = sum(1 for s in gen_stress if s.verdict == "MUTATE")
+                    gen_kill = sum(1 for s in gen_stress if s.verdict == "KILL")
+                    gen_verdicts = {"BUILD": gen_build, "MUTATE": gen_mutate, "KILL": gen_kill}
+                    _log_ok("EVOLVE", f"Gen {gen} results: {fmt_verdicts(gen_verdicts)}")
+                except Exception as e:
+                    _log_warn("EVOLVE", f"Generation {gen} failed ({e}). Continuing with gen {gen-1} results.")
                     break
-
-                # CONVERGE on evolved ideas
-                _log_phase_header("CONVERGE", f"Gen {gen}: Scoring {len(evolved_raw)} evolved ideas")
-                tp2 = time.monotonic()
-                evolved_candidates = self._phase_converge(evolved_raw)
-                _log_ok("CONVERGE", f"Gen {gen} done in {time.monotonic() - tp2:.0f}s")
-
-                # Tag evolution metadata on converged candidates
-                # Build lookup of raw evolved idea source_technique by id
-                evolved_technique_map = {r.id: r.source_technique for r in evolved_raw}
-                for ec in evolved_candidates:
-                    ec.generation = gen
-                    ec.evolution_rationale = evolved_technique_map.get(ec.id, ec.source_technique)
-
-                # Combine elites with evolved candidates for stress testing
-                all_gen_candidates = list(elites) + evolved_candidates
-
-                # STRESS TEST the new generation
-                _log_phase_header("STRESS TEST", f"Gen {gen}: Testing {len(all_gen_candidates)} candidates")
-                tp2 = time.monotonic()
-                gen_stress = self._phase_stress_test(all_gen_candidates)
-                _log_ok("STRESS", f"Gen {gen} done in {time.monotonic() - tp2:.0f}s")
-
-                # Merge into result
-                result.stress_test_results.extend(gen_stress)
-                gen_survivors = self._merge_survivors(all_gen_candidates, gen_stress)
-
-                # Tag generation on each survivor
-                for s in gen_survivors:
-                    s.phase = f"gen_{gen}"
-                    s.generation = gen
-
-                # Replace survivors with new generation (elites + evolved)
-                survivors = gen_survivors
-                result.survivors = survivors
-
-                gen_build = sum(1 for s in gen_stress if s.verdict == "BUILD")
-                gen_mutate = sum(1 for s in gen_stress if s.verdict == "MUTATE")
-                gen_kill = sum(1 for s in gen_stress if s.verdict == "KILL")
-                gen_verdicts = {"BUILD": gen_build, "MUTATE": gen_mutate, "KILL": gen_kill}
-                _log_ok("EVOLVE", f"Gen {gen} results: {fmt_verdicts(gen_verdicts)}")
 
         # Token totals
         result.total_input_tokens = self.llm.total_input_tokens
         result.total_output_tokens = self.llm.total_output_tokens
 
-        # Deduplicate stress test results to match deduplicated survivors
+        # Deduplicate stress test results to match deduplicated survivors.
+        # Keep the LATEST result per idea_id (last wins) so that verdicts
+        # from the most recent generation/stress-test are used in the summary.
         survivor_ids = {c.id for c in result.survivors}
         seen_stress_ids: set[str] = set()
         unique_stress: list[StressTestResult] = []
-        for st in result.stress_test_results:
+        for st in reversed(result.stress_test_results):
             if st.idea_id in survivor_ids and st.idea_id not in seen_stress_ids:
                 seen_stress_ids.add(st.idea_id)
                 unique_stress.append(st)
+        unique_stress.reverse()  # restore chronological order
         result.stress_test_results = unique_stress
 
         # Write outputs (do this BEFORE any other processing to ensure files exist)
@@ -597,6 +645,38 @@ class IdeatePipeline:
         except Exception as e:
             _log_warn("CONSTCHK", f"Skipped (error: {e})")
 
+    def _phase_extract_constraints(self, brief_text: str) -> list[str]:
+        """Extract hard constraints from the brief text via a cheap LLM call."""
+        _log("CONSTXT", "Extracting hard constraints from brief...")
+
+        prompt = CONSTRAINT_EXTRACT_USER.format(brief_text=brief_text)
+        try:
+            timer = log_llm_call("CONSTXT", "Extracting constraints from brief")
+            data = self.llm.generate_json(
+                CONSTRAINT_EXTRACT_SYSTEM, prompt, temperature=0.2,
+                model_override=self._model_for_phase(PHASE_CONSTRAINTS),
+                phase=PHASE_CONSTRAINTS,
+                max_tokens=self._max_tokens_for_phase(PHASE_CONSTRAINTS),
+            )
+            timer.done()
+
+            hard = data.get("hard_constraints", [])
+            extracted = [item["constraint"] for item in hard if item.get("constraint")]
+            if extracted:
+                _log_ok("CONSTXT", f"Extracted [ok]{len(extracted)}[/ok] hard constraint(s):")
+                for c in extracted:
+                    _log_detail("CONSTXT", f"  - {_esc(c)}")
+            else:
+                _log_detail("CONSTXT", "No hard constraints found in brief.")
+
+            soft = data.get("soft_preferences", [])
+            if soft:
+                _log_detail("CONSTXT", f"Also noted {len(soft)} soft preference(s).")
+            return extracted
+        except Exception as e:
+            _log_warn("CONSTXT", f"Skipped (error: {e})")
+            return []
+
     def _phase_diverge(
         self,
         constraints: list[str] | None,
@@ -751,6 +831,7 @@ class IdeatePipeline:
         overrepresented: list[str],
         existing_ideas: list[RawIdea],
         brief_text: str | None,
+        constraints: list[str] | None = None,
     ) -> list[RawIdea]:
         """Multi-turn divergence: generate new ideas to fill gaps from round 1."""
         # Cap at half of original idea count to keep total manageable
@@ -761,6 +842,7 @@ class IdeatePipeline:
             idea_count=gap_count,
             brief_context=build_brief_context(brief_text),
             domain_context=build_domain_context(),
+            constraint_context=build_constraint_context(constraints),
             playbook_context=build_playbook_context(self.memory.get_playbook()),
             overrepresented="; ".join(overrepresented),
             gaps="; ".join(gaps),
@@ -816,6 +898,7 @@ class IdeatePipeline:
             calibration_context=calibration_ctx,
             novelty_context=novelty_ctx,
             brief_context=build_brief_context(self._brief_text),
+            constraint_context=build_constraint_context(self._constraints),
         )
 
         timer = log_llm_call("CONVERGE", f"Clustering {len(raw_ideas)} ideas → top {self.cfg.converge_top_n}")
@@ -991,7 +1074,90 @@ class IdeatePipeline:
 
         return candidates
 
-    def _phase_stress_test(self, candidates: list[IdeaCard]) -> list[StressTestResult]:
+    # ── Attack Angle Selection ──────────────────────────────────────
+
+    def _phase_select_attack_angles(
+        self,
+        brief_text: str | None,
+        candidates: list[IdeaCard],
+    ) -> list[dict]:
+        """Select the most relevant attack angles from the catalog for this brief."""
+        attack_count = Config.stress_attack_count
+
+        # If no brief, use the full default set (first N from catalog)
+        if not brief_text:
+            default = ATTACK_ANGLE_CATALOG[:attack_count]
+            _log("STRESS", f"No brief — using first {attack_count} default attack angles.")
+            return default
+
+        _log_phase_header("ATTACK ANGLES", f"Selecting {attack_count} from catalog of {len(ATTACK_ANGLE_CATALOG)}")
+
+        # Build candidate themes summary from domain tags
+        themes: set[str] = set()
+        for c in candidates:
+            themes.update(c.domain_tags)
+        candidate_themes = ", ".join(sorted(themes)) if themes else "general"
+
+        prompt = ANGLE_SELECT_USER.format(
+            angle_count=attack_count,
+            brief_text=brief_text,
+            candidate_themes=candidate_themes,
+            catalog_size=len(ATTACK_ANGLE_CATALOG),
+            catalog_text=build_angle_catalog_text(),
+        )
+
+        try:
+            timer = log_llm_call("ANGLES", "Selecting attack angles for brief")
+            data = self.llm.generate_json(
+                ANGLE_SELECT_SYSTEM, prompt, temperature=0.2,
+                model_override=self._model_for_phase(PHASE_STRESS_ANGLES),
+                phase=PHASE_STRESS_ANGLES,
+                max_tokens=self._max_tokens_for_phase(PHASE_STRESS_ANGLES),
+            )
+            timer.done()
+
+            raw_selections = data.get("selected_angles", [])
+            selected: list[dict] = []
+            for item in raw_selections:
+                aid = item.get("id", "")
+                if aid in ANGLE_CATALOG_BY_ID:
+                    angle = dict(ANGLE_CATALOG_BY_ID[aid])  # copy
+                    angle["relevance"] = item.get("relevance", "")
+                    selected.append(angle)
+
+            # Fallback if LLM returned too few valid IDs
+            if len(selected) < attack_count:
+                seen_ids = {a["id"] for a in selected}
+                for a in ATTACK_ANGLE_CATALOG:
+                    if a["id"] not in seen_ids:
+                        selected.append(dict(a))
+                        seen_ids.add(a["id"])
+                    if len(selected) >= attack_count:
+                        break
+
+            selected = selected[:attack_count]
+
+            # Terminal output: show selected angles
+            _log_ok("ANGLES", f"Selected [ok]{len(selected)}[/ok] attack angles:")
+            for i, a in enumerate(selected, 1):
+                cat_tag = f"[dim]{a['category']}[/dim]"
+                relevance = a.get("relevance", "")
+                if relevance:
+                    _log("ANGLES", f"  {i:2d}. {a['name']:30s} {cat_tag}")
+                    _log_detail("ANGLES", f"      {_esc(relevance)}")
+                else:
+                    _log("ANGLES", f"  {i:2d}. {a['name']:30s} {cat_tag}")
+            _log("ANGLES", "")
+
+            return selected
+
+        except Exception as e:
+            _log_warn("ANGLES", f"Selection failed ({e}) — using defaults")
+            return list(ATTACK_ANGLE_CATALOG[:attack_count])
+
+    # ── Stress Test ─────────────────────────────────────────────────
+
+    def _phase_stress_test(self, candidates: list[IdeaCard], selected_angles: list[dict] | None = None) -> list[StressTestResult]:
         _log("STRESS", f"Adversarial stress test for [error]{len(candidates)}[/error] candidates (parallel)...")
         _log("STRESS", "")
 
@@ -1004,6 +1170,13 @@ class IdeatePipeline:
                 "rationale": c.rationale,
                 "domain_tags": c.domain_tags,
             }
+
+        # Resolve attack angles
+        if selected_angles is None:
+            selected_angles = list(ATTACK_ANGLE_CATALOG[:Config.stress_attack_count])
+        attack_count = len(selected_angles)
+        survive_threshold = max(1, round(attack_count * 5 / 9))
+        attack_angles_text = build_attack_angles_text(selected_angles)
 
         stress_model = self._model_for_phase(PHASE_STRESS)
         sys_attack = self._sys(STRESS_TEST_SYSTEM)
@@ -1043,6 +1216,9 @@ class IdeatePipeline:
             prompt = STRESS_TEST_USER.format(
                 candidate_count=1, candidates_json=cj, brief_context=brief_ctx,
                 adaptive_stress_context=adaptive_ctx,
+                attack_count=attack_count,
+                attack_angles=attack_angles_text,
+                survive_threshold=survive_threshold,
             )
             if prior_art_ctx:
                 prompt = prior_art_ctx + prompt
@@ -1054,7 +1230,8 @@ class IdeatePipeline:
                 )
                 raw = _unwrap_single(data, "results", c.id, "attack")
                 _attack_done += 1
-                _log_ok("STRESS", f"[{_attack_done}/{_attack_total}] {c.title[:50]} - attack received")
+                _elapsed = time.monotonic() - _attack_t0
+                _log_ok("STRESS", f"[{_attack_done}/{_attack_total}] {c.title[:50]} ({_elapsed:.0f}s)")
                 return AttackResponse.model_validate(raw)
             except (ValueError, Exception) as e:
                 _attack_done += 1
@@ -1067,11 +1244,7 @@ class IdeatePipeline:
         # ── Assemble final StressTestResults directly from attack ────
 
         results: list[StressTestResult] = []
-        angles = [
-            "Prior art", "Adoption failure", "Technical blocker",
-            "Problem reframe", "Negative externalities", "Obsolescence",
-            "Timing", "Defensibility", "Expertise gap",
-        ]
+        angle_names = [a["name"] for a in selected_angles]
 
         for ar in attack_results:
             idea_id = ar.idea_id
@@ -1089,7 +1262,7 @@ class IdeatePipeline:
             defenses = ar.defenses or []
             outcomes = getattr(ar, "attack_outcomes", None) or []
             for i, attack_text in enumerate(ar.structured_attacks):
-                angle = angles[i] if i < len(angles) else f"Attack {i+1}"
+                angle = angle_names[i] if i < len(angle_names) else f"Attack {i+1}"
                 defense_text = defenses[i] if i < len(defenses) else ""
                 outcome = outcomes[i] if i < len(outcomes) else ""
                 debate_rounds.append(DebateExchange(
@@ -1134,12 +1307,14 @@ class IdeatePipeline:
         # ── Programmatic verdict enforcement ────────────────────
         # The LLM tends to hedge with MUTATE even when its own numbers
         # say BUILD.  Enforce the quantitative rule from the prompt:
-        # attacks_survived >= 5  AND  attacks_fatal <= 1  →  BUILD
+        # attacks_survived >= threshold  AND  attacks_fatal <= 1  →  BUILD
         # Also: low-confidence KILLs (< 0.4) get downgraded to MUTATE
+        # Also: high-fragility BUILDs (inverse_confidence >= 7.0) downgrade to MUTATE
+        candidate_map = {c.id: c for c in candidates}
         overrides = 0
         for r in results:
             if (r.verdict == "MUTATE"
-                    and r.attacks_survived >= 5
+                    and r.attacks_survived >= survive_threshold
                     and r.attacks_fatal <= 1):
                 _log_warn("STRESS", f">> Override {r.idea_id}: MUTATE->BUILD "
                      f"(survived={r.attacks_survived}, fatal={r.attacks_fatal})")
@@ -1153,6 +1328,16 @@ class IdeatePipeline:
                      f"(low confidence={r.attack_confidence:.2f})")
                 r.verdict = "MUTATE"
                 overrides += 1
+
+        # Fragility guard: BUILD ideas with high inverse_confidence are fragile
+        for r in results:
+            if r.verdict == "BUILD" and not r.error_source:
+                card = candidate_map.get(r.idea_id)
+                if card and card.inverse_confidence >= 7.0:
+                    _log_warn("STRESS", f">> Override {r.idea_id}: BUILD->MUTATE "
+                         f"(fragile: inverse_confidence={card.inverse_confidence:.1f})")
+                    r.verdict = "MUTATE"
+                    overrides += 1
 
         _log("STRESS", "")
         verdicts: dict[str, int] = {}
@@ -1226,6 +1411,7 @@ class IdeatePipeline:
             generation=generation,
             max_generations=self.cfg.generations,
             brief_context=brief_ctx,
+            constraint_context=build_constraint_context(self._constraints),
             survivors_json=survivors_json,
             gene_context=gene_ctx,
             mutation_archive_context=mutation_ctx,

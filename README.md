@@ -1,6 +1,6 @@
 # xBrain — AI Idea Engine
 
-Generate, score, stress-test, and evolve project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then runs adversarial stress testing — a devil's advocate attacks every idea from 9 angles — so only the genuinely strong ones survive. With `--generations N`, surviving ideas are evolved through mutation, crossover, and selection pressure across multiple generations, producing battle-hardened ideas that have beaten the stress test repeatedly.
+Generate, score, stress-test, and evolve project ideas using Claude. xBrain runs a multi-phase AI pipeline that generates diverse ideas, removes duplicates, fills creative gaps, scores with bias correction, and then runs adversarial stress testing — a devil's advocate attacks every idea from auto-selected angles tailored to your brief — so only the genuinely strong ones survive. With `--generations N`, surviving ideas are evolved through mutation, crossover, and selection pressure across multiple generations, producing battle-hardened ideas that have beaten the stress test repeatedly.
 
 ## Setup
 
@@ -32,7 +32,7 @@ Each run creates a folder in `xbrain-runs/` containing:
 | **idea-report.md** | The main document to read — ranked ideas with scores, verdicts, and analysis |
 | idea-cards.json | Machine-readable idea data |
 | idea-log.json | Full pipeline trace |
-| stress-test-report.json | Adversarial stress test results (9-angle attack) |
+| stress-test-report.json | Adversarial stress test results |
 
 Open **idea-report.md** to review your ideas.
 
@@ -65,6 +65,8 @@ python -m xbrain ideate --constraints "must be free" "must work on mobile" "no l
 
 python -m xbrain ideate --constraints "solo developer" "launch in 2 weeks" "zero marketing budget"
 ```
+
+Constraints are also **auto-extracted from the brief** — if your brief says "I cannot freelance", the pipeline detects that as a hard constraint and enforces it across all phases. Explicit `--constraints` are merged with auto-extracted ones.
 
 ### `--ideas` — How many raw ideas to generate
 
@@ -314,13 +316,14 @@ xBrain runs a multi-phase pipeline inspired by evolutionary computation. Most id
 Organized by pipeline phase. Each technique is annotated with `«concept»` in the architecture diagram below.
 
 **DIVERGE** — idea generation
-- **6 Techniques** — each approaches ideation from a different angle, weighted by meta-learned survival rates:
+- **7 Techniques** — each approaches ideation from a different angle, weighted by meta-learned survival rates:
   - **Domain Scan** — systematically sweep every domain (health, finance, education, agriculture…) for unsolved problems that are programmable.
   - **Cross-Domain Collision** — force unexpected intersections between two unrelated domains (e.g., "epidemiology × misinformation = contagion modeling for fake news").
   - **Contrarian Inversion** — take a widely held assumption and flip it: "what if the opposite were true?" Produces ideas that challenge conventional wisdom.
   - **Contextual Constraints** — apply harsh real-world limits ("must work offline", "must cost $0", "must work on 2G") to force practical creativity.
   - **Mechanism Stealing** — extract the core working mechanism from a successful product (e.g., Duolingo's streak mechanic) and transplant it to a completely different domain.
   - **Gap Fill** — after dedup identifies under-represented themes, generate ideas specifically targeting those gaps at maximum creativity (temp=0.95).
+  - **Obvious First** — before going exotic, generate the most straightforward, practical solution a domain expert would try first. Grounds the idea set in reality and prevents novelty-chasing.
 - **3 Parallel Streams** — DIVERGE fires three async prompts simultaneously, each with different technique emphasis (balanced / contrarian+mechanism / cross-domain+constraints). Triples creative surface area without tripling cost, since each stream generates ⅓ of the ideas.
 - **Kill-Reason Pre-Filter** — specific reasons ideas died in past runs (e.g., "no moat against incumbents", "requires regulatory approval") injected as AVOID constraints. Prevents regenerating known-dead patterns.
 - **Winner Repulsion** — previous high-scorers (≥ 5.0) fed as an exclusion list, pushing the engine toward unexplored territory instead of re-discovering the same winning ideas.
@@ -334,16 +337,13 @@ Organized by pipeline phase. Each technique is annotated with `«concept»` in t
 - **Dynamic Output** — detects brief type and adapts format: product briefs get personas + ICPs + GTM analysis, internal tools get workflow fit + integration surfaces, process briefs get change impact analysis.
 
 **STRESS TEST** — adversarial attack (all ideas tested in parallel)
-- **9 Attack Angles** — each idea is attacked from nine structured angles, plus one freeform "most devastating argument you can construct":
-  1. Prior art — does this already exist?
-  2. Adoption failure — why would users not switch?
-  3. Technical blocker — what makes this hard to build?
-  4. Problem reframe — is the problem actually different than assumed?
-  5. Negative externalities — what harm could this cause?
-  6. Obsolescence — what kills this in 2 years?
-  7. Timing — is the market too early or too late?
-  8. Defensibility — can a big player copy this trivially?
-  9. Expertise gap — does the team lack critical skills?
+- **Auto-Selected Attack Angles** — the LLM picks the most relevant angles from a catalog of 20 based on the brief's context. A career brief gets angles like "Credential barrier" and "Geographic constraint"; a SaaS brief gets "Defensibility gap" and "Prior art." Catalog spans 5 categories:
+  - **Universal** (6): Prior art, Adoption barrier, Timing misfit, Opportunity cost, Negative externalities, Dependency risk
+  - **Execution** (4): Execution blocker, Expertise gap, Resource constraint, Sustainability trap
+  - **Economics** (4): Revenue ceiling, Defensibility gap, Problem reframe, Buyer power
+  - **Environment** (4): Regulatory barrier, Geographic constraint, Economic cycle risk, Obsolescence risk
+  - **Personal** (2): Personal fit risk, Credential barrier
+- **Configurable Count** — defaults to 9 angles per idea. Override with `XBRAIN_ATTACK_COUNT` env var.
 - **Adaptive Weights** — angles that historically kill more ideas (learned across all runs) are weighted more heavily. The stress test gets harder over time as the system learns where ideas actually break.
 - **Web Search Grounding** — queries DuckDuckGo + HackerNews for real prior art per idea before attacking. Grounds the prior-art angle in actual competitors, not hallucinated ones. Best-effort: pipeline runs without it if search is unavailable.
 - **Confidence Scoring** — LLM self-rates attack certainty (0.0–1.0). Low-confidence KILLs (< 0.4) are speculative, so they're downgraded to MUTATE — giving the idea a chance to be fixed rather than killed on weak evidence.
@@ -353,8 +353,10 @@ Organized by pipeline phase. Each technique is annotated with `«concept»` in t
 - **4 Evolutionary Operators** — after stress testing, survivors are evolved through four mechanisms:
   - **Elite Carry-Forward** — top BUILD ideas pass unchanged into the next generation as stable anchors, preventing regression.
   - **Mutation** — each MUTATE-verdict idea gets its specific identified weakness fixed (the suggested_mutation from stress testing), producing a modified offspring.
-  - **Crossover** — the mechanism from one high-scoring idea is combined with the audience of another, producing hybrid offspring (e.g., idea A's gamification mechanic applied to idea B's healthcare audience).
-  - **Novelty Explorer** — generates ideas maximally different from all survivors, preventing the population from collapsing to a single niche (local optimum avoidance).
+  - **Crossover** — picks 2 survivors from **different domain clusters** (not just top-2) to prevent thematic monoculture. Combines the mechanism of one with the audience of another, producing hybrid offspring.
+  - **Novelty Explorer** — generates ideas maximally different from all survivors, preventing the population from collapsing to a single niche (local optimum avoidance). Requires at least 1 obvious/practical idea.
+- **Thematic Diversity Enforcement** — CONVERGE and EVOLVE enforce that the final idea set spans at least 3 distinct solution categories. No single category may hold more than half the top-N slots. Prevents the pipeline from collapsing all ideas into one niche.
+- **Constraint Propagation** — hard constraints extracted from the brief are injected into DIVERGE, CONVERGE, EVOLVE, and GAP-FILL. Ideas violating any hard constraint score 0 in CONVERGE. Ensures the pipeline respects the user's real-world limitations.
 - **Gene Recombination** — reusable solution patterns ("idea genes") extracted from high-scoring ideas in past runs are transplanted into new contexts during crossover and novelty generation. The engine builds institutional memory of what works.
 - **Attack Pattern Recycling** — the most lethal attack patterns from the just-completed stress test are injected into EVOLVE as mutation priorities, so the evolutionary process targets the actual vulnerabilities that killed ideas.
 
@@ -367,8 +369,9 @@ Organized by pipeline phase. Each technique is annotated with `«concept»` in t
 - Extracts mutations, attack patterns, failure blocklist, and problem reframes from the failed round. Re-generates with progressively lower temperature (0.9 → 0.75 → 0.60) and fewer ideas (50% → 33% → 25%), getting more focused each round. Stops when a BUILD verdict is found or 3 rounds are exhausted.
 
 **PROGRAMMATIC ENFORCEMENT** — code overrides LLM output where the LLM consistently gets it wrong
-- **BUILD Override** — if an idea survived ≥ 5/9 attacks with ≤ 1 fatal, the verdict is forced to BUILD regardless of LLM hedging. LLMs tend to say MUTATE even when the numbers say BUILD.
+- **BUILD Override** — if an idea survived ≥ 56% of attacks (e.g. 5/9) with ≤ 1 fatal, the verdict is forced to BUILD regardless of LLM hedging. Threshold scales automatically with attack count. LLMs tend to say MUTATE even when the numbers say BUILD.
 - **KILL Downgrade** — low-confidence attacks (< 0.4) → KILL overridden to MUTATE. Speculative kills shouldn't be final.
+- **Fragility Guard** — if a BUILD idea has inverse_confidence ≥ 7.0 (key assumptions flagged fragile), verdict is forced to MUTATE. Prevents narratively strong ideas with quantitatively shaky foundations from getting BUILD.
 - **Score Spread** — if all CONVERGE scores land within 3.0 points of each other, they're linearly stretched to enforce meaningful differentiation while preserving rank order.
 - **Effort Diversity** — if the LLM marks every idea "medium" effort (which it usually does), the lowest-effort idea is remapped to "small" and the highest to "large".
 - **Score Clamping** — values outside [0, 10] are clamped. Catches when the LLM returns dollar amounts or percentages instead of 0–10 scores.
@@ -426,6 +429,20 @@ Organized by pipeline phase. Each technique is annotated with `«concept»` in t
   +==================+=====================+
                      |
                      v
+  +========================================+
+  | PHASE -0.25: CONSTRAINT EXTRACTION     |
+  | (auto, when brief provided)            |
+  |                                        |
+  |  Reads the brief and extracts hard     |
+  |  constraints the user stated or        |
+  |  implied (e.g. "cannot register CVR", |
+  |  "evenings only"). Uses cheap model.   |
+  |  Extracted constraints are propagated  |
+  |  to DIVERGE, CONVERGE, and EVOLVE so   |
+  |  every phase respects them.            |
+  +==================+=====================+
+                     |
+                     v
   +========================================+       +==========================+
   | PHASE 1: DIVERGE                       |       | Injected Context:        |
   | «3 Parallel Streams» temp=0.9          |<------| - Playbook (meta-learn)  |
@@ -436,13 +453,15 @@ Organized by pipeline phase. Each technique is annotated with `«concept»` in t
   |    Stream B: contrarian + mechanism    |       | - Failure taxonomy       |
   |    Stream C: cross-domain + contextual |       | - Memory (past ideas,    |
   |                                        |       |   domain heat map)       |
-  |  6 techniques per stream:              |       | - Brief + constraints    |
+  |  7 techniques per stream:              |       | - Brief + constraints    |
   |  1. Domain Scan                        |       +==========================+
   |  2. Cross-Domain Collision             |
   |  3. Contrarian Inversion               |
   |  4. Contextual Constraints             |
   |  5. AI-Augmentable Gap Detection       |
   |  6. Mechanism Stealing                 |
+  |  7. Obvious First (Grounded            |
+  |     Practicality)                      |
   |                                        |
   |  Output: RawIdea[] (merged from all 3) |
   +==================+=====================+
@@ -456,6 +475,8 @@ Organized by pipeline phase. Each technique is annotated with `«concept»` in t
   |  Identify:                             |
   |    - Over-represented themes           |
   |    - Gap areas (missing topics)        |
+  |    - Thematic overlap (same user +     |
+  |      same activity, different model)   |
   |                                        |
   |  Output: filtered RawIdea[],           |
   |    gaps[], overrepresented[]           |
@@ -510,10 +531,9 @@ Organized by pipeline phase. Each technique is annotated with `«concept»` in t
   |  +-----------------------------------------------------------+ |
   |  | ATTACK (Devil's Advocate)                     temp=0.4      | |
   |  |                                                            | |
-  |  |  9 structured attack angles per idea:                      | |
-  |  |  Prior art, Adoption failure, Technical blocker,           | |
-  |  |  Problem reframe, Negative externalities, Obsolescence,    | |
-  |  |  Timing, Defensibility, Expertise gap                      | |
+  |  |  Auto-selected attack angles from catalog of 20:           | |
+  |  |  LLM picks N most relevant angles for THIS brief           | |
+  |  |  (Universal, Execution, Economics, Environment, Personal)  | |
   |  |  + 1 freeform devastating attack                           | |
   |  |                                                            | |
   |  |  «Adaptive Weights» — high-kill-rate angles                | |
@@ -681,11 +701,14 @@ Cross-session learning. Reads accumulated data from all previous runs: score dis
 **Phase -0.5 — CONSTRAINT CHECK** (automatic, when 2+ constraints provided)
 Analyzes constraints for logical contradictions. Warns about conflicts and suggests resolutions. Non-blocking.
 
+**Phase -0.25 — CONSTRAINT EXTRACTION** (automatic, when brief provided)
+Reads the brief text and extracts hard constraints the user stated or implied (e.g., "cannot register a CVR number", "evenings and weekends only"). Uses a cheap model (Haiku) for cost efficiency. Extracted constraints are propagated to DIVERGE, CONVERGE, EVOLVE, and GAP-FILL so every phase respects them. Ideas violating hard constraints score 0.
+
 **Phase 1 — DIVERGE**
-Raw idea generation using six techniques: Domain Scan, Cross-Domain Collision, Contrarian Inversion, Contextual Constraints, AI-Augmentable Gap Detection, and Mechanism Stealing. Runs as 3 parallel async streams with different technique emphasis for broader creative coverage. Each technique is weighted by meta-learning: techniques that historically produce more BUILD ideas are emphasized. Kill reasons from past runs are injected as AVOID constraints. Idea genes from high-scoring past ideas are injected as recombination material.
+Raw idea generation using seven techniques: Domain Scan, Cross-Domain Collision, Contrarian Inversion, Contextual Constraints, AI-Augmentable Gap Detection, Mechanism Stealing, and Obvious First (Grounded Practicality). Runs as 3 parallel async streams with different technique emphasis for broader creative coverage. Each technique is weighted by meta-learning: techniques that historically produce more BUILD ideas are emphasized. The "Obvious First" technique grounds each stream by generating the most straightforward, practical solution before exploring exotic angles. Kill reasons from past runs are injected as AVOID constraints. Idea genes from high-scoring past ideas are injected as recombination material.
 
 **Phase 1b — DEDUP** (Semantic Deduplication)
-Collapses near-identical ideas and identifies over-represented themes and gap areas.
+Collapses near-identical ideas and identifies over-represented themes and gap areas. A third pass (PASS 3) detects thematic overlap — ideas targeting the same user doing the same activity but with a different business model are flagged and consolidated.
 
 **Phase 1c — DIVERGE GAP-FILL**
 Generates new ideas specifically for gap areas at higher creativity (temperature=0.95), avoiding over-represented themes.
@@ -696,10 +719,10 @@ Clusters, scores, and ranks. Output format adapts to brief type (product, intern
 Scoring dimensions: Impact (25%), Confidence (20%), Sustainability (10%), Defensibility (10%), Market Timing (5%), Effort (-10%), Cost (-10%), Ethical Risk (-10%). Composite = weighted sum + 3.0, clamped to [0, 10].
 
 **Phase 3 — STRESS TEST**
-Adversarial attack with adaptive weights. Each idea tested in parallel via async API calls. Web search finds real prior art per idea before attacking. 9 structured attack angles + 1 freeform. Attack angles that historically kill more ideas are weighted more heavily. LLM self-rates attack confidence (0.0–1.0); low-confidence KILLs are downgraded to MUTATE. API crashes produce INCUBATE with fidelity tracking. Produces feasibility matrix (9 dims, 1-5), kill criteria, and verdict (BUILD/MUTATE/KILL/INCUBATE).
+Adversarial attack with adaptive weights. Each idea tested in parallel via async API calls. Web search finds real prior art per idea before attacking. Attack angles are auto-selected from a catalog of 20, tailored to the brief's context (default: 9 angles + 1 freeform). Angles that historically kill more ideas are weighted more heavily. LLM self-rates attack confidence (0.0–1.0); low-confidence KILLs are downgraded to MUTATE. API crashes produce INCUBATE with fidelity tracking. Produces feasibility matrix (9 dims, 1-5), kill criteria, and verdict (BUILD/MUTATE/KILL/INCUBATE).
 
 **Phase 3.5 — EVOLVE** (when `--generations > 1`)
-The evolutionary engine. For each generation after the first, applies four operators to survivors: (1) **Elite carry-forward** — top BUILD ideas survive unchanged as anchors. (2) **Mutation** — each MUTATE idea gets its suggested fix applied, informed by the cross-run mutation archive. (3) **Crossover** — combines the mechanism of one high-scorer with the audience of another, producing hybrid offspring. (4) **Novelty explorer** — generates ideas maximally different from all survivors. Idea genes from past runs are recombined. Most lethal attack patterns from stress tests are recycled as mutation priorities. Each generation's offspring go through CONVERGE and STRESS TEST again. MUTATE ideas that survive 5+ attacks with ≤1 fatal get promoted to BUILD.
+The evolutionary engine. For each generation after the first, applies four operators to survivors: (1) **Elite carry-forward** — top BUILD ideas survive unchanged as anchors. (2) **Mutation** — each MUTATE idea gets its suggested fix applied, informed by the cross-run mutation archive. (3) **Crossover** — picks 2 survivors from different domain clusters (not just top-2 by score) to prevent thematic monoculture, then combines mechanism from one with audience of another. (4) **Novelty explorer** — generates ideas maximally different from all survivors, requiring at least 1 obvious/practical idea. Idea genes from past runs are recombined. Most lethal attack patterns from stress tests are recycled as mutation priorities. Each generation's offspring go through CONVERGE and STRESS TEST again. MUTATE ideas that survive 5+ attacks with ≤1 fatal get promoted to BUILD. Thematic diversity is enforced: the final set must span 3+ distinct solution categories, and no single category may hold more than half the slots.
 
 **Phase 4 — REFINE** (automatic, if no BUILD verdicts)
 Up to 3 refinement rounds. Extracts mutations, attack patterns, failure blocklist, and problem reframes from previous round. Re-generates with progressively lower creativity and fewer ideas. Stops when BUILD found or 3 rounds exhausted.

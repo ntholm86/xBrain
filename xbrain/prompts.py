@@ -42,14 +42,175 @@ If there are NO conflicts, respond with: {{"conflicts": [], "notes": "No conflic
 """
 
 # ---------------------------------------------------------------------------
+# Phase 0.5: CONSTRAINT EXTRACTION — mine hard constraints from brief
+# ---------------------------------------------------------------------------
+
+CONSTRAINT_EXTRACT_SYSTEM = (
+    "You are a constraint extraction engine. You read a user brief and "
+    "identify HARD CONSTRAINTS — things the user CANNOT do, MUST avoid, "
+    "or has explicitly ruled out. Separate hard constraints (non-negotiable) "
+    "from soft preferences (nice-to-have). "
+    "You MUST respond with valid JSON only — no markdown, no commentary."
+)
+
+CONSTRAINT_EXTRACT_USER = """\
+Read this brief and extract all HARD CONSTRAINTS — things the user cannot \
+do, must avoid, or has explicitly ruled out. Also extract SOFT PREFERENCES \
+— things they prefer but haven't ruled out alternatives.
+
+BRIEF:
+---
+{brief_text}
+---
+
+For each constraint, quote the relevant phrase from the brief.
+
+Respond with ONLY valid JSON:
+{{
+  "hard_constraints": [
+    {{
+      "constraint": "Short imperative statement (e.g., 'Must not require business registration')",
+      "source_quote": "The exact phrase from the brief that implies this"
+    }}
+  ],
+  "soft_preferences": [
+    {{
+      "preference": "Short statement (e.g., 'Prefers passive income')",
+      "source_quote": "The exact phrase from the brief"
+    }}
+  ]
+}}
+
+Be thorough. Extract ALL constraints, including implicit ones (e.g., if \
+the user mentions 'evenings and weekends only,' that implies a time constraint).
+"""
+
+# ---------------------------------------------------------------------------
+# Attack Angle Catalog & Selection
+# ---------------------------------------------------------------------------
+
+ATTACK_ANGLE_CATALOG = [
+    # ── Universal (broadly applicable to any idea type) ──
+    {"id": "prior_art", "name": "Prior art / Saturation", "category": "Universal",
+     "prompt": "\"This already exists as [X]\" or \"the market is saturated with [Y]\""},
+    {"id": "adoption_barrier", "name": "Adoption barrier", "category": "Universal",
+     "prompt": "\"The target audience won't adopt this because [X]\""},
+    {"id": "timing_misfit", "name": "Timing misfit", "category": "Universal",
+     "prompt": "\"This is too early/too late because [X]\""},
+    {"id": "opportunity_cost", "name": "Opportunity cost", "category": "Universal",
+     "prompt": "\"The time/money/energy would yield better returns on [X] instead\""},
+    {"id": "negative_externalities", "name": "Negative externalities", "category": "Universal",
+     "prompt": "\"This will cause unintended harm because [X]\""},
+    {"id": "dependency_risk", "name": "Dependency risk", "category": "Universal",
+     "prompt": "\"This critically depends on [X] which could change or disappear\""},
+    # ── Execution & Feasibility ──
+    {"id": "execution_blocker", "name": "Execution blocker", "category": "Execution",
+     "prompt": "\"This is impossible/impractical to execute because [X]\""},
+    {"id": "expertise_gap", "name": "Expertise gap", "category": "Execution",
+     "prompt": "\"This requires expertise in [X] that is hard to acquire\""},
+    {"id": "resource_constraint", "name": "Resource constraint", "category": "Execution",
+     "prompt": "\"The financial, time, or energy requirements exceed what's available\""},
+    {"id": "sustainability_trap", "name": "Sustainability trap", "category": "Execution",
+     "prompt": "\"Initial effort is manageable but ongoing demands will become [X]\""},
+    # ── Market & Economics ──
+    {"id": "revenue_ceiling", "name": "Revenue ceiling", "category": "Economics",
+     "prompt": "\"Maximum realistic revenue is capped at [X] because [Y]\""},
+    {"id": "defensibility_gap", "name": "Defensibility gap", "category": "Economics",
+     "prompt": "\"Anyone can replicate this in [X] days because there is no moat\""},
+    {"id": "problem_reframe", "name": "Problem reframe", "category": "Economics",
+     "prompt": "\"The real problem isn't what you think — it's actually [X]\""},
+    {"id": "buyer_power", "name": "Buyer power", "category": "Economics",
+     "prompt": "\"Customers/employers/gatekeepers have too much leverage because [X]\""},
+    # ── Context & Environment ──
+    {"id": "regulatory_barrier", "name": "Regulatory / legal barrier", "category": "Environment",
+     "prompt": "\"Laws, regulations, or policies prevent/constrain this because [X]\""},
+    {"id": "geographic_constraint", "name": "Geographic constraint", "category": "Environment",
+     "prompt": "\"Location, market size, or regional factors limit this because [X]\""},
+    {"id": "economic_cycle", "name": "Economic cycle risk", "category": "Environment",
+     "prompt": "\"A recession or market downturn would devastate this because [X]\""},
+    {"id": "obsolescence", "name": "Obsolescence risk", "category": "Environment",
+     "prompt": "\"In 2-3 years this becomes irrelevant because [X]\""},
+    # ── Personal Fit ──
+    {"id": "personal_fit", "name": "Personal fit risk", "category": "Personal",
+     "prompt": "\"This conflicts with lifestyle, values, or commitments because [X]\""},
+    {"id": "credential_barrier", "name": "Credential barrier", "category": "Personal",
+     "prompt": "\"Formal qualifications or certifications required: [X]\""},
+]
+
+ANGLE_CATALOG_BY_ID: dict[str, dict] = {a["id"]: a for a in ATTACK_ANGLE_CATALOG}
+
+
+ANGLE_SELECT_SYSTEM = (
+    "You are an attack angle selector for idea stress testing. "
+    "Given a brief and a catalog of attack angles, you select the most "
+    "relevant angles for testing THIS specific set of ideas. "
+    "You MUST respond with valid JSON only — no markdown, no commentary."
+)
+
+ANGLE_SELECT_USER = """\
+Select the {angle_count} most relevant attack angles for stress-testing \
+ideas generated from this brief. Choose angles that will produce the most \
+meaningful, challenging test for THIS specific type of idea/context.
+
+BRIEF:
+---
+{brief_text}
+---
+
+CANDIDATE THEMES: {candidate_themes}
+
+ATTACK ANGLE CATALOG ({catalog_size} available):
+{catalog_text}
+
+Rules:
+- Select EXACTLY {angle_count} angles by their ID.
+- Prioritize angles that target the WEAKEST aspects of ideas from this brief.
+- Choose angles from at least 3 different categories — don't cluster.
+- For each selected angle, write ONE sentence explaining why it's \
+relevant to THIS brief.
+
+Respond with ONLY valid JSON:
+{{
+  "selected_angles": [
+    {{"id": "prior_art", "relevance": "Several established platforms already exist"}},
+    {{"id": "resource_constraint", "relevance": "Brief mentions limited time"}}
+  ]
+}}
+"""
+
+
+def build_angle_catalog_text() -> str:
+    """Format the full attack angle catalog for the selection prompt."""
+    lines: list[str] = []
+    current_cat = ""
+    for a in ATTACK_ANGLE_CATALOG:
+        if a["category"] != current_cat:
+            current_cat = a["category"]
+            lines.append(f"\n[{current_cat}]")
+        lines.append(f"  - {a['id']}: {a['name']} — {a['prompt']}")
+    return "\n".join(lines)
+
+
+def build_attack_angles_text(selected_angles: list[dict]) -> str:
+    """Format selected angles for insertion into the stress test prompt."""
+    lines: list[str] = []
+    for a in selected_angles:
+        lines.append(f"   - {a['name']}: {a['prompt']}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Phase 1: DIVERGE
 # ---------------------------------------------------------------------------
 
 DIVERGE_SYSTEM = (
     "You are a divergent thinking engine. Your job is to generate RAW, "
-    "UNFILTERED idea seeds for software projects. Do NOT self-censor. "
-    "Do NOT evaluate feasibility yet. Prioritize novelty and surprise. "
-    "Think weird, go deep, find the unexpected. "
+    "UNFILTERED idea seeds for software projects. Prioritize novelty and "
+    "surprise. Think weird, go deep, find the unexpected. "
+    "However, you MUST respect all user-specified HARD CONSTRAINTS. "
+    "Constraints are non-negotiable guardrails — every idea you generate "
+    "must be compatible with them. Creativity applies to the solution "
+    "space WITHIN the constraints, not to ignoring them. "
     "You MUST respond with valid JSON only — no markdown, no commentary."
 )
 
@@ -104,6 +265,13 @@ demand"). Now apply each mechanism to the brief's domain or a completely \
 different domain. The idea should NOT be a clone — it should transplant \
 the mechanism into a new context where it creates unexpected value.
 
+7. OBVIOUS FIRST (Grounded Practicality): Before going exotic, generate \
+2-3 ideas based on the most OBVIOUS, PROVEN approaches that someone in \
+this situation would realistically try first. What would a pragmatic \
+person do? What are the well-known, boring-but-effective paths? Include \
+these alongside your creative ideas — the best portfolio has both \
+grounded and novel options.
+
 Respond with ONLY valid JSON:
 {{
   "ideas": [
@@ -154,6 +322,13 @@ weakest examples for removal and add their solution shape to \
 overrepresented_themes. The final set MUST have at least 3 genuinely \
 different solution approaches.
 
+PASS 3 — THEMATIC OVERLAP: Compare each pair of surviving ideas. If \
+two ideas target the SAME end user doing the SAME activity in the SAME \
+context (even if the business model differs), mark the weaker one for \
+removal. Example: "dinner club for food tourists" and "culinary travel \
+concierge for food tourists" are thematically overlapping — keep the \
+stronger, remove the weaker.
+
 Also report what themes are OVER-REPRESENTED (too many similar ideas) \
 and what areas have GAPS (no ideas generated despite being relevant).
 
@@ -188,6 +363,8 @@ ideation round.
 {brief_context}
 {domain_context}
 {playbook_context}
+
+{constraint_context}
 
 PREVIOUS ROUND ANALYSIS:
 - Over-represented themes (DO NOT generate more of these): {overrepresented}
@@ -228,6 +405,7 @@ CONVERGE_USER = """\
 Converge {idea_count} raw idea seeds into the top {top_n} candidates.
 
 {brief_context}
+{constraint_context}
 
 RAW IDEAS:
 {ideas_json}
@@ -265,6 +443,15 @@ Use the effort SCORE to decide: effort >= 7 → "large", effort <= 3 → "small"
 DO NOT mark all ideas as medium — that means you failed to differentiate.
 - BE HARSH on ideas that are generic, vague, or that any competent developer \
 could build in a weekend. These should score below 5 on impact and defensibility.
+- THEMATIC DIVERSITY: The top {top_n} MUST span at least 3 genuinely \
+different solution categories (not variations of the same niche). If your \
+ranking would produce {top_n} ideas mostly in the same domain (e.g., all \
+content/affiliate or all SaaS), REPLACE the weakest duplicates with the \
+best ideas from under-represented clusters — even if they score slightly lower. \
+No single category may hold more than half the top-{top_n} slots.
+- CONSTRAINT COMPLIANCE: Any idea that violates a user-specified HARD \
+CONSTRAINT must be scored 0 on impact and 0 on confidence, regardless of \
+other merits. Do not select it as a top candidate.
 
 Respond with ONLY this JSON structure:
 {{
@@ -444,22 +631,13 @@ For EACH candidate:
 1. FREEFORM ATTACK: Study the idea deeply. Find its weakest assumption. \
 Construct the most devastating argument you can — something the creators \
 didn't anticipate. Think like:
-   - A competitor who wants to build something better
+   - A skeptic who has seen this type of idea fail before
    - A journalist writing a takedown piece
-   - A VC who's seen this pitch 50 times
-   - A user who tried something similar and got burned
+   - An expert who's evaluated 50 similar proposals
+   - Someone who tried something similar and got burned
 
-2. STRUCTURED ATTACKS (check each angle):
-   - Prior art: "This already exists as [X]"
-   - Adoption failure: "Nobody will use this because..."
-   - Technical blocker: "This is impossible/impractical because..."
-   - Problem reframe: "The real problem isn't what you think..."
-   - Negative externalities: "This will cause harm because..."
-   - Obsolescence: "In 2 years this'll be irrelevant because..."
-   - Timing: "This is too early/too late because..."
-   - Defensibility: "A competitor could clone this in [X] days"
-   - Expertise gap: "Building this requires domain expertise in [X] — \
-assess whether that expertise is obtainable"
+2. STRUCTURED ATTACKS (use these {attack_count} angles, selected for this brief):
+{attack_angles}
 
 3. STRONGEST DEFENSE: For each structured attack, also provide the \
 strongest possible counter-argument in one sentence. Be fair — if the \
@@ -472,7 +650,10 @@ Return as attack_outcomes array, one entry per structured attack, same order.
 
 4. FEASIBILITY (score each 1-5, where 5 is best/lowest risk):
    - technical_risk, data_availability, regulatory_risk, cost_infra_month
-   - time_to_prototype, maintenance_burden, llm_capability_fit
+   - time_to_prototype, maintenance_burden
+   - llm_capability_fit (score 3 if the idea does NOT involve AI/LLM — \
+this dimension is only meaningful for tech/AI ideas; for non-tech ideas \
+like physical products, services, or offline businesses, default to 3)
    - defensibility, market_timing
 
 5. KILL CRITERIA: 2-3 conditions that should abort a build if discovered.
@@ -480,8 +661,9 @@ Return as attack_outcomes array, one entry per structured attack, same order.
 6. VERDICT (be decisive — MUTATE is not a safe default):
    - BUILD: more attacks survived than failed, no single fatal flaw \
 that invalidates the core concept. Most ideas should get BUILD if they \
-have a strong core. QUANTITATIVE RULE: if attacks_survived >= 5 out of 9, \
-the verdict MUST be BUILD unless there is exactly one irreparable fatal flaw.
+have a strong core. QUANTITATIVE RULE: if attacks_survived >= \
+{survive_threshold} out of {attack_count}, the verdict MUST be BUILD \
+unless there is exactly one irreparable fatal flaw.
    - MUTATE: the core concept is valid BUT a specific, named flaw \
 requires a concrete change (you MUST describe the exact mutation). \
 Do NOT use MUTATE as a hedge — if the idea works, say BUILD. \
@@ -508,26 +690,21 @@ Respond with ONLY valid JSON:
       "idea_id": "idea-001",
       "freeform_attack": "The most devastating attack...",
       "structured_attacks": [
-        "Prior art: ...",
-        "Adoption: ...",
-        "Technical: ...",
-        "Reframe: ...",
-        "Externalities: ...",
-        "Obsolescence: ...",
-        "Timing: ...",
-        "Defensibility: ..."
+        "Angle 1: ...",
+        "Angle 2: ...",
+        "Angle 3: ..."
       ],
       "defenses": [
-        "Prior art defense: ...",
-        "Adoption defense: ...",
-        "Technical defense: ..."
+        "Angle 1 defense: ...",
+        "Angle 2 defense: ...",
+        "Angle 3 defense: ..."
       ],
       "attack_outcomes": [
         "survived",
         "fatal",
         "survived"
       ],
-      "attacks_made": 9,
+      "attacks_made": {attack_count},
       "attacks_survived": 6,
       "attacks_fatal": 3,
       "strongest_argument": "The single most compelling attack",
@@ -598,7 +775,11 @@ def build_domain_context() -> str:
 def build_constraint_context(constraints: list[str] | None) -> str:
     if not constraints:
         return "No specific constraints — apply contextual ones as described above."
-    return "USER-SPECIFIED CONSTRAINTS:\n" + "\n".join(f"- {c}" for c in constraints)
+    header = (
+        "MANDATORY CONSTRAINTS — EVERY idea MUST satisfy ALL of these. "
+        "Ideas that violate any constraint are INVALID and must not be generated:\n"
+    )
+    return header + "\n".join(f"- {c}" for c in constraints)
 
 
 def build_winner_repulsion_context(previous_winners: list[dict]) -> str:
@@ -800,6 +981,7 @@ EVOLVE_USER = """\
 GENERATION {generation}/{max_generations}: Evolve survivors into a stronger next generation.
 
 {brief_context}
+{constraint_context}
 
 SURVIVORS FROM PREVIOUS GENERATION (with stress test results):
 {survivors_json}
@@ -821,7 +1003,8 @@ from its stress test. The mutated idea must:
    - Preserve the core strength that earned a passing score
    - Get a NEW id (e.g., "evo-{generation}-mut-001")
 
-3. CROSSOVER: Take the 2 highest-scoring survivors and COMBINE them:
+3. CROSSOVER: Pick 2 survivors from DIFFERENT DOMAIN CLUSTERS and COMBINE them:
+   - Do NOT cross two ideas from the same thematic niche — diversity matters
    - Extract the MECHANISM from idea A (how it works)
    - Extract the AUDIENCE from idea B (who it serves)
    - Create a hybrid that uses A's mechanism to serve B's audience
@@ -834,6 +1017,8 @@ ALL survivors. These ideas must:
    - Target a different audience or domain
    - NOT be a variation of any surviving idea
    - Explore angles that were completely absent from previous generation
+   - Include at least 1 OBVIOUS/PRACTICAL idea that a pragmatic person \
+would try first (not just exotic or novel approaches)
    - Get NEW ids (e.g., "evo-{generation}-novel-001")
 
 IDEA GENE RECOMBINATION: If idea genes from previous runs are available \
@@ -856,6 +1041,11 @@ Respond with ONLY valid JSON:
     }}
   ]
 }}
+
+DIVERSITY RULE: The full set of evolved_ideas MUST span at least 3 distinct \
+solution categories (e.g., content, data products, tools, community, \
+marketplace, education). If your mutations + crossovers all cluster into \
+one theme, add extra novelty_explorer ideas from under-represented categories.
 
 Generate at least {evolve_count} evolved ideas (mutations + crossovers + novelty). Be bold.
 """

@@ -1,167 +1,5 @@
 [
   {
-    "id": "idea-005",
-    "title": "Algorithmic Audit Engine",
-    "score": 7.9,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-012",
-    "title": "Privacy-Preserving Synthetic Patient Data Engine",
-    "score": 7.9,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-010",
-    "title": "Cryptographic Abuse Pattern Detector",
-    "score": 7.6,
-    "verdict": "KILL"
-  },
-  {
-    "id": "idea-001",
-    "title": "Legislative Impact Simulator",
-    "score": 7.3,
-    "verdict": "KILL"
-  },
-  {
-    "id": "idea-002",
-    "title": "Replication Marketplace for Failed Studies",
-    "score": 7.3,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-011",
-    "title": "Transparent Carbon Ledger for Supply Chains",
-    "score": 7.0,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-009",
-    "title": "Hyperlocal Job Displacement Forecaster",
-    "score": 6.9,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-003",
-    "title": "Hyperlocal Misinformation Early Warning System",
-    "score": 6.8,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-001-merged",
-    "title": "Real-Time Emissions Verification Network",
-    "score": 7.9,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-004-merged",
-    "title": "Supply Chain Carbon Decoder & Green Swap Engine",
-    "score": 7.7,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-016",
-    "title": "Climate Impact Reverse-Auction Marketplace",
-    "score": 7.3,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-003-merged",
-    "title": "Community Renewable Energy Design & Deployment Platform",
-    "score": 7.0,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-005",
-    "title": "Climate Research Monetization & Startup Acceleration",
-    "score": 7.0,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-015",
-    "title": "Climate Tech Regulatory Compliance Automation",
-    "score": 7.0,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-018-merged",
-    "title": "Real-Time Consumer Climate Cost Transparency",
-    "score": 6.9,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-002-merged",
-    "title": "Policy Impact Simulation Game Suite",
-    "score": 6.7,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-002",
-    "title": "Real-Time Tax Optimization Engine for Developer Income",
-    "score": 7.6,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-008",
-    "title": "Reputation-Backed Developer Lending",
-    "score": 7.4,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-021",
-    "title": "Freelance Rate Benchmarking & Wage Transparency Tool",
-    "score": 7.3,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-011",
-    "title": "European Tax Residency Arbitrage Scanner",
-    "score": 7.1,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-017",
-    "title": "Causal Skill-to-Wealth Roadmap Generator",
-    "score": 6.9,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-004",
-    "title": "Developer Equity Crowdfunding Platform",
-    "score": 6.8,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-001",
-    "title": "Peer-Verified Micro-Credential Marketplace",
-    "score": 6.6,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-019",
-    "title": "Content-to-Revenue Automation Engine",
-    "score": 6.6,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-001",
-    "title": "PræcisionsLandbrugsFond - Jordkemi møder Crowdfunding",
-    "score": 7.6,
-    "verdict": "MUTATE"
-  },
-  {
-    "id": "idea-005",
-    "title": "SolFællesskab - Kollektiv solcelleejerskab",
-    "score": 7.6,
-    "verdict": "BUILD"
-  },
-  {
-    "id": "idea-002-013-merged",
-    "title": "TaxAI - Proaktiv Skatteoptimering for Selvstændige",
-    "score": 7.6,
-    "verdict": "MUTATE"
-  },
-  {
     "id": "idea-020",
     "title": "RevenueShare API - Revenue-deling uden juridisk ekspertise",
     "score": 7.4,
@@ -5021,6 +4859,554 @@
       "collaboration",
       "recommendation_systems",
       "network_effects"
+    ]
+  },
+  {
+    "id": "evo-2-novel-003",
+    "title": "Regulatory Readiness Scorecard SaaS for Indie Founders",
+    "score": 8.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "compliance",
+      "saas",
+      "indie_founders",
+      "regulatory_intelligence",
+      "self_service",
+      "product_led_growth"
+    ]
+  },
+  {
+    "id": "evo-2-cross-001",
+    "title": "Compliance-Focused Synthetic Data Licensing",
+    "score": 7.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "synthetic_data",
+      "compliance",
+      "regulatory_intelligence",
+      "data_commerce",
+      "security_testing",
+      "gdpr_ccpa_hipaa"
+    ]
+  },
+  {
+    "id": "xd-003",
+    "title": "Regulatory Debt Visualization Engine for Developers",
+    "score": 7.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "compliance",
+      "software_quality",
+      "regulatory_intelligence",
+      "b2b_data_products"
+    ]
+  },
+  {
+    "id": "evo-2-mut-001",
+    "title": "Embedded Systems Synthetic Data for Edge-Case ML",
+    "score": 7.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "machine_learning",
+      "synthetic_data",
+      "embedded_systems",
+      "data_commerce",
+      "passive_income",
+      "niche_specialization"
+    ]
+  },
+  {
+    "id": "evo-2-mut-003",
+    "title": "GitHub Compliance Linter for Code Review Automation",
+    "score": 6.5,
+    "verdict": "BUILD",
+    "domains": [
+      "compliance",
+      "developer_tools",
+      "github_automation",
+      "regulatory_intelligence",
+      "code_quality",
+      "workflow_integration"
+    ]
+  },
+  {
+    "id": "evo-2-novel-002",
+    "title": "Fractional Data Annotation Marketplace for ML Edge Cases",
+    "score": 5.7,
+    "verdict": "BUILD",
+    "domains": [
+      "machine_learning",
+      "data_annotation",
+      "crowdsourcing",
+      "domain_expertise",
+      "passive_income",
+      "data_commerce"
+    ]
+  },
+  {
+    "id": "evo-2-mut-002",
+    "title": "Technical Affiliate Content Hub for Developer Tools",
+    "score": 8.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "affiliate_marketing",
+      "developer_tools",
+      "content_marketing",
+      "SEO",
+      "technical_writing"
+    ]
+  },
+  {
+    "id": "evo-2-mut-004",
+    "title": "Hybrid Open+Paid Technical Blog with Community Engagement Layer",
+    "score": 7.6,
+    "verdict": "BUILD",
+    "domains": [
+      "content_marketing",
+      "subscription",
+      "creator_economy",
+      "community",
+      "personal_brand"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Enterprise SaaS Affiliate Content Hub",
+    "score": 6.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "B2B_affiliate",
+      "SaaS",
+      "enterprise_software",
+      "content_marketing"
+    ]
+  },
+  {
+    "id": "evo-2-cross-002",
+    "title": "Developer Tools Affiliate Content + Community SaaS Subscription Hybrid",
+    "score": 6.5,
+    "verdict": "BUILD",
+    "domains": [
+      "affiliate_marketing",
+      "subscription",
+      "developer_tools",
+      "community",
+      "content_marketing"
+    ]
+  },
+  {
+    "id": "evo-2-mut-003",
+    "title": "Vertical-Specialized Prompt & Workflow Template Marketplace",
+    "score": 6.3,
+    "verdict": "BUILD",
+    "domains": [
+      "ai",
+      "professional_services",
+      "templates",
+      "workflow_automation",
+      "vertical_specialization"
+    ]
+  },
+  {
+    "id": "evo-2-novel-001",
+    "title": "Open-Source ML Model Fine-Tuning as a Service (Marketplace for Computed Models)",
+    "score": 5.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "machine_learning",
+      "open_source",
+      "digital_products",
+      "model_marketplace",
+      "ai"
+    ]
+  },
+  {
+    "id": "evo-2-novel-002",
+    "title": "Micro-Course Creator for Niche Technical Skills",
+    "score": 7.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "education",
+      "digital_products",
+      "passive_income",
+      "technical_training"
+    ]
+  },
+  {
+    "id": "evo-2-mut-004",
+    "title": "Niche Technical Newsletter + Sponsorship Model",
+    "score": 6.9,
+    "verdict": "BUILD",
+    "domains": [
+      "content_marketing",
+      "creator_economy",
+      "sponsorship_model",
+      "technical_writing"
+    ]
+  },
+  {
+    "id": "evo-2-mut-002",
+    "title": "Synthetic Data Licensing + Validation Toolkit",
+    "score": 6.8,
+    "verdict": "BUILD",
+    "domains": [
+      "machine_learning",
+      "synthetic_data",
+      "digital_products",
+      "privacy_tech"
+    ]
+  },
+  {
+    "id": "idea-004",
+    "title": "Synthetic Data Licensing for Niche ML Datasets",
+    "score": 6.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "machine_learning",
+      "synthetic_data",
+      "data_products",
+      "privacy_tech"
+    ]
+  },
+  {
+    "id": "evo-2-novel-003",
+    "title": "GitHub-Integrated Code Review Workflow Optimizer",
+    "score": 5.9,
+    "verdict": "MUTATE",
+    "domains": [
+      "developer_tools",
+      "github_integrations",
+      "code_quality",
+      "automation"
+    ]
+  },
+  {
+    "id": "evo-2-mut-001",
+    "title": "Niche-Specific AI Fine-Tuning Model Weights Marketplace",
+    "score": 5.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "machine_learning",
+      "digital_products",
+      "e_commerce",
+      "nordic_market"
+    ]
+  },
+  {
+    "id": "alt-002",
+    "title": "Fractional CIO Advisory Service for Rural Hospitals",
+    "score": 8.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "management_consulting",
+      "healthcare_it",
+      "fractional_leadership",
+      "rural_infrastructure"
+    ]
+  },
+  {
+    "id": "evo-2-mut-001",
+    "title": "Fractional CIO + Vendor Management Service for Rural Hospitals",
+    "score": 8.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "management_consulting",
+      "healthcare_it",
+      "fractional_leadership",
+      "rural_infrastructure"
+    ]
+  },
+  {
+    "id": "evo-2-novel-003",
+    "title": "HIPAA Compliance Audit-as-a-Service SaaS",
+    "score": 7.1,
+    "verdict": "BUILD",
+    "domains": [
+      "healthcare_compliance",
+      "hipaa",
+      "saas",
+      "audit_services"
+    ]
+  },
+  {
+    "id": "idea-005",
+    "title": "EHR Configuration Abstraction Layer (Open-Source + SaaS)",
+    "score": 6.6,
+    "verdict": "BUILD",
+    "domains": [
+      "healthcare_IT",
+      "open_source",
+      "EHR_integration",
+      "FHIR",
+      "vendor_abstraction",
+      "infrastructure_software"
+    ]
+  },
+  {
+    "id": "evo-2-mut-002",
+    "title": "FHIR Integration Micro-Platform for Critical Access Hospitals",
+    "score": 6.2,
+    "verdict": "BUILD",
+    "domains": [
+      "healthcare_it",
+      "FHIR",
+      "vendor_integration",
+      "critical_access_hospitals"
+    ]
+  },
+  {
+    "id": "evo-2-novel-002",
+    "title": "Healthcare IT Debt & Modernization Diagnostic SaaS",
+    "score": 6.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "saas",
+      "healthcare_it",
+      "infrastructure_assessment",
+      "modernization_planning"
+    ]
+  },
+  {
+    "id": "evo-2-cross-002",
+    "title": "Incident Response Readiness Bundle (SaaS + Training)",
+    "score": 5.9,
+    "verdict": "BUILD",
+    "domains": [
+      "healthcare_it",
+      "cybersecurity",
+      "incident_response",
+      "training_services"
+    ]
+  },
+  {
+    "id": "idea-003",
+    "title": "Fractional Healthcare IT Director Service for Micro-Hospitals",
+    "score": 8.0,
+    "verdict": "BUILD",
+    "domains": [
+      "healthcare",
+      "services",
+      "consulting",
+      "fractional_leadership"
+    ]
+  },
+  {
+    "id": "evo-2-novel-003",
+    "title": "EHR Vendor Contract Negotiation + Audit Service",
+    "score": 8.0,
+    "verdict": "BUILD",
+    "domains": [
+      "healthcare",
+      "vendor_management",
+      "contract_negotiation",
+      "cost_reduction",
+      "consulting"
+    ]
+  },
+  {
+    "id": "evo-2-mut-001-merged",
+    "title": "EHR Migration + IT Audit Fractional Director Service",
+    "score": 7.8,
+    "verdict": "MUTATE",
+    "domains": [
+      "healthcare",
+      "consulting",
+      "fractional_leadership",
+      "ehr_migrations",
+      "audit"
+    ]
+  },
+  {
+    "id": "evo-2-mut-002",
+    "title": "Managed RCM + Compliance Hybrid Service",
+    "score": 6.4,
+    "verdict": "BUILD",
+    "domains": [
+      "healthcare_finance",
+      "revenue_cycle_management",
+      "consulting",
+      "recurring_revenue",
+      "rural_hospitals"
+    ]
+  },
+  {
+    "id": "evo-2-novel-001",
+    "title": "Rural Hospital IT Staffing Co-op Model",
+    "score": 6.4,
+    "verdict": "MUTATE",
+    "domains": [
+      "healthcare",
+      "staffing",
+      "operational_model",
+      "cost_reduction",
+      "rural_hospitals"
+    ]
+  },
+  {
+    "id": "evo-2-cross-001-merged",
+    "title": "Healthcare IT Compliance Training + Certification Bundle",
+    "score": 6.1,
+    "verdict": "MUTATE",
+    "domains": [
+      "healthcare",
+      "education",
+      "compliance",
+      "content",
+      "recurring_revenue"
+    ]
+  },
+  {
+    "id": "evo-2-mut-003",
+    "title": "Compliance Playbook Bundles for Mid-Market",
+    "score": 7.6,
+    "verdict": "BUILD",
+    "domains": [
+      "AI_ethics",
+      "compliance_automation",
+      "regulatory_tech",
+      "mid_market",
+      "digital_products"
+    ]
+  },
+  {
+    "id": "evo-2-mut-004",
+    "title": "Civic Infrastructure Scenario Pack Library",
+    "score": 7.6,
+    "verdict": "MUTATE",
+    "domains": [
+      "civic_infrastructure",
+      "simulation",
+      "climate_adaptation",
+      "digital_products",
+      "global_market"
+    ]
+  },
+  {
+    "id": "idea-002",
+    "title": "Nordic NLP Toolkit: Open-Source Library + GitHub Sponsors",
+    "score": 7.4,
+    "verdict": "BUILD",
+    "domains": [
+      "open_source",
+      "software",
+      "sponsorship_model",
+      "passive_income"
+    ]
+  },
+  {
+    "id": "evo-2-mut-002",
+    "title": "Domain-Specific Labeled Datasets + Automated Curation",
+    "score": 6.3,
+    "verdict": "MUTATE",
+    "domains": [
+      "machine_learning",
+      "data_products",
+      "automation",
+      "niche_specialization",
+      "hobby_income"
+    ]
+  },
+  {
+    "id": "evo-2-novel-001",
+    "title": "Technical Debt Audit Templates as Gumroad Products",
+    "score": 5.6,
+    "verdict": "BUILD",
+    "domains": [
+      "technical_debt",
+      "software_quality",
+      "audit_tools",
+      "digital_products",
+      "indie_market"
+    ]
+  },
+  {
+    "id": "evo-2-novel-003",
+    "title": "Code Snippet Library + Documentation as Monetized Knowledge Base",
+    "score": 4.7,
+    "verdict": "MUTATE",
+    "domains": [
+      "developer_tools",
+      "knowledge_base",
+      "code_snippets",
+      "content_monetization",
+      "audience_building"
+    ]
+  },
+  {
+    "id": "gap-002",
+    "title": "Alentejo Kitchen Table Dinner Club (Hybrid Membership Model)",
+    "score": 8.4,
+    "verdict": "BUILD",
+    "domains": [
+      "experiential_commerce",
+      "membership_models",
+      "hybrid_online_offline",
+      "community_building"
+    ]
+  },
+  {
+    "id": "evo-2-cross-002",
+    "title": "Tiered Content Studio for Artisan Food Producers",
+    "score": 8.0,
+    "verdict": "BUILD",
+    "domains": [
+      "content_strategy",
+      "artisan_support",
+      "tiered_services",
+      "recurring_revenue",
+      "outsourced_execution"
+    ]
+  },
+  {
+    "id": "evo-2-mut-001",
+    "title": "Portuguese Food Heritage Academy + Retainer Partnerships",
+    "score": 7.7,
+    "verdict": "BUILD",
+    "domains": [
+      "education",
+      "cultural_preservation",
+      "recurring_revenue",
+      "storytelling_monetization",
+      "content_licensing"
+    ]
+  },
+  {
+    "id": "evo-2-novel-001",
+    "title": "Alentejo Culinary Travel Concierge & Hotel Partnerships",
+    "score": 7.0,
+    "verdict": "MUTATE",
+    "domains": [
+      "tourism_monetization",
+      "experiential_travel",
+      "partnership_model",
+      "destination_marketing",
+      "hospitality"
+    ]
+  },
+  {
+    "id": "evo-2-mut-004",
+    "title": "Flagship Course + Group Coaching Funnel",
+    "score": 6.4,
+    "verdict": "BUILD",
+    "domains": [
+      "education",
+      "group_coaching",
+      "audience_building",
+      "funnel_monetization",
+      "personal_brand"
+    ]
+  },
+  {
+    "id": "evo-2-novel-002",
+    "title": "Diaspora Recipe Box + Heritage Storytelling Subscription",
+    "score": 6.2,
+    "verdict": "BUILD",
+    "domains": [
+      "subscription_commerce",
+      "food_delivery",
+      "diaspora_marketing",
+      "content_bundling",
+      "cultural_preservation"
     ]
   }
 ]

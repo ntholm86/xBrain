@@ -165,31 +165,40 @@ class LLMClient:
     @staticmethod
     def _extract_json(text: str, *, truncated: bool = False) -> dict | list:
         """Extract JSON from an LLM response, handling code blocks and truncation."""
-        # 1. Try ```json ... ``` blocks (complete fence)
-        match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
-        if match:
-            inner = match.group(1).strip()
-            try:
-                return json.loads(inner)
-            except json.JSONDecodeError:
-                # Fence found but JSON is malformed/truncated — try repair
-                repaired = LLMClient._repair_truncated_json(inner)
-                if repaired is not None:
-                    _log_warn("LLM", "JSON in code fence was truncated; recovered partial JSON.")
-                    return repaired
+        # 0. Strip leading/trailing fences unconditionally — LLMs sometimes
+        #    wrap JSON in ```json despite instructions.  This normalisation
+        #    prevents edge-cases where backticks inside string values confuse
+        #    the fence-aware regex below.
+        stripped = text.strip()
+        if stripped.startswith("```"):
+            # Remove opening fence line
+            first_nl = stripped.find("\n")
+            if first_nl != -1:
+                stripped = stripped[first_nl + 1:]
+            # Remove trailing fence if present
+            if stripped.rstrip().endswith("```"):
+                stripped = stripped.rstrip()[:-3].rstrip()
+            text_defenced = stripped
+        else:
+            text_defenced = text
 
-        # 2. Check for OPEN fence with no closing fence (truncated response)
-        open_fence = re.search(r"```(?:json)?\s*\n?", text)
-        if open_fence and "```" not in text[open_fence.end():]:
-            # Opening fence found but no closing fence — extract everything after it
-            inner = text[open_fence.end():].strip()
-            try:
-                return json.loads(inner)
-            except json.JSONDecodeError:
-                repaired = LLMClient._repair_truncated_json(inner)
-                if repaired is not None:
-                    _log_warn("LLM", "JSON in unclosed code fence was truncated; recovered partial JSON.")
-                    return repaired
+        # 1. Try parsing the defenced text directly
+        try:
+            return json.loads(text_defenced.strip())
+        except json.JSONDecodeError:
+            pass
+
+        # 1b. Try fixing unescaped quotes
+        try:
+            return json.loads(LLMClient._fix_unescaped_quotes(text_defenced.strip()))
+        except (json.JSONDecodeError, Exception):
+            pass
+
+        # 1c. Try truncation repair on defenced text
+        repaired = LLMClient._repair_truncated_json(text_defenced.strip())
+        if repaired is not None:
+            _log_warn("LLM", "JSON was truncated; recovered partial JSON.")
+            return repaired
 
         # Strip remaining markdown fences so they don't interfere with raw search
         cleaned = re.sub(r"```(?:json)?\s*\n?", "", text)
@@ -232,6 +241,44 @@ class LLMClient:
 
         _log_error("LLM", f"Could not parse JSON from LLM response. First 500 chars: {text[:500]}")
         raise ValueError("No valid JSON found in LLM response")
+
+    @staticmethod
+    def _fix_unescaped_quotes(text: str) -> str:
+        """Fix unescaped double quotes inside JSON string values.
+
+        Heuristic: a closing \" is real if the next non-whitespace char is
+        one of , } ] : or end-of-text.  Otherwise it's an unescaped internal
+        quote and gets escaped to \\\".
+        """
+        result: list[str] = []
+        i = 0
+        in_string = False
+        while i < len(text):
+            ch = text[i]
+            if not in_string:
+                result.append(ch)
+                if ch == '"':
+                    in_string = True
+                i += 1
+            else:
+                if ch == '\\':
+                    result.append(text[i:i + 2] if i + 1 < len(text) else ch)
+                    i += 2 if i + 1 < len(text) else 1
+                elif ch == '"':
+                    j = i + 1
+                    while j < len(text) and text[j] in ' \t\n\r':
+                        j += 1
+                    if j >= len(text) or text[j] in ',}]:':
+                        result.append('"')
+                        in_string = False
+                        i += 1
+                    else:
+                        result.append('\\"')
+                        i += 1
+                else:
+                    result.append(ch)
+                    i += 1
+        return ''.join(result)
 
     @staticmethod
     def _repair_truncated_json(text: str) -> dict | list | None:

@@ -105,6 +105,22 @@ def generate_idea_report(result: IdeateRunResult, cost_info: dict | None = None)
         
     lines.append("")
 
+    # Selected Attack Angles
+    if result.selected_attack_angles:
+        lines.append("### Attack Angles")
+        lines.append(
+            f"Auto-selected {len(result.selected_attack_angles)} angles "
+            f"from catalog of 20, tailored to this brief:"
+        )
+        lines.append("| # | Angle | Category | Relevance |")
+        lines.append("|---|-------|----------|-----------|")
+        for i, a in enumerate(result.selected_attack_angles, 1):
+            name = a.get("name", a.get("id", "?"))
+            cat = a.get("category", "")
+            rel = a.get("relevance", "")
+            lines.append(f"| {i} | {name} | {cat} | {rel} |")
+        lines.append("")
+
     # Domain briefs summary (if immerse ran)
     if result.domain_briefs:
         lines.append("---")

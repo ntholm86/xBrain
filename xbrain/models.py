@@ -231,6 +231,7 @@ class IdeateRunResult(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
     constraints: list[str] = Field(default_factory=list)
+    selected_attack_angles: list[dict] = Field(default_factory=list)
     domain_briefs: list[DomainBrief] = Field(default_factory=list)
     raw_ideas: list[RawIdea] = Field(default_factory=list)
     candidates: list[IdeaCard] = Field(default_factory=list)

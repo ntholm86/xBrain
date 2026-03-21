@@ -1,5 +1,87 @@
 # Changelog
 
+## v1.21.0 — 2026-03-21
+
+### Added
+
+#### Dynamic Attack Angle Selection
+The stress test phase now auto-selects the most relevant attack angles from a catalog of 20 (across 5 categories: Universal, Execution, Economics, Environment, Personal) instead of using 9 hardcoded software/SaaS-focused angles. A cheap LLM call picks the N most relevant angles for the brief, with a relevance explanation per angle. The angle catalog is defined in `prompts.py` and the selection phase uses `ANGLE_SELECT_SYSTEM/USER` prompts.
+
+- **Catalog categories:** Universal (6), Execution (4), Economics (4), Environment (4), Personal (2)
+- **Dynamic threshold:** `survive_threshold = max(1, round(attack_count * 5 / 9))` scales automatically with attack count
+- **Config:** `XBRAIN_ATTACK_COUNT` env var (default 9), `stress-angles` phase in routing
+- **Report:** New "Attack Angles" section shows selected angles with categories and relevance
+- **Fallback:** If angle selection fails, uses first N angles from catalog
+
+#### Rich Spinners for Pipeline Phases
+All major pipeline phases now display a Rich `Status` spinner in the terminal that shows the current phase name, description, and elapsed time. This provides continuous visual feedback during long-running LLM calls (10-60s each) so the user always knows the pipeline is alive and which phase is executing.
+
+- Phases with spinners: DIVERGE (including dedup + gap-fill), CONVERGE, ANGLES, STRESS TEST, REFINE, EVOLVE
+- Sub-step updates: spinners show progress like "12 seeds → dedup" or "gap-filling 3 gaps"
+- Stress test attack progress now includes elapsed time per attack
+
+#### Fragility-Aware Verdict Guard
+BUILD ideas with high fragility (inverse_confidence >= 7.0) are now automatically downgraded to MUTATE. Previously, an idea could survive the stress test attacks narratively while being quantitatively fragile — all key assumptions flagged as `[!]` and a high inverse score — yet still receive BUILD. The new guard catches this mismatch.
+
+#### Enhanced Dedup: Thematic Overlap Detection
+The DEDUP phase now includes a third pass (PASS 3 — THEMATIC OVERLAP) that compares surviving ideas pairwise for same-end-user / same-activity / same-context overlap, even when the business model differs. This prevents two ideas targeting the same user doing essentially the same thing from both appearing in the final output.
+
+### Changed
+
+- **Feasibility Matrix: LLM Capability Fit** — The stress test prompt now instructs the LLM to default `llm_capability_fit` to 3 for non-tech ideas (physical products, services, offline businesses). Previously this dimension scored low for non-tech briefs, dragging down averages meaninglessly.
+- **EVOLVE crash resilience** — The evolve loop body is wrapped in try-except so a single generation failure doesn't lose the entire pipeline.
+- **JSON extraction** — Improved handling of LLM responses wrapped in \`\`\`json fences and/or truncated at max_tokens.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.21.0
+- `xbrain/prompts.py` — 20-angle `ATTACK_ANGLE_CATALOG`, `ANGLE_SELECT_SYSTEM/USER`, `build_angle_catalog_text()`, `build_attack_angles_text()`, dynamic `STRESS_TEST_USER` placeholders, DEDUP PASS 3, feasibility llm_capability_fit guidance
+- `xbrain/ideate.py` — `_phase_select_attack_angles()`, dynamic survive threshold, fragility verdict guard, `phase_spinner` integration, attack progress with elapsed time
+- `xbrain/models.py` — `selected_attack_angles` field on `IdeateRunResult`
+- `xbrain/output.py` — Attack Angles report section with table
+- `xbrain/config.py` — `stress_attack_count`, `stress-angles` phase routing and max tokens
+- `xbrain/log.py` — `phase_spinner()` context manager, `_PhaseSpinner` class
+- `xbrain/llm.py` — improved `_extract_json()` for fenced+truncated responses
+- `README.md` — updated 4 references from hardcoded 9 angles to dynamic catalog
+
+---
+
+## v1.20.0 — 2026-03-21
+
+### Added
+
+#### Constraint Extraction Phase
+A new `CONSTXT` micro-phase runs before DIVERGE and automatically extracts hard constraints from the brief text using a cheap Haiku call (~$0.003). Previously, constraints were only available via CLI `--constraint` flags — now the pipeline reads the brief itself and identifies non-negotiable guardrails (e.g., "Must not require CVR registration") with source quotes. Extracted constraints are merged with any CLI constraints and propagated to all downstream phases.
+
+#### Constraint Propagation to CONVERGE and EVOLVE
+CONVERGE and EVOLVE prompts now receive the full `{constraint_context}` block. Previously, constraints were only visible to DIVERGE and GAP-FILL — meaning the scoring and evolution phases were blind to user constraints. Ideas violating hard constraints could score highly and survive into the final output.
+
+- **CONVERGE:** Added `CONSTRAINT COMPLIANCE` scoring rule — ideas violating a hard constraint are scored 0 on impact and 0 on confidence.
+- **EVOLVE:** Constraint context injected into the evolution prompt so mutations and crossovers respect constraints.
+
+#### Thematic Diversity Enforcement
+Three new diversity rules prevent the pipeline from collapsing into a single thematic niche:
+
+- **CONVERGE:** "The top N MUST span at least 3 genuinely different solution categories. No single category may hold more than half the top-N slots." Previously required only 2 categories.
+- **EVOLVE CROSSOVER:** "Pick 2 survivors from DIFFERENT DOMAIN CLUSTERS" instead of the previous "Take the 2 highest-scoring survivors" — prevents crossover from amplifying a dominant theme.
+- **EVOLVE DIVERSITY RULE:** "The full set of evolved ideas MUST span at least 3 distinct solution categories." If mutations and crossovers cluster into one theme, the model must add novelty explorer ideas from under-represented categories.
+
+#### "Obvious First" Ideation Technique
+DIVERGE now includes a 7th technique: **OBVIOUS FIRST (Grounded Practicality)** — generates 2-3 ideas based on the most proven, pragmatic approaches before exploring exotic angles. Ensures the portfolio includes boring-but-effective options alongside novel ones.
+
+### Changed
+
+- **DIVERGE system prompt:** Replaced "Do NOT self-censor. Do NOT evaluate feasibility yet." with constraint-aware language: "you MUST respect all user-specified HARD CONSTRAINTS. Constraints are non-negotiable guardrails."
+- **`build_constraint_context()`:** When constraints exist, header changed from "USER-SPECIFIED CONSTRAINTS:" to "MANDATORY CONSTRAINTS — EVERY idea MUST satisfy ALL of these. Ideas that violate any constraint are INVALID and must not be generated."
+- **EVOLVE NOVELTY EXPLORER:** Now requires "at least 1 OBVIOUS/PRACTICAL idea that a pragmatic person would try first."
+- **Report header:** Extracted constraints are now listed under the brief in `idea-report.md`.
+
+### Files Changed
+- `xbrain/__init__.py` — version bump to 1.20.0
+- `xbrain/prompts.py` — new `CONSTRAINT_EXTRACT_SYSTEM`/`CONSTRAINT_EXTRACT_USER` prompts, hardened `DIVERGE_SYSTEM`, technique 7 "OBVIOUS FIRST", `{constraint_context}` in CONVERGE/EVOLVE/GAP-FILL, diversity mandates, `build_constraint_context()` hardened
+- `xbrain/ideate.py` — new `_phase_extract_constraints()` method, `self._constraints` storage, constraint wiring into `_phase_converge()`, `_phase_evolve()`, `_phase_diverge_gapfill()`
+
+---
+
 ## v1.19.0 — 2026-03-21
 
 ### Added
